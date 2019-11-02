@@ -1,29 +1,9 @@
-midPoint 3.6 "Comenius"
-----------------------------------
+midPoint 4.0.1 "Gutenberg" Update 1
+-----------------------------------
 
-Release 3.6 is twenty first midPoint release code-named Comenius.
-The 3.6 release brings numerous new features especially in the
-field of identity governance, password management and identity
-connectors.
+Release 4.0.1 is a twenty ninth midPoint release. It is the fist maintenance update for 4.0.x version family code-named code-named Gutenberg. The 4.0.x is a long-term support (LTS) version family. The 4.0.1 release brings bugfixes and minor improvements.
 
-Release date: 4th July 2017
+Release date: 22nd October 2019
 
-Changes with respect to version 3.5.1:
-    Major SoD improvements
-    Certificaiton improvements
-    Escalation
-    Other identity governance features
-    Password hashing
-    Manual connectors by ITSM integration
-    Important improvements to mappings, expressions, object templates and other mechanisms
-    Custom forms
-    Quasi-fulltext search
-    Shopping cart and role catalog improvements
-    Numerous GUI improvements
-    Significantly improved Powershell support
-    New CSV connector
-    Other connector improvements
-
-Java 7 environment is no longer supported.
-XPath2 scripting is no longer supported.
-CSVFile Connector is no longer supported.
+Please see the release notes for detailed list of changes:
+https://wiki.evolveum.com/display/midPoint/Release+4.0.1

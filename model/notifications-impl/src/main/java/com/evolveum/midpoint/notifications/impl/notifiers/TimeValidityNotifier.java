@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2014 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.notifications.impl.notifiers;
@@ -49,7 +40,7 @@ public class TimeValidityNotifier extends SimplePolicyRuleNotifier {
     @Override
     protected boolean quickCheckApplicability(Event event, GeneralNotifierType generalNotifierType, OperationResult result) {
        if (!(event instanceof PolicyRuleEvent)) {
-    	   return false;
+           return false;
        }
        PolicyRuleEvent modelEvent = (PolicyRuleEvent) event;
 
@@ -58,39 +49,39 @@ public class TimeValidityNotifier extends SimplePolicyRuleNotifier {
 
     @Override
     protected boolean checkApplicability(Event event, GeneralNotifierType generalNotifierType, OperationResult result) {
-	    PolicyRuleEvent ruleEvent = (PolicyRuleEvent) event;
-	    PolicyConstraintsType policyConstraints = ruleEvent.getPolicyRule().getPolicyConstraints();
-	    return policyConstraints != null &&
-			    policyConstraints.getObjectTimeValidity() != null &&
-			    !policyConstraints.getObjectTimeValidity().isEmpty();
+        PolicyRuleEvent ruleEvent = (PolicyRuleEvent) event;
+        PolicyConstraintsType policyConstraints = ruleEvent.getPolicyRule().getPolicyConstraints();
+        return policyConstraints != null &&
+                policyConstraints.getObjectTimeValidity() != null &&
+                !policyConstraints.getObjectTimeValidity().isEmpty();
     }
 
     @Override
     protected String getSubject(Event event, GeneralNotifierType generalNotifierType, String transport, Task task,
-    		OperationResult result) {
+            OperationResult result) {
 
 
-    	return "Planned deactivation of user " + getUserName(event);
+        return "Planned deactivation of user " + getUserName(event);
     }
 
     @Override
     protected String getBody(Event event, GeneralNotifierType generalNotifierType, String transport, Task task,
-    		OperationResult result) throws SchemaException {
+            OperationResult result) throws SchemaException {
 
-    	return "User " + getUserName(event) + " is going to be deactivated on " + getUser(event).getActivation().getValidTo();
+        return "User " + getUserName(event) + " is going to be deactivated on " + getUser(event).getActivation().getValidTo();
 
     }
 
     private String getUserName(Event event){
-		UserType user = getUser(event);
-		PolyStringType username = user.getName();
-		return username.getOrig();
-	}
+        UserType user = getUser(event);
+        PolyStringType username = user.getName();
+        return username.getOrig();
+    }
 
     private UserType getUser(Event event){
-    	PolicyRuleEvent taskEvent = (PolicyRuleEvent) event;
-		UserType user = (UserType) taskEvent.getRequesteeObject();
-		return user;
+        PolicyRuleEvent taskEvent = (PolicyRuleEvent) event;
+        UserType user = (UserType) taskEvent.getRequesteeObject();
+        return user;
     }
 
     @Override

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.model.intest.gensync;
 
@@ -37,9 +28,9 @@ import com.evolveum.midpoint.task.api.Task;
 @DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 public class AbstractGenericSyncTest extends AbstractInitializedModelIntegrationTest {
 
-	public static final File TEST_DIR = new File("src/test/resources/gensync");
+    public static final File TEST_DIR = new File("src/test/resources/gensync");
 
-	protected static final File USER_OTIS_FILE = new File(TEST_DIR, "user-otis.xml");
+    protected static final File USER_OTIS_FILE = new File(TEST_DIR, "user-otis.xml");
     protected static final String USER_OTIS_OID = "fd5039c8-ddc8-11e4-8ec7-001e8c717e5b";
     protected static final String USER_OTIS_USERNAME = "otis";
 
@@ -61,7 +52,7 @@ public class AbstractGenericSyncTest extends AbstractInitializedModelIntegration
     protected static final File OBJECT_TEMPLATE_ROLE_FILE = new File(TEST_DIR, "object-template-role.xml");
 
     public static final File LOOKUP_ROLE_TYPE_FILE = new File(TEST_DIR, "lookup-role-type.xml");
-	public static final String LOOKUP_ROLE_TYPE_OID = "70000000-0000-0000-1111-000000000021";
+    public static final String LOOKUP_ROLE_TYPE_OID = "70000000-0000-0000-1111-000000000021";
 
     @Override
     public void initSystem(Task initTask, OperationResult initResult) throws Exception {
@@ -73,8 +64,8 @@ public class AbstractGenericSyncTest extends AbstractInitializedModelIntegration
     }
 
     @Override
-	protected File getSystemConfigurationFile() {
-		return SYSTEM_CONFIGURATION_GENSYNC_FILE;
-	}
+    protected File getSystemConfigurationFile() {
+        return SYSTEM_CONFIGURATION_GENSYNC_FILE;
+    }
 
 }

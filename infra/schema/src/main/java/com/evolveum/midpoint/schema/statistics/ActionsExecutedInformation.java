@@ -1,35 +1,24 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.schema.statistics;
 
 import com.evolveum.midpoint.prism.delta.ChangeType;
 import com.evolveum.midpoint.prism.xml.XmlTypeConverter;
+import com.evolveum.midpoint.util.QNameUtil;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectActionsExecutedEntryType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ActionsExecutedInformationType;
 import org.apache.commons.lang.StringUtils;
+import org.jetbrains.annotations.Nullable;
 
 import javax.xml.datatype.DatatypeConstants;
 import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.namespace.QName;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author Pavol Mederly
@@ -88,9 +77,11 @@ public class ActionsExecutedInformation {
         return rv;
     }
 
-    public static void addTo(ActionsExecutedInformationType sum, ActionsExecutedInformationType delta) {
-        addTo(sum.getObjectActionsEntry(), delta.getObjectActionsEntry());
-        addTo(sum.getResultingObjectActionsEntry(), delta.getResultingObjectActionsEntry());
+    public static void addTo(ActionsExecutedInformationType sum, @Nullable ActionsExecutedInformationType delta) {
+        if (delta != null) {
+            addTo(sum.getObjectActionsEntry(), delta.getObjectActionsEntry());
+            addTo(sum.getResultingObjectActionsEntry(), delta.getResultingObjectActionsEntry());
+        }
     }
 
     public static void addTo(List<ObjectActionsExecutedEntryType> sumEntries, List<ObjectActionsExecutedEntryType> deltaEntries) {
@@ -224,16 +215,16 @@ public class ActionsExecutedInformation {
     }
 
     private static class ObjectActionExecuted {
-        String objectName;
-        String objectDisplayName;
-        QName objectType;
+        final String objectName;
+        final String objectDisplayName;
+        final QName objectType;
         String objectOid;
-        ChangeType changeType;
-        String channel;
-        Throwable exception;
-        XMLGregorianCalendar timestamp;
+        final ChangeType changeType;
+        final String channel;
+        final Throwable exception;
+        final XMLGregorianCalendar timestamp;
 
-        public ObjectActionExecuted(String objectName, String objectDisplayName, QName objectType, String objectOid, ChangeType changeType, String channel, Throwable exception, XMLGregorianCalendar timestamp) {
+        ObjectActionExecuted(String objectName, String objectDisplayName, QName objectType, String objectOid, ChangeType changeType, String channel, Throwable exception, XMLGregorianCalendar timestamp) {
             this.objectName = objectName;
             this.objectDisplayName = objectDisplayName;
             this.objectType = objectType;
@@ -242,6 +233,33 @@ public class ActionsExecutedInformation {
             this.channel = channel;
             this.exception = exception;
             this.timestamp = timestamp;
+        }
+    }
+
+    public static String format(ActionsExecutedInformationType information) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("  All object actions:\n");
+        for (ObjectActionsExecutedEntryType a : information.getObjectActionsEntry()) {
+            formatActionExecuted(sb, a);
+        }
+        sb.append("  Resulting object actions:\n");
+        for (ObjectActionsExecutedEntryType a : information.getResultingObjectActionsEntry()) {
+            formatActionExecuted(sb, a);
+        }
+        return sb.toString();
+    }
+
+    private static void formatActionExecuted(StringBuilder sb, ObjectActionsExecutedEntryType a) {
+        sb.append(String.format("    %-10s %-30s %s\n", a.getOperation(), QNameUtil.getLocalPart(a.getObjectType()), a.getChannel()));
+        if (a.getTotalSuccessCount() > 0) {
+            sb.append(String.format(Locale.US, "      success: %6d time(s), last: %s (%s, %s) on %tc\n", a.getTotalSuccessCount(),
+                    a.getLastSuccessObjectName(), a.getLastSuccessObjectDisplayName(), a.getLastSuccessObjectOid(),
+                    XmlTypeConverter.toDate(a.getLastSuccessTimestamp())));
+        }
+        if (a.getTotalFailureCount() > 0) {
+            sb.append(String.format(Locale.US, "      failure: %6d time(s), last: %s (%s, %s) on %tc\n", a.getTotalFailureCount(),
+                    a.getLastFailureObjectName(), a.getLastFailureObjectDisplayName(), a.getLastFailureObjectOid(),
+                    XmlTypeConverter.toDate(a.getLastFailureTimestamp())));
         }
     }
 }

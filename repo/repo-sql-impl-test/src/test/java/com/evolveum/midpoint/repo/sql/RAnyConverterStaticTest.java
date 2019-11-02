@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql;
@@ -19,11 +10,14 @@ package com.evolveum.midpoint.repo.sql;
 import java.util.Set;
 
 import com.evolveum.midpoint.prism.*;
+import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.repo.sql.data.common.any.RAnyConverter;
 import com.evolveum.midpoint.repo.sql.data.common.any.RAnyValue;
+import com.evolveum.midpoint.repo.sql.data.common.type.RObjectExtensionType;
+import com.evolveum.midpoint.repo.sql.util.DtoTranslationException;
 import com.evolveum.midpoint.schema.DeltaConvertor;
 import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
 import com.evolveum.midpoint.util.DOMUtil;
@@ -63,7 +57,7 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         Session session = getFactory().openSession();
 
         QName valueName = new QName(NS_P, "polyType");
-        ItemDefinition def = getDefinition(GenericObjectType.class, new ItemPath(ObjectType.F_EXTENSION, valueName));
+        ItemDefinition def = getDefinition(GenericObjectType.class, ItemPath.create(ObjectType.F_EXTENSION, valueName));
         AssertJUnit.assertNotNull(def);
 
         Element poly = DOMUtil.createElement(DOMUtil.getDocument(), valueName);
@@ -75,7 +69,7 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         poly.appendChild(orig);
         poly.appendChild(norm);
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, poly);
+        Object realValue = RAnyConverter.getRealRepoValue(def, poly, prismContext);
         AssertJUnit.assertEquals(new PolyString("Foo_Bar", "foo bar"), realValue);
 
         session.close();
@@ -86,13 +80,13 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         Session session = getFactory().openSession();
 
         QName valueName = new QName(NS_P, "intType");
-        ItemDefinition def = getDefinition(GenericObjectType.class, new ItemPath(ObjectType.F_EXTENSION, valueName));
+        ItemDefinition def = getDefinition(GenericObjectType.class, ItemPath.create(ObjectType.F_EXTENSION, valueName));
         AssertJUnit.assertNotNull(def);
 
         Element value = DOMUtil.createElement(DOMUtil.getDocument(), valueName);
         value.setTextContent("123");
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, value);
+        Object realValue = RAnyConverter.getRealRepoValue(def, value, prismContext);
         AssertJUnit.assertEquals(123L, realValue);
 
         session.close();
@@ -103,13 +97,13 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         Session session = getFactory().openSession();
 
         QName valueName = new QName(NS_P, "longType");
-        ItemDefinition def = getDefinition(GenericObjectType.class, new ItemPath(ObjectType.F_EXTENSION, valueName));
+        ItemDefinition def = getDefinition(GenericObjectType.class, ItemPath.create(ObjectType.F_EXTENSION, valueName));
         AssertJUnit.assertNotNull(def);
 
         Element value = DOMUtil.createElement(DOMUtil.getDocument(), valueName);
         value.setTextContent("123");
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, value);
+        Object realValue = RAnyConverter.getRealRepoValue(def, value, prismContext);
         AssertJUnit.assertEquals(123L, realValue);
 
         session.close();
@@ -120,13 +114,13 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         Session session = getFactory().openSession();
 
         QName valueName = new QName(NS_P, "shortType");
-        ItemDefinition def = getDefinition(GenericObjectType.class, new ItemPath(ObjectType.F_EXTENSION, valueName));
+        ItemDefinition def = getDefinition(GenericObjectType.class, ItemPath.create(ObjectType.F_EXTENSION, valueName));
         AssertJUnit.assertNotNull(def);
 
         Element value = DOMUtil.createElement(DOMUtil.getDocument(), valueName);
         value.setTextContent("123");
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, value);
+        Object realValue = RAnyConverter.getRealRepoValue(def, value, prismContext);
         AssertJUnit.assertEquals(123L, realValue);
 
         session.close();
@@ -137,13 +131,13 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         Session session = getFactory().openSession();
 
         QName valueName = new QName(NS_P, "doubleType");
-        ItemDefinition def = getDefinition(GenericObjectType.class, new ItemPath(ObjectType.F_EXTENSION, valueName));
+        ItemDefinition def = getDefinition(GenericObjectType.class, ItemPath.create(ObjectType.F_EXTENSION, valueName));
         AssertJUnit.assertNotNull(def);
 
         Element value = DOMUtil.createElement(DOMUtil.getDocument(), valueName);
         value.setTextContent("123.1");
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, value);
+        Object realValue = RAnyConverter.getRealRepoValue(def, value, prismContext);
         AssertJUnit.assertEquals("123.1", realValue);
 
         session.close();
@@ -154,13 +148,13 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         Session session = getFactory().openSession();
 
         QName valueName = new QName(NS_P, "floatType");
-        ItemDefinition def = getDefinition(GenericObjectType.class, new ItemPath(ObjectType.F_EXTENSION, valueName));
+        ItemDefinition def = getDefinition(GenericObjectType.class, ItemPath.create(ObjectType.F_EXTENSION, valueName));
         AssertJUnit.assertNotNull(def);
 
         Element value = DOMUtil.createElement(DOMUtil.getDocument(), valueName);
         value.setTextContent("123.1");
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, value);
+        Object realValue = RAnyConverter.getRealRepoValue(def, value, prismContext);
         AssertJUnit.assertEquals("123.1", realValue);
 
         session.close();
@@ -171,13 +165,13 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         Session session = getFactory().openSession();
 
         QName valueName = new QName(NS_P, "floatType");
-        ItemDefinition def = getDefinition(GenericObjectType.class, new ItemPath(ObjectType.F_EXTENSION, valueName));
+        ItemDefinition def = getDefinition(GenericObjectType.class, ItemPath.create(ObjectType.F_EXTENSION, valueName));
         AssertJUnit.assertNotNull(def);
 
         Element value = DOMUtil.createElement(DOMUtil.getDocument(), valueName);
         value.setTextContent("example");
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, value);
+        Object realValue = RAnyConverter.getRealRepoValue(def, value, prismContext);
         AssertJUnit.assertEquals("example", realValue);
 
         session.close();
@@ -188,21 +182,30 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         Session session = getFactory().openSession();
 
         QName valueName = new QName(NS_P, "enumType");
-        ItemDefinition def = getDefinition(GenericObjectType.class, new ItemPath(ObjectType.F_EXTENSION, valueName));
+        ItemDefinition def = getDefinition(GenericObjectType.class, ItemPath.create(ObjectType.F_EXTENSION, valueName));
         AssertJUnit.assertNotNull(def);
         PrismProperty item = (PrismProperty) def.instantiate();
-        item.setValue(new PrismPropertyValue(BeforeAfterType.AFTER));
-        ((ItemDefinitionImpl) def).setName(valueName);
+        item.setRealValue(BeforeAfterType.AFTER);
+        def.toMutable().setItemName(valueName);
 
 
-        RAnyConverter converter = new RAnyConverter(prismContext);
-        Set<RAnyValue> values = converter.convertToRValue(item, false);
+        RAnyConverter converter = new RAnyConverter(prismContext, extItemDictionary);
+        Set<RAnyValue<?>> values;
+        try {
+            values = converter.convertToRValue(item, false, RObjectExtensionType.EXTENSION);
+            AssertJUnit.fail("Should have throw serialization related exception after creating ext item");
+        } catch (RestartOperationRequestedException ex) {   // this is a new way
+            System.out.println("Got expected exception: " + ex);
+        } catch (DtoTranslationException ex) {              // this was an old way
+            AssertJUnit.assertEquals("Wrong exception class", RestartOperationRequestedException.class, ex.getCause().getClass());
+        }
+
+        values = converter.convertToRValue(item, false, RObjectExtensionType.EXTENSION);
 
         AssertJUnit.assertEquals("Expected only one enum value, but was " + values.size(), 1, values.size());
 
         RAnyValue value = values.iterator().next();
         AssertJUnit.assertEquals("after", value.getValue());
-
 
         session.close();
     }
@@ -212,13 +215,13 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         Session session = getFactory().openSession();
 
         QName valueName = new QName(NS_P, "decimalType");
-        ItemDefinition def = getDefinition(GenericObjectType.class, new ItemPath(ObjectType.F_EXTENSION, valueName));
+        ItemDefinition def = getDefinition(GenericObjectType.class, ItemPath.create(ObjectType.F_EXTENSION, valueName));
         AssertJUnit.assertNotNull(def);
 
         Element value = DOMUtil.createElement(DOMUtil.getDocument(), valueName);
         value.setTextContent("1234");
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, value);
+        Object realValue = RAnyConverter.getRealRepoValue(def, value, prismContext);
         AssertJUnit.assertEquals("1234", realValue);
 
         session.close();
@@ -229,7 +232,7 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         Session session = getFactory().openSession();
 
         QName valueName = new QName(NS_P, "locations");
-        ItemDefinition def = getDefinition(GenericObjectType.class, new ItemPath(ObjectType.F_EXTENSION, valueName));
+        ItemDefinition def = getDefinition(GenericObjectType.class, ItemPath.create(ObjectType.F_EXTENSION, valueName));
         AssertJUnit.assertNotNull(def);
 
         Document document = DOMUtil.getDocument();
@@ -239,7 +242,7 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         location.setAttribute("key", "heaven");
         location.setTextContent("somewhere above");
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, value);
+        Object realValue = RAnyConverter.getRealRepoValue(def, value, prismContext);
         //asserting simple dom
         document = DOMUtil.parseDocument((String) realValue);
         Element root = document.getDocumentElement();
@@ -263,13 +266,13 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
     public void testAttributesString() throws Exception {
         Session session = getFactory().openSession();
 
-        QName valueName = new QName(NS_FOO_RESOURCE, "uid");
+        ItemName valueName = new ItemName(NS_FOO_RESOURCE, "uid");
         ItemDefinition def = getDefinition(GenericObjectType.class, valueName);
         AssertJUnit.assertNull(def);
 
         Element value = createAttributeValue(valueName, "xsd:string", "some uid");
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, value);
+        Object realValue = RAnyConverter.getRealRepoValue(def, value, prismContext);
         AssertJUnit.assertEquals("some uid", realValue);
 
         session.close();
@@ -279,13 +282,13 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
     public void testAttributesDouble() throws Exception {
         Session session = getFactory().openSession();
 
-        QName valueName = new QName(NS_FOO_RESOURCE, "uid");
+        ItemName valueName = new ItemName(NS_FOO_RESOURCE, "uid");
         ItemDefinition def = getDefinition(GenericObjectType.class, valueName);
         AssertJUnit.assertNull(def);
 
         Element value = createAttributeValue(valueName, "xsd:double", "123.1");
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, value);
+        Object realValue = RAnyConverter.getRealRepoValue(def, value, prismContext);
         AssertJUnit.assertEquals("123.1", realValue);
 
         session.close();
@@ -304,13 +307,13 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
     public void testAttributesLong() throws Exception {
         Session session = getFactory().openSession();
 
-        QName valueName = new QName(NS_FOO_RESOURCE, "uid");
+        ItemName valueName = new ItemName(NS_FOO_RESOURCE, "uid");
         ItemDefinition def = getDefinition(GenericObjectType.class, valueName);
         AssertJUnit.assertNull(def);
 
         Element value = createAttributeValue(valueName, "xsd:long", "123");
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, value);
+        Object realValue = RAnyConverter.getRealRepoValue(def, value, prismContext);
         AssertJUnit.assertEquals(123L, realValue);
 
         session.close();
@@ -331,14 +334,10 @@ public class RAnyConverterStaticTest extends BaseSQLRepoTest {
         value.appendChild(orig);
         value.appendChild(norm);
 
-        Object realValue = RAnyConverter.getRealRepoValue(def, value);
+        Object realValue = RAnyConverter.getRealRepoValue(def, value, prismContext);
         AssertJUnit.assertEquals(new PolyString("john example", "john example"), realValue);
 
         session.close();
-    }
-
-    private <T extends ObjectType> ItemDefinition getDefinition(Class<T> type, QName name) {
-        return getDefinition(type, new ItemPath(name));
     }
 
     private <T extends ObjectType> ItemDefinition getDefinition(Class<T> type, ItemPath path) {

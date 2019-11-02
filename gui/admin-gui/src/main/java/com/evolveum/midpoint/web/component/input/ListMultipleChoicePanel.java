@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.input;
@@ -23,6 +14,7 @@ import org.apache.wicket.markup.html.form.IChoiceRenderer;
 import org.apache.wicket.markup.html.form.ListMultipleChoice;
 import org.apache.wicket.model.IModel;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -31,21 +23,29 @@ import java.util.Map;
  */
 public class ListMultipleChoicePanel<T> extends InputPanel {
 
+    private static final long serialVersionUID = 1L;
+
     public ListMultipleChoicePanel(String id, IModel<List<T>> model, IModel<List<T>> choices) {
         super(id);
-        ListMultipleChoice<T> multiple = new ListMultipleChoice<T>("input", model, choices);
+        ListMultipleChoice<T> multiple = new ListMultipleChoice<>("input", model, choices);
         add(multiple);
     }
 
-    public ListMultipleChoicePanel(String id, IModel<List<T>> model, IModel<List<T>> choices, IChoiceRenderer renderer,
+    public ListMultipleChoicePanel(String id, IModel<List<T>> model, IModel<List<T>> choices, IChoiceRenderer<T> renderer,
                                    IModel<Map<String, String>> options){
         super(id);
-        DropDownMultiChoice multiChoice = new DropDownMultiChoice<T>("input", model, choices, renderer, options);
+        DropDownMultiChoice<T> multiChoice = new DropDownMultiChoice<T>("input", model, choices, renderer, options);
         add(multiChoice);
     }
 
     @Override
-    public FormComponent getBaseFormComponent() {
-        return (FormComponent) get("input");
+    public FormComponent<T> getBaseFormComponent() {
+        return (FormComponent<T>) get("input");
     }
+
+    public Collection<T> getModelObject() {
+        DropDownMultiChoice<T> input = (DropDownMultiChoice) getBaseFormComponent();
+        return input.getModelObject();
+    }
+
 }

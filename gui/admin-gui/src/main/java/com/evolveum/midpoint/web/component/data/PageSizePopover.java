@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2010-2019 Evolveum and contributors
+ *
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
+ */
 package com.evolveum.midpoint.web.component.data;
 
 import com.evolveum.midpoint.gui.api.component.BasePanel;
@@ -56,20 +62,20 @@ public class PageSizePopover extends BasePanel {
         popover.setOutputMarkupId(true);
         add(popover);
 
-        Form form = new Form(ID_FORM);
+        Form form = new com.evolveum.midpoint.web.component.form.Form(ID_FORM);
         popover.add(form);
 
         AjaxSubmitButton button = new AjaxSubmitButton(ID_BUTTON) {
 
             @Override
-            protected void onError(AjaxRequestTarget target, Form<?> form) {
-                super.onError(target, form);
+            protected void onError(AjaxRequestTarget target) {
+                super.onError(target);
                 target.add(getPageBase().getFeedbackPanel());
             }
 
             @Override
-            protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
-                super.onSubmit(target, form);
+            protected void onSubmit(AjaxRequestTarget target) {
+                super.onSubmit(target);
 
                 pageSizeChanged(target);
             }

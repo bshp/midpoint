@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2018 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.common;
@@ -22,22 +13,24 @@ import java.util.List;
 import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.namespace.QName;
 
-import com.evolveum.midpoint.common.refinery.RefinedResourceSchemaImpl;
-import com.evolveum.midpoint.util.QNameUtil;
+import com.evolveum.midpoint.prism.PrismContext;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.Validate;
 
 import com.evolveum.midpoint.common.refinery.RefinedResourceSchema;
+import com.evolveum.midpoint.common.refinery.RefinedResourceSchemaImpl;
 import com.evolveum.midpoint.prism.PrismObject;
-import com.evolveum.midpoint.prism.PrismPropertyValue;
 import com.evolveum.midpoint.prism.delta.PropertyDelta;
-import com.evolveum.midpoint.prism.path.ItemPath;
+import com.evolveum.midpoint.prism.delta.builder.S_MaybeDelete;
 import com.evolveum.midpoint.prism.xml.XmlTypeConverter;
+import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.processor.ObjectClassComplexTypeDefinition;
 import com.evolveum.midpoint.schema.util.MiscSchemaUtil;
+import com.evolveum.midpoint.util.QNameUtil;
 import com.evolveum.midpoint.util.exception.SchemaException;
+import com.evolveum.midpoint.util.logging.Trace;
+import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectSynchronizationType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ResourceType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ShadowKindType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ShadowType;
@@ -45,234 +38,182 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.SynchronizationSitua
 import com.evolveum.midpoint.xml.ns._public.common.common_3.SynchronizationSituationType;
 
 public class SynchronizationUtils {
-	
-	public static boolean isPolicyApplicable(PrismObject<? extends ShadowType> currentShadow,
-			ObjectSynchronizationType synchronizationPolicy, PrismObject<ResourceType> resource)
-					throws SchemaException {
-		ShadowType currentShadowType = currentShadow.asObjectable();
 
-		// objectClass
-		QName shadowObjectClass = currentShadowType.getObjectClass();
-		Validate.notNull(shadowObjectClass, "No objectClass in currentShadow");
-		
-		return isPolicyApplicable(shadowObjectClass, currentShadowType.getKind(), currentShadowType.getIntent(), synchronizationPolicy, resource);
-		
-	}
+    private static final Trace LOGGER = TraceManager.getTrace(SynchronizationUtils.class);
 
-	public static boolean isPolicyApplicable(QName objectClass, ShadowKindType kind, String intent, ObjectSynchronizationType synchronizationPolicy, PrismObject<ResourceType> resource) throws SchemaException{
-		
-		List<QName> policyObjectClasses = synchronizationPolicy.getObjectClass();
+    private static PropertyDelta<SynchronizationSituationType> createSynchronizationSituationDelta(
+            PrismObject<ShadowType> shadow, SynchronizationSituationType situation,
+            PrismContext prismContext) {
 
-		if (policyObjectClasses == null || policyObjectClasses.isEmpty()) {
+        if (situation == null) {
+            SynchronizationSituationType oldValue = shadow.asObjectable().getSynchronizationSituation();
+            return prismContext.deltaFactory().property().createModificationDeleteProperty(ShadowType.F_SYNCHRONIZATION_SITUATION, shadow.getDefinition(), oldValue);
+        }
 
-			String policyIntent = synchronizationPolicy.getIntent();
-			ShadowKindType policyKind = synchronizationPolicy.getKind();
-			ObjectClassComplexTypeDefinition policyObjectClass = null;
-			RefinedResourceSchema schema = RefinedResourceSchemaImpl.getRefinedSchema(resource);
-			if (schema == null) {
-				throw new SchemaException("No schema defined in resource. Possible configuration problem?");
-			}
-			if (policyKind == null && policyIntent == null) {
-				policyObjectClass = schema.findDefaultObjectClassDefinition(ShadowKindType.ACCOUNT);
-			}
+        return prismContext.deltaFactory().property().createModificationReplaceProperty(ShadowType.F_SYNCHRONIZATION_SITUATION, shadow.getDefinition(), situation);
+    }
 
-			if (policyKind != null) {
-				if (StringUtils.isEmpty(policyIntent)) {
-					policyObjectClass = schema.findDefaultObjectClassDefinition(policyKind);
-				} else {
-					policyObjectClass = schema.findObjectClassDefinition(policyKind, policyIntent);
-				}
+    private static PropertyDelta<XMLGregorianCalendar> createSynchronizationTimestampDelta(PrismObject<ShadowType> object,
+            QName propName, XMLGregorianCalendar timestamp, PrismContext prismContext) {
+        PropertyDelta<XMLGregorianCalendar> syncSituationDelta = prismContext.deltaFactory().property()
+                .createReplaceDelta(object.getDefinition(), propName, timestamp);
+        return syncSituationDelta;
+    }
 
-			}
-			if (policyObjectClass != null && !policyObjectClass.getTypeName().equals(objectClass)) {
-				return false;
-			}
-		}
-		if (policyObjectClasses != null && !policyObjectClasses.isEmpty()) {
-			if (!QNameUtil.contains(policyObjectClasses, objectClass)) {
-				return false;
-			}
-		}
+    public static List<PropertyDelta<?>> createSynchronizationSituationAndDescriptionDelta(PrismObject<ShadowType> shadow,
+            SynchronizationSituationType situation, String sourceChannel, boolean full, XMLGregorianCalendar timestamp,
+            PrismContext prismContext) throws SchemaException {
 
-		// kind
-		ShadowKindType policyKind = synchronizationPolicy.getKind();
-		if (policyKind != null && kind != null && !policyKind.equals(kind)) {
-			return false;
-		}
+        List<PropertyDelta<?>> propertyDeltas = new ArrayList<>();
 
-		// intent
-		// TODO is the intent always present in shadow at this time? [med]
-		String policyIntent = synchronizationPolicy.getIntent();
-		if (policyIntent != null && intent != null
-				&& !MiscSchemaUtil.equalsIntent(intent, policyIntent)) {
-			return false;
-		}
+        PropertyDelta<SynchronizationSituationDescriptionType> syncDescriptionDelta = createSynchronizationSituationDescriptionDelta(shadow, situation,
+                timestamp, sourceChannel, full, prismContext);
+        propertyDeltas.add(syncDescriptionDelta);
 
-		
-		return true;
-	}
 
-	public static boolean contains(ObjectType target, String sourceChannel,
-			SynchronizationSituationType situation) {
-		if (target instanceof ShadowType) {
-			List<SynchronizationSituationDescriptionType> syncSituationDescriptions = ((ShadowType) target)
-					.getSynchronizationSituationDescription();
-			if (syncSituationDescriptions == null || syncSituationDescriptions.isEmpty()) {
-				return false;
-			}
-			for (SynchronizationSituationDescriptionType syncSituationDescription : syncSituationDescriptions) {
-				if (sourceChannel == null && syncSituationDescription.getChannel() != null) {
-					return false;
-				}
-				if (sourceChannel != null && syncSituationDescription.getChannel() == null) {
-					return false;
-				}
-				if (situation == null && syncSituationDescription.getSituation() != null) {
-					return false;
-				}
-				if (situation != null && syncSituationDescription.getSituation() == null) {
-					return false;
-				}
-				if (((syncSituationDescription.getChannel() == null && sourceChannel == null)
-						|| (syncSituationDescription.getChannel().equals(sourceChannel)))
-						&& ((syncSituationDescription.getSituation() == null && situation == null)
-								|| (syncSituationDescription.getSituation() == situation))) {
-					return true;
-				}
-			}
-		}
-		return true;
-	}
+        propertyDeltas.addAll(createSynchronizationTimestampsDelta(shadow, timestamp, full, prismContext));
 
-	public static PropertyDelta<SynchronizationSituationType> createSynchronizationSituationDelta(
-			PrismObject object, SynchronizationSituationType situation) {
+        PropertyDelta<SynchronizationSituationType> syncSituationDelta = createSynchronizationSituationDelta(shadow, situation, prismContext);
+        propertyDeltas.add(syncSituationDelta);
 
-		SynchronizationSituationType oldValue = ((ShadowType) object.asObjectable())
-				.getSynchronizationSituation();
-		if (situation == null) {
-			if (oldValue != null) {
-				ItemPath syncSituationPath = new ItemPath(ShadowType.F_SYNCHRONIZATION_SITUATION);
-				return PropertyDelta.createModificationDeleteProperty(syncSituationPath,
-						object.findProperty(syncSituationPath).getDefinition(), oldValue);
-			}
+        return propertyDeltas;
+    }
 
-		} else {
-			if (oldValue != situation) {
-				return PropertyDelta.createReplaceDelta(object.getDefinition(),
-						ShadowType.F_SYNCHRONIZATION_SITUATION, situation);
-			}
-		}
-		return null;
-	}
+    private static PropertyDelta<SynchronizationSituationDescriptionType> createSynchronizationSituationDescriptionDelta(
+            PrismObject<ShadowType> shadow,
+            SynchronizationSituationType situation, XMLGregorianCalendar timestamp, String sourceChannel,
+            boolean full, PrismContext prismContext) throws SchemaException {
+        SynchronizationSituationDescriptionType syncSituationDescription = new SynchronizationSituationDescriptionType();
+        syncSituationDescription.setSituation(situation);
+        syncSituationDescription.setChannel(sourceChannel);
+        syncSituationDescription.setTimestamp(timestamp);
+        syncSituationDescription.setFull(full);
 
-	public static PropertyDelta<XMLGregorianCalendar> createSynchronizationTimestampDelta(PrismObject object,
-			QName propName, XMLGregorianCalendar timestamp) {
-		// XMLGregorianCalendar gcal =
-		// XmlTypeConverter.createXMLGregorianCalendar(System.currentTimeMillis());
-		PropertyDelta<XMLGregorianCalendar> syncSituationDelta = PropertyDelta
-				.createReplaceDelta(object.getDefinition(), propName, timestamp);
-		return syncSituationDelta;
-	}
+        S_MaybeDelete builder = prismContext.deltaFor(ShadowType.class)
+            .item(ShadowType.F_SYNCHRONIZATION_SITUATION_DESCRIPTION).add(syncSituationDescription);
 
-	public static List<PropertyDelta<?>> createSynchronizationSituationAndDescriptionDelta(PrismObject object,
-			SynchronizationSituationType situation, String sourceChannel, boolean full) {
-		XMLGregorianCalendar timestamp = XmlTypeConverter
-				.createXMLGregorianCalendar(System.currentTimeMillis());
 
-		List<PropertyDelta<?>> delta = createSynchronizationSituationDescriptionDelta(object, situation,
-				timestamp, sourceChannel, full);
+        List<SynchronizationSituationDescriptionType> oldSituationDescriptions = getSituationFromSameChannel(
+                shadow, sourceChannel);
+        if (CollectionUtils.isNotEmpty(oldSituationDescriptions)) {
+            builder.deleteRealValues(oldSituationDescriptions);
+        }
 
-		PropertyDelta<XMLGregorianCalendar> timestampDelta = createSynchronizationTimestampDelta(object,
-				ShadowType.F_SYNCHRONIZATION_TIMESTAMP, timestamp);
-		delta.add(timestampDelta);
+        return (PropertyDelta<SynchronizationSituationDescriptionType>) builder.asItemDelta();
+    }
 
-		if (full) {
-			timestampDelta = createSynchronizationTimestampDelta(object,
-					ShadowType.F_FULL_SYNCHRONIZATION_TIMESTAMP, timestamp);
-			delta.add(timestampDelta);
-		}
+    public static List<PropertyDelta<?>> createSynchronizationTimestampsDelta(
+            PrismObject<ShadowType> shadow, PrismContext prismContext) {
+            XMLGregorianCalendar timestamp = XmlTypeConverter
+                    .createXMLGregorianCalendar(System.currentTimeMillis());
+        return createSynchronizationTimestampsDelta(shadow, timestamp, true, prismContext);
+    }
 
-		PropertyDelta<SynchronizationSituationType> syncSituationDelta = createSynchronizationSituationDelta(object, situation);
+    private static List<PropertyDelta<?>> createSynchronizationTimestampsDelta(PrismObject<ShadowType> shadow,
+            XMLGregorianCalendar timestamp, boolean full, PrismContext prismContext) {
 
-		if (syncSituationDelta != null) {
-			delta.add(syncSituationDelta);
-		}
+        List<PropertyDelta<?>> deltas = new ArrayList<>();
+        PropertyDelta<XMLGregorianCalendar> timestampDelta = createSynchronizationTimestampDelta(shadow,
+                ShadowType.F_SYNCHRONIZATION_TIMESTAMP, timestamp, prismContext);
+        deltas.add(timestampDelta);
 
-		return delta;
-	}
+        if (full) {
+            timestampDelta = createSynchronizationTimestampDelta(shadow,
+                    ShadowType.F_FULL_SYNCHRONIZATION_TIMESTAMP, timestamp, prismContext);
+            deltas.add(timestampDelta);
+        }
+        return deltas;
+    }
 
-	public static <O extends ObjectType> List<PropertyDelta<?>> createSynchronizationTimestampsDelta(
-			PrismObject<O> object) {
-		XMLGregorianCalendar timestamp = XmlTypeConverter
-				.createXMLGregorianCalendar(System.currentTimeMillis());
+    private static List<SynchronizationSituationDescriptionType> getSituationFromSameChannel(
+            PrismObject<ShadowType> shadow, String channel) {
 
-		List<PropertyDelta<?>> deltas = new ArrayList<>();
-		PropertyDelta<XMLGregorianCalendar> timestampDelta = createSynchronizationTimestampDelta(object,
-				ShadowType.F_SYNCHRONIZATION_TIMESTAMP, timestamp);
-		deltas.add(timestampDelta);
+        List<SynchronizationSituationDescriptionType> syncSituationDescriptions = shadow.asObjectable().getSynchronizationSituationDescription();
+        List<SynchronizationSituationDescriptionType> valuesToDelete = new ArrayList<>();
+        if (CollectionUtils.isEmpty(syncSituationDescriptions)) {
+            return null;
+        }
+        for (SynchronizationSituationDescriptionType syncSituationDescription : syncSituationDescriptions) {
+            if (StringUtils.isEmpty(syncSituationDescription.getChannel()) && StringUtils.isEmpty(channel)) {
+                valuesToDelete.add(syncSituationDescription);
+                continue;
+            }
+            if ((StringUtils.isEmpty(syncSituationDescription.getChannel()) && channel != null)
+                    || (StringUtils.isEmpty(channel) && syncSituationDescription.getChannel() != null)) {
+                continue;
+            }
+            if (syncSituationDescription.getChannel().equals(channel)) {
+                valuesToDelete.add(syncSituationDescription);
+                continue;
+            }
+        }
+        return valuesToDelete;
+    }
 
-		timestampDelta = createSynchronizationTimestampDelta(object,
-				ShadowType.F_FULL_SYNCHRONIZATION_TIMESTAMP, timestamp);
-		deltas.add(timestampDelta);
-		return deltas;
-	}
+    public static boolean isPolicyApplicable(QName objectClass, ShadowKindType kind, String intent, ObjectSynchronizationType synchronizationPolicy, PrismObject<ResourceType> resource, boolean strictIntent) throws SchemaException {
 
-	public static List<PropertyDelta<?>> createSynchronizationSituationDescriptionDelta(PrismObject object,
-			SynchronizationSituationType situation, XMLGregorianCalendar timestamp, String sourceChannel,
-			boolean full) {
-		SynchronizationSituationDescriptionType syncSituationDescription = new SynchronizationSituationDescriptionType();
-		syncSituationDescription.setSituation(situation);
-		syncSituationDescription.setChannel(sourceChannel);
-		syncSituationDescription.setTimestamp(timestamp);
-		syncSituationDescription.setFull(full);
+        List<QName> policyObjectClasses = synchronizationPolicy.getObjectClass();
+        //check objectClass if match
+        if (CollectionUtils.isNotEmpty(policyObjectClasses) && objectClass != null) {
+            if (!QNameUtil.matchAny(objectClass, policyObjectClasses)) {
+                return false;
+            }
+        }
 
-		List<PropertyDelta<?>> deltas = new ArrayList<PropertyDelta<?>>();
 
-		PropertyDelta syncSituationDelta = PropertyDelta.createDelta(
-				new ItemPath(ShadowType.F_SYNCHRONIZATION_SITUATION_DESCRIPTION), object.getDefinition());
-		syncSituationDelta.addValueToAdd(new PrismPropertyValue(syncSituationDescription));
-		deltas.add(syncSituationDelta);
+        RefinedResourceSchema schema = RefinedResourceSchemaImpl.getRefinedSchema(resource);
+        if (schema == null) {
+            throw new SchemaException("No schema defined in resource. Possible configuration problem?");
+        }
 
-		List<PrismPropertyValue<SynchronizationSituationDescriptionType>> oldSituationDescriptions = getSituationFromSameChannel(
-				object, sourceChannel);
-		if (oldSituationDescriptions != null && !oldSituationDescriptions.isEmpty()) {
-			syncSituationDelta = PropertyDelta.createDelta(
-					new ItemPath(ShadowType.F_SYNCHRONIZATION_SITUATION_DESCRIPTION), object.getDefinition());
-			syncSituationDelta.addValuesToDelete(oldSituationDescriptions);
-			deltas.add(syncSituationDelta);
-		}
+        ShadowKindType policyKind = synchronizationPolicy.getKind();
+        if (policyKind == null) {
+            policyKind = ShadowKindType.ACCOUNT;
+        }
 
-		return deltas;
-	}
+        String policyIntent = synchronizationPolicy.getIntent();
 
-	private static List<PrismPropertyValue<SynchronizationSituationDescriptionType>> getSituationFromSameChannel(
-			PrismObject prismObject, String channel) {
-		ShadowType target = (ShadowType) prismObject.asObjectable();
-		List<SynchronizationSituationDescriptionType> syncSituationDescriptions = ((ShadowType) target)
-				.getSynchronizationSituationDescription();
-		List<PrismPropertyValue<SynchronizationSituationDescriptionType>> valuesToDelete = new ArrayList<PrismPropertyValue<SynchronizationSituationDescriptionType>>();
-		if (syncSituationDescriptions == null || syncSituationDescriptions.isEmpty()) {
-			return null;
-		}
-		for (SynchronizationSituationDescriptionType syncSituationDescription : syncSituationDescriptions) {
-			if (StringUtils.isEmpty(syncSituationDescription.getChannel()) && StringUtils.isEmpty(channel)) {
-				valuesToDelete.add(new PrismPropertyValue<SynchronizationSituationDescriptionType>(
-						syncSituationDescription));
-				continue;
-				// return syncSituationDescription;
-			}
-			if ((StringUtils.isEmpty(syncSituationDescription.getChannel()) && channel != null)
-					|| (StringUtils.isEmpty(channel) && syncSituationDescription.getChannel() != null)) {
-				// return null;
-				continue;
-			}
-			if (syncSituationDescription.getChannel().equals(channel)) {
-				valuesToDelete.add(new PrismPropertyValue<SynchronizationSituationDescriptionType>(
-						syncSituationDescription));
-				continue;
-				// return syncSituationDescription;
-			}
-		}
-		return valuesToDelete;
-	}
+        ObjectClassComplexTypeDefinition policyObjectClass = null;
+        if (StringUtils.isEmpty(policyIntent)) {
+            policyObjectClass = schema.findDefaultObjectClassDefinition(policyKind);
+            policyIntent = policyObjectClass.getIntent();
+        } else {
+            policyObjectClass = schema.findObjectClassDefinition(policyKind, policyIntent);
+        }
+
+        // re-check objctClass if wasn't defined
+        if (objectClass != null && !QNameUtil.match(objectClass, policyObjectClass.getTypeName())) {
+            return false;
+        }
+
+        // kind
+        LOGGER.trace("Comparing kinds, policy kind: {}, current kind: {}", policyKind, kind);
+        if (kind != null && kind != ShadowKindType.UNKNOWN && !policyKind.equals(kind)) {
+            LOGGER.trace("Kinds don't match, skipping policy {}", synchronizationPolicy);
+            return false;
+        }
+
+        // intent
+        // TODO is the intent always present in shadow at this time? [med]
+        LOGGER.trace("Comparing intents, policy intent: {}, current intent: {}", policyIntent, intent);
+        if (!strictIntent) {
+            if (intent != null && !SchemaConstants.INTENT_UNKNOWN.equals(intent) && !MiscSchemaUtil.equalsIntent(intent, policyIntent)) {
+                LOGGER.trace("Intents don't match, skipping policy {}", synchronizationPolicy);
+                return false;
+            }
+        } else {
+            if (!MiscSchemaUtil.equalsIntent(intent, policyIntent)) {
+                LOGGER.trace("Intents don't match, skipping policy {}", synchronizationPolicy);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static boolean isPolicyApplicable(QName objectClass, ShadowKindType kind, String intent, ObjectSynchronizationType synchronizationPolicy, PrismObject<ResourceType> resource) throws SchemaException{
+        return isPolicyApplicable(objectClass, kind, intent, synchronizationPolicy, resource, false);
+
+    }
+
 }

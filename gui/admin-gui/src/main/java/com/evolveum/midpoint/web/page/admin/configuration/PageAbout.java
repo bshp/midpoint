@@ -1,25 +1,19 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2018 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.configuration;
 
 import com.evolveum.midpoint.gui.api.model.LoadableModel;
 import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
+import com.evolveum.midpoint.init.InitialDataImport;
 import com.evolveum.midpoint.model.api.ModelPublicConstants;
-import com.evolveum.midpoint.model.api.WorkflowService;
+import com.evolveum.midpoint.model.common.SystemObjectCache;
+import com.evolveum.midpoint.prism.delta.ObjectDelta;
+import com.evolveum.midpoint.prism.query.*;
 import com.evolveum.midpoint.schema.LabeledString;
 import com.evolveum.midpoint.schema.ProvisioningDiag;
 import com.evolveum.midpoint.schema.RepositoryDiag;
@@ -29,6 +23,7 @@ import com.evolveum.midpoint.security.api.AuthorizationConstants;
 import com.evolveum.midpoint.security.api.MidPointPrincipal;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.task.api.TaskManager;
+import com.evolveum.midpoint.util.Producer;
 import com.evolveum.midpoint.util.exception.CommunicationException;
 import com.evolveum.midpoint.util.exception.ConfigurationException;
 import com.evolveum.midpoint.util.exception.ExpressionEvaluationException;
@@ -41,8 +36,16 @@ import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.application.AuthorizationAction;
 import com.evolveum.midpoint.web.application.PageDescriptor;
 import com.evolveum.midpoint.web.component.AjaxButton;
+import com.evolveum.midpoint.web.component.dialog.ConfirmationPanel;
+import com.evolveum.midpoint.web.component.dialog.Popupable;
 import com.evolveum.midpoint.web.page.login.PageLogin;
 import com.evolveum.midpoint.web.security.SecurityUtils;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.NodeType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.TaskType;
+
+import com.evolveum.midpoint.repo.cache.RepositoryCache;
+
 import org.apache.commons.lang.StringUtils;
 import org.apache.wicket.RestartResponseException;
 import org.apache.wicket.ajax.AjaxRequestTarget;
@@ -51,12 +54,17 @@ import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.PropertyModel;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.Serializable;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import javax.xml.namespace.QName;
 
 /**
  * @author lazyman
@@ -75,11 +83,15 @@ public class PageAbout extends PageAdminConfiguration {
     private static final String OPERATION_TEST_REPOSITORY_CHECK_ORG_CLOSURE = DOT_CLASS + "testRepositoryCheckOrgClosure";
     private static final String OPERATION_GET_REPO_DIAG = DOT_CLASS + "getRepoDiag";
     private static final String OPERATION_SUBMIT_REINDEX = DOT_CLASS + "submitReindex";
-    private static final String OPERATION_CLEANUP_ACTIVITI_PROCESSES = DOT_CLASS + "cleanupActivitiProcesses";
+    private static final String OPERATION_CHECK_WORKFLOW_PROCESSES = DOT_CLASS + "checkWorkflowProcesses";
     private static final String OPERATION_GET_PROVISIONING_DIAG = DOT_CLASS + "getProvisioningDiag";
+    private static final String OPERATION_DELETE_ALL_OBJECTS = DOT_CLASS + "deleteAllObjects";
+    private static final String OPERATION_DELETE_TASK = DOT_CLASS + "deleteTask";
+    private static final String POST_INIT = DOT_CLASS + "postInit";
 
+    private static final String ID_BUILD_TIMESTAMP = "buildTimestamp";
     private static final String ID_BUILD = "build";
-    private static final String ID_REVISION = "revision";
+    private static final String ID_BRANCH = "branch";
     private static final String ID_PROPERTY = "property";
     private static final String ID_VALUE = "value";
     private static final String ID_LIST_SYSTEM_ITEMS = "listSystemItems";
@@ -87,7 +99,7 @@ public class PageAbout extends PageAdminConfiguration {
     private static final String ID_TEST_REPOSITORY_CHECK_ORG_CLOSURE = "testRepositoryCheckOrgClosure";
     private static final String ID_REINDEX_REPOSITORY_OBJECTS = "reindexRepositoryObjects";
     private static final String ID_TEST_PROVISIONING = "testProvisioning";
-    private static final String ID_CLEANUP_ACTIVITI_PROCESSES = "cleanupActivitiProcesses";
+    private static final String ID_CHECK_WORKFLOW_PROCESSES = "checkWorkflowProcesses";
     private static final String ID_IMPLEMENTATION_SHORT_NAME = "implementationShortName";
     private static final String ID_IMPLEMENTATION_DESCRIPTION = "implementationDescription";
     private static final String ID_IS_EMBEDDED = "isEmbedded";
@@ -101,6 +113,8 @@ public class PageAbout extends PageAdminConfiguration {
     private static final String ID_PROVISIONING_DETAIL_NAME = "provisioningDetailName";
     private static final String ID_PROVISIONING_DETAIL_VALUE = "provisioningDetailValue";
     private static final String ID_JVM_PROPERTIES = "jvmProperties";
+    private static final String ID_CLEAR_CSS_JS_CACHE = "clearCssJsCache";
+    private static final String ID_FACTORY_DEFAULT = "factoryDefault";
 
     private static final String[] PROPERTIES = new String[]{"file.separator", "java.class.path",
             "java.home", "java.vendor", "java.vendor.url", "java.version", "line.separator", "os.arch",
@@ -108,6 +122,9 @@ public class PageAbout extends PageAdminConfiguration {
 
     private IModel<RepositoryDiag> repoDiagModel;
     private IModel<ProvisioningDiag> provisioningDiagModel;
+
+    @Autowired RepositoryCache repositoryCache;
+    @Autowired protected SystemObjectCache systemObjectCache;
 
     public PageAbout() {
         repoDiagModel = new LoadableModel<RepositoryDiag>(false) {
@@ -128,11 +145,15 @@ public class PageAbout extends PageAdminConfiguration {
     }
 
     private void initLayout() {
-        Label revision = new Label(ID_REVISION, createStringResource("PageAbout.midPointRevision"));
+        Label branch = new Label(ID_BRANCH, createStringResource("midpoint.system.branch"));
+        branch.setRenderBodyOnly(true);
+        add(branch);
+
+        Label revision = new Label(ID_BUILD, createStringResource("midpoint.system.build"));
         revision.setRenderBodyOnly(true);
         add(revision);
 
-        Label build = new Label(ID_BUILD, createStringResource("PageAbout.build"));
+        Label build = new Label(ID_BUILD_TIMESTAMP, createStringResource("midpoint.system.buildTimestamp"));
         build.setRenderBodyOnly(true);
         add(build);
 
@@ -161,7 +182,7 @@ public class PageAbout extends PageAdminConfiguration {
         addLabel(ID_REPOSITORY_URL, "repositoryUrl");
 
         ListView<LabeledString> additionalDetails = new ListView<LabeledString>(ID_ADDITIONAL_DETAILS,
-                new PropertyModel<List<LabeledString>>(repoDiagModel, "additionalDetails")) {
+            new PropertyModel<>(repoDiagModel, "additionalDetails")) {
 
             @Override
             protected void populateItem(ListItem<LabeledString> item) {
@@ -179,7 +200,7 @@ public class PageAbout extends PageAdminConfiguration {
         add(additionalDetails);
 
         ListView<LabeledString> provisioningAdditionalDetails = new ListView<LabeledString>(ID_PROVISIONING_ADDITIONAL_DETAILS,
-                new PropertyModel<List<LabeledString>>(provisioningDiagModel, "additionalDetails")) {
+            new PropertyModel<>(provisioningDiagModel, "additionalDetails")) {
 
             @Override
             protected void populateItem(ListItem<LabeledString> item) {
@@ -243,7 +264,7 @@ public class PageAbout extends PageAdminConfiguration {
         };
         add(testRepositoryCheckOrgClosure);
 
-		AjaxButton reindexRepositoryObjects = new AjaxButton(ID_REINDEX_REPOSITORY_OBJECTS,
+        AjaxButton reindexRepositoryObjects = new AjaxButton(ID_REINDEX_REPOSITORY_OBJECTS,
                 createStringResource("PageAbout.button.reindexRepositoryObjects")) {
 
             @Override
@@ -263,15 +284,36 @@ public class PageAbout extends PageAdminConfiguration {
         };
         add(testProvisioning);
 
-        AjaxButton cleanupActivitiProcesses = new AjaxButton(ID_CLEANUP_ACTIVITI_PROCESSES,
-                createStringResource("PageAbout.button.cleanupActivitiProcesses")) {
+        AjaxButton checkWorkflowProcesses = new AjaxButton(ID_CHECK_WORKFLOW_PROCESSES,
+                createStringResource("PageAbout.button.checkWorkflowProcesses")) {
 
             @Override
             public void onClick(AjaxRequestTarget target) {
-                cleanupActivitiProcessesPerformed(target);
+//                checkWorkflowProcessesPerformed(target);
             }
         };
-        add(cleanupActivitiProcesses);
+        checkWorkflowProcesses.setVisible(false);
+        add(checkWorkflowProcesses);
+
+        AjaxButton clearCssJsCache = new AjaxButton(ID_CLEAR_CSS_JS_CACHE,
+                createStringResource("PageAbout.button.clearCssJsCache")) {
+
+            @Override
+            public void onClick(AjaxRequestTarget target) {
+                clearLessJsCache(target);
+            }
+        };
+        add(clearCssJsCache);
+
+        AjaxButton factoryDefault = new AjaxButton(ID_FACTORY_DEFAULT,
+                createStringResource("PageAbout.button.factoryDefault")) {
+
+            @Override
+            public void onClick(AjaxRequestTarget target) {
+                showMainPopup(getDeleteAllObjectsConfirmationPanel(), target);
+            }
+        };
+        add(factoryDefault);
     }
 
     private RepositoryDiag loadRepoDiagModel() {
@@ -284,7 +326,7 @@ public class PageAbout extends PageAdminConfiguration {
             result.recordSuccessIfUnknown();
         } catch (Exception ex) {
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't get repo diagnostics", ex);
-            result.recordFatalError("Couldn't get repo diagnostics.", ex);
+            result.recordFatalError(getString("PageAbout.message.loadRepoDiagModel.fatalError"), ex);
         }
         result.recomputeStatus();
 
@@ -305,7 +347,7 @@ public class PageAbout extends PageAdminConfiguration {
             result.recordSuccessIfUnknown();
         } catch (Exception ex) {
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't get provisioning diagnostics", ex);
-            result.recordFatalError("Couldn't get provisioning diagnostics.", ex);
+            result.recordFatalError(getString("PageAbout.message.loadProvisioningDiagModel.fatalError"), ex);
         }
         result.recomputeStatus();
 
@@ -321,7 +363,7 @@ public class PageAbout extends PageAdminConfiguration {
 
             @Override
             protected List<SystemItem> load() {
-                List<SystemItem> items = new ArrayList<SystemItem>();
+                List<SystemItem> items = new ArrayList<>();
                 for (String property : PROPERTIES) {
                     items.add(new SystemItem(property, System.getProperty(property)));
                 }
@@ -357,20 +399,20 @@ public class PageAbout extends PageAdminConfiguration {
     private void reindexRepositoryObjectsPerformed(AjaxRequestTarget target) {
         OperationResult result = new OperationResult(OPERATION_SUBMIT_REINDEX);
         try {
-			TaskManager taskManager = getTaskManager();
-			Task task = taskManager.createTaskInstance();
-			MidPointPrincipal user = SecurityUtils.getPrincipalUser();
-			if (user == null) {
-				throw new RestartResponseException(PageLogin.class);
-			} else {
-				task.setOwner(user.getUser().asPrismObject());
-			}
-			authorize(AuthorizationConstants.AUTZ_ALL_URL, null, null, null, null, null, result);
-			task.setChannel(SchemaConstants.CHANNEL_GUI_USER_URI);
-			task.setHandlerUri(ModelPublicConstants.REINDEX_TASK_HANDLER_URI);
-			task.setName("Reindex repository objects");
-			taskManager.switchToBackground(task, result);
-			result.setBackgroundTaskOid(task.getOid());
+            TaskManager taskManager = getTaskManager();
+            Task task = taskManager.createTaskInstance();
+            MidPointPrincipal user = SecurityUtils.getPrincipalUser();
+            if (user == null) {
+                throw new RestartResponseException(PageLogin.class);
+            } else {
+                task.setOwner(user.getUser().asPrismObject());
+            }
+            authorize(AuthorizationConstants.AUTZ_ALL_URL, null, null, null, null, null, result);
+            task.setChannel(SchemaConstants.CHANNEL_GUI_USER_URI);
+            task.setHandlerUri(ModelPublicConstants.REINDEX_TASK_HANDLER_URI);
+            task.setName("Reindex repository objects");
+            taskManager.switchToBackground(task, result);
+            result.setBackgroundTaskOid(task.getOid());
         } catch (SecurityViolationException | SchemaException|RuntimeException | ExpressionEvaluationException | ObjectNotFoundException | CommunicationException | ConfigurationException e) {
             result.recordFatalError(e);
         } finally {
@@ -389,16 +431,93 @@ public class PageAbout extends PageAdminConfiguration {
         target.add(getFeedbackPanel());
     }
 
-    private void cleanupActivitiProcessesPerformed(AjaxRequestTarget target) {
-		Task task = getTaskManager().createTaskInstance(OPERATION_CLEANUP_ACTIVITI_PROCESSES);
-        OperationResult result = task.getResult();
+    private Popupable getDeleteAllObjectsConfirmationPanel() {
+        return new ConfirmationPanel(getMainPopupBodyId(), createStringResource("PageAbout.message.deleteAllObjects")) {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void yesPerformed(AjaxRequestTarget target) {
+                resetStateToInitialConfig(target);
+            }
+
+        };
+    }
+
+    private void resetStateToInitialConfig(AjaxRequestTarget target) {
+        OperationResult result = new OperationResult(OPERATION_DELETE_ALL_OBJECTS);
+        String taskOid = null;
+        String taskName = "Delete all objects";
+
+        QueryFactory factory = getPrismContext().queryFactory();
+
+        TypeFilter nodeFilter = factory.createType(NodeType.COMPLEX_TYPE, factory.createAll());
+        final ObjectFilter taskFilter = getPrismContext().queryFor(TaskType.class)
+                .item(TaskType.F_NAME).eq(taskName).buildFilter();
+        NotFilter notNodeFilter = factory.createNot(nodeFilter);
+        NotFilter notTaskFilter = factory.createNot(taskFilter);
+
         try {
-            WorkflowService workflowService = getWorkflowService();
-            workflowService.cleanupActivitiProcesses(task, result);
-        } catch (SecurityViolationException | SchemaException|RuntimeException | ExpressionEvaluationException | ObjectNotFoundException | CommunicationException | ConfigurationException e) {
-            result.recordFatalError(e);
-        } finally {
-            result.computeStatusIfUnknown();
+            QName type = ObjectType.COMPLEX_TYPE;
+            taskOid = deleteObjectsAsync(type, factory.createQuery(
+                    factory.createAnd(notTaskFilter, notNodeFilter)), true,
+                    taskName, result);
+
+        } catch (Exception ex) {
+            result.recomputeStatus();
+            result.recordFatalError(getString("PageAbout.message.resetStateToInitialConfig.allObject.fatalError"), ex);
+
+            LoggingUtils.logUnexpectedException(LOGGER, "Couldn't delete all objects", ex);
+        }
+
+        final String taskOidToRemoving = taskOid;
+
+        try {
+            while(!getTaskManager().getTask(taskOid, result).isClosed()) {TimeUnit.SECONDS.sleep(5);}
+
+            runPrivileged(new Producer<Object>() {
+
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object run() {
+                    Task task = createAnonymousTask(OPERATION_DELETE_TASK);
+                    OperationResult result = new OperationResult(OPERATION_DELETE_TASK);
+                    ObjectDelta<TaskType> delta = getPrismContext().deltaFactory().object()
+                            .createDeleteDelta(TaskType.class, taskOidToRemoving);
+                    Collection<ObjectDelta<? extends ObjectType>> deltaCollection = new ArrayList<ObjectDelta<? extends ObjectType>>() {{add(delta);}};
+                    try {
+                        getModelService().executeChanges(deltaCollection, null, task, result);
+                    } catch (Exception ex) {
+                        result.recomputeStatus();
+                        result.recordFatalError(getString("PageAbout.message.resetStateToInitialConfig.task.fatalError"), ex);
+
+                        LoggingUtils.logUnexpectedException(LOGGER, "Couldn't delete task", ex);
+                    }
+                    result.computeStatus();
+                    return null;
+                }
+
+            });
+
+            InitialDataImport initialDataImport = new InitialDataImport();
+            initialDataImport.setModel(getModelService());
+            initialDataImport.setTaskManager(getTaskManager());
+            initialDataImport.setPrismContext(getPrismContext());
+            initialDataImport.setConfiguration(getMidpointConfiguration());
+            initialDataImport.init();
+
+            // TODO consider if we need to go clusterwide here
+            getCacheDispatcher().dispatchInvalidation(null, null, true, null);
+
+            getModelService().shutdown();
+
+            getModelService().postInit(result);
+
+
+        } catch (Exception ex) {
+            result.recomputeStatus();
+            result.recordFatalError(getString("PageAbout.message.resetStateToInitialConfig.import.fatalError"), ex);
+            LoggingUtils.logUnexpectedException(LOGGER, "Couldn't import initial objects", ex);
         }
         showResult(result);
         target.add(getFeedbackPanel());

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.model.impl.scripting.actions;
@@ -25,12 +16,16 @@ import com.evolveum.midpoint.model.impl.scripting.helpers.OperationsHelper;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.PrismObjectValue;
 import com.evolveum.midpoint.prism.PrismValue;
+import com.evolveum.midpoint.prism.delta.DeltaFactory;
 import com.evolveum.midpoint.prism.delta.ObjectDelta;
+import com.evolveum.midpoint.schema.ObjectDeltaOperation;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
 import com.evolveum.midpoint.xml.ns._public.model.scripting_3.ActionExpressionType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import java.util.Collection;
 
 import javax.annotation.PostConstruct;
 
@@ -66,23 +61,25 @@ public class AddExecutor extends BaseActionExecutor {
                 long started = operationsHelper.recordStart(context, objectType);
                 Throwable exception = null;
                 try {
-                    operationsHelper.applyDelta(createAddDelta(objectType), executionOptions, dryRun, context, result);
+                    Collection<ObjectDeltaOperation<? extends ObjectType>> executedDeltas = operationsHelper.applyDelta(createAddDelta(objectType), executionOptions, dryRun, context, result);
+                    String newObjectOid = ObjectDeltaOperation.findAddDeltaOid(executedDeltas, prismObject);
+                    prismObject.setOid(newObjectOid);
                     operationsHelper.recordEnd(context, objectType, started, null);
                 } catch (Throwable ex) {
                     operationsHelper.recordEnd(context, objectType, started, ex);
                     exception = processActionException(ex, NAME, value, context);
                 }
-				context.println((exception != null ? "Attempted to add " : "Added ") + prismObject.toString() + optionsSuffix(executionOptions, dryRun) + exceptionSuffix(exception));
+                context.println((exception != null ? "Attempted to add " : "Added ") + prismObject.toString() + optionsSuffix(executionOptions, dryRun) + exceptionSuffix(exception));
             } else {
-				//noinspection ThrowableNotThrown
-				processActionException(new ScriptExecutionException("Item is not a PrismObject"), NAME, value, context);
+                //noinspection ThrowableNotThrown
+                processActionException(new ScriptExecutionException("Item is not a PrismObject"), NAME, value, context);
             }
             operationsHelper.trimAndCloneResult(result, globalResult, context);
         }
         return input;
     }
 
-	private ObjectDelta<? extends ObjectType> createAddDelta(ObjectType objectType) {
-        return ObjectDelta.createAddDelta(objectType.asPrismObject());
+    private ObjectDelta<? extends ObjectType> createAddDelta(ObjectType objectType) {
+        return DeltaFactory.Object.createAddDelta(objectType.asPrismObject());
     }
 }

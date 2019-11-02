@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.notifications.impl;
@@ -22,6 +13,7 @@ import com.evolveum.midpoint.notifications.api.NotificationManager;
 import com.evolveum.midpoint.notifications.api.events.BaseEvent;
 import com.evolveum.midpoint.notifications.api.events.Event;
 import com.evolveum.midpoint.notifications.api.transports.Transport;
+import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.repo.api.RepositoryService;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.result.OperationResult;
@@ -49,22 +41,20 @@ import java.util.HashMap;
 public class NotificationManagerImpl implements NotificationManager {
 
     private static final Trace LOGGER = TraceManager.getTrace(NotificationManager.class);
-	private static final String OPERATION_PROCESS_EVENT = NotificationManager.class + ".processEvent";
+    private static final String OPERATION_PROCESS_EVENT = NotificationManager.class + ".processEvent";
 
-	@Autowired
+    @Autowired
     @Qualifier("cacheRepositoryService")
     private transient RepositoryService cacheRepositoryService;
 
-	@Autowired
-	private NotificationFunctions notificationFunctions;
-
-	@Autowired
-	private TaskManager taskManager;
+    @Autowired private PrismContext prismContext;
+    @Autowired private NotificationFunctions notificationFunctions;
+    @Autowired private TaskManager taskManager;
 
     private boolean disabled = false;               // for testing purposes (in order for model-intest to run more quickly)
 
     private HashMap<Class<? extends EventHandlerType>,EventHandler> handlers = new HashMap<>();
-    private HashMap<String,Transport> transports = new HashMap<String,Transport>();
+    private HashMap<String,Transport> transports = new HashMap<>();
 
     public void registerEventHandler(Class<? extends EventHandlerType> clazz, EventHandler handler) {
         LOGGER.trace("Registering event handler " + handler + " for " + clazz);
@@ -98,21 +88,17 @@ public class NotificationManagerImpl implements NotificationManager {
         }
     }
 
-    public void processEvent(@Nullable Event event) {
-		Task task = taskManager.createTaskInstance(OPERATION_PROCESS_EVENT);
-        processEvent(event, task, task.getResult());
-    }
-
     public void processEvent(@Nullable Event event, Task task, OperationResult result) {
         if (event == null) {
             return;
         }
 
-		if (event instanceof BaseEvent) {
-			((BaseEvent) event).setNotificationFunctions(notificationFunctions);
-		}
+        if (event instanceof BaseEvent) {
+            ((BaseEvent) event).setNotificationFunctions(notificationFunctions);
+            ((BaseEvent) event).setPrismContext(prismContext);
+        }
 
-		LOGGER.trace("NotificationManager processing event:\n{}", event.debugDumpLazily(1));
+        LOGGER.trace("NotificationManager processing event:\n{}", event.debugDumpLazily(1));
 
         if (event.getAdHocHandler() != null) {
             processEvent(event, event.getAdHocHandler(), task, result);
@@ -120,7 +106,7 @@ public class NotificationManagerImpl implements NotificationManager {
 
         boolean errorIfNotFound = !SchemaConstants.CHANNEL_GUI_INIT_URI.equals(task.getChannel());
         SystemConfigurationType systemConfigurationType = NotificationFunctionsImpl
-				.getSystemConfiguration(cacheRepositoryService, errorIfNotFound, result);
+                .getSystemConfiguration(cacheRepositoryService, errorIfNotFound, result);
         if (systemConfigurationType == null) {      // something really wrong happened (or we are doing initial import of objects)
             return;
         }
@@ -128,43 +114,43 @@ public class NotificationManagerImpl implements NotificationManager {
 //        boolean specificSecurityPoliciesDefined = false;
 //        if (systemConfigurationType.getGlobalSecurityPolicyRef() != null) {
 //
-//        	SecurityPolicyType securityPolicyType = NotificationFuctionsImpl.getSecurityPolicyConfiguration(systemConfigurationType.getGlobalSecurityPolicyRef(), cacheRepositoryService, result);
-//        	if (securityPolicyType != null && securityPolicyType.getAuthentication() != null) {
+//            SecurityPolicyType securityPolicyType = NotificationFuctionsImpl.getSecurityPolicyConfiguration(systemConfigurationType.getGlobalSecurityPolicyRef(), cacheRepositoryService, result);
+//            if (securityPolicyType != null && securityPolicyType.getAuthentication() != null) {
 //
-//        		for (MailAuthenticationPolicyType mailPolicy : securityPolicyType.getAuthentication().getMailAuthentication()) {
-//        			NotificationConfigurationType notificationConfigurationType = mailPolicy.getNotificationConfiguration();
-//        			if (notificationConfigurationType != null) {
-//        				specificSecurityPoliciesDefined = true;
-//        				processNotifications(notificationConfigurationType, event, task, result);
-//        			}
-//        		}
+//                for (MailAuthenticationPolicyType mailPolicy : securityPolicyType.getAuthentication().getMailAuthentication()) {
+//                    NotificationConfigurationType notificationConfigurationType = mailPolicy.getNotificationConfiguration();
+//                    if (notificationConfigurationType != null) {
+//                        specificSecurityPoliciesDefined = true;
+//                        processNotifications(notificationConfigurationType, event, task, result);
+//                    }
+//                }
 //
-//        		for (SmsAuthenticationPolicyType mailPolicy : securityPolicyType.getAuthentication().getSmsAuthentication()) {
-//        			NotificationConfigurationType notificationConfigurationType = mailPolicy.getNotificationConfiguration();
-//        			if (notificationConfigurationType != null) {
-//        				specificSecurityPoliciesDefined = true;
-//        				processNotifications(notificationConfigurationType, event, task, result);
-//        			}
-//        		}
+//                for (SmsAuthenticationPolicyType mailPolicy : securityPolicyType.getAuthentication().getSmsAuthentication()) {
+//                    NotificationConfigurationType notificationConfigurationType = mailPolicy.getNotificationConfiguration();
+//                    if (notificationConfigurationType != null) {
+//                        specificSecurityPoliciesDefined = true;
+//                        processNotifications(notificationConfigurationType, event, task, result);
+//                    }
+//                }
 //
-//        		return;
-//        	}
+//                return;
+//            }
 //        }
 //
 //        if (specificSecurityPoliciesDefined) {
-//        	LOGGER.trace("Specific policy for notifier set in security configuration, skupping notifiers defined in system configuration.");
+//            LOGGER.trace("Specific policy for notifier set in security configuration, skupping notifiers defined in system configuration.");
 //            return;
 //        }
 
         if (systemConfigurationType.getNotificationConfiguration() == null) {
-			LOGGER.trace("No notification configuration in repository, finished event processing.");
+            LOGGER.trace("No notification configuration in repository, finished event processing.");
             return;
         }
 
         NotificationConfigurationType notificationConfigurationType = systemConfigurationType.getNotificationConfiguration();
         processNotifications(notificationConfigurationType, event, task, result);
 
-		LOGGER.trace("NotificationManager successfully processed event {} ({} top level handler(s))", event, notificationConfigurationType.getHandler().size());
+        LOGGER.trace("NotificationManager successfully processed event {} ({} top level handler(s))", event, notificationConfigurationType.getHandler().size());
     }
 
     private void processNotifications(NotificationConfigurationType notificationConfigurationType, Event event, Task task, OperationResult result){

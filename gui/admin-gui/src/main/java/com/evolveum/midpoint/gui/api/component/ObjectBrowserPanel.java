@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.gui.api.component;
 
@@ -21,220 +12,240 @@ import java.util.List;
 
 import javax.xml.namespace.QName;
 
-import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.query.ObjectFilter;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
 
 import com.evolveum.midpoint.schema.GetOperationOptions;
 import com.evolveum.midpoint.schema.SelectorOptions;
 import com.evolveum.midpoint.schema.constants.ObjectTypes;
-import com.evolveum.midpoint.web.component.data.SelectableBeanObjectDataProvider;
 import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.form.OnChangeAjaxBehavior;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.form.DropDownChoice;
+import org.apache.wicket.markup.html.form.EnumChoiceRenderer;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.StringResourceModel;
 import org.apache.wicket.model.util.ListModel;
 
 import com.evolveum.midpoint.gui.api.model.LoadableModel;
 import com.evolveum.midpoint.gui.api.page.PageBase;
-import com.evolveum.midpoint.prism.PrismObjectDefinition;
 import com.evolveum.midpoint.web.component.AjaxButton;
 import com.evolveum.midpoint.web.component.dialog.Popupable;
-import com.evolveum.midpoint.web.component.input.QNameChoiceRenderer;
 import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 
 public class ObjectBrowserPanel<O extends ObjectType> extends BasePanel<O> implements Popupable {
 
-	private static final long serialVersionUID = 1L;
-	private static final String ID_TYPE = "type";
-	private static final String ID_TYPE_PANEL = "typePanel";
-	private static final String ID_TABLE = "table";
+    private static final long serialVersionUID = 1L;
+    private static final String ID_TYPE = "type";
+    private static final String ID_TYPE_PANEL = "typePanel";
+    private static final String ID_TABLE = "table";
 
-	private static final String ID_BUTTON_ADD = "addButton";
+    private static final String ID_BUTTON_ADD = "addButton";
 
-	private IModel<QName> typeModel;
+    private IModel<ObjectTypes> typeModel;
 
-	private PageBase parentPage;
-	private ObjectFilter queryFilter;
-	private List<O> selectedObjectsList = new ArrayList<O>();
+    private PageBase parentPage;
+    private ObjectFilter queryFilter;
+    private List<O> selectedObjectsList = new ArrayList<>();
+    private Class<? extends O> defaultType;
+    private List<QName> supportedTypes = new ArrayList<>();
+    boolean multiselect;
 
-	/**
-	 * @param defaultType specifies type of the object that will be selected by default
-	 */
-	public ObjectBrowserPanel(String id, final Class<? extends O> defaultType, List<QName> supportedTypes, boolean multiselect,
-							  PageBase parentPage) {
-		this(id, defaultType, supportedTypes, multiselect, parentPage, null);
-	}
+    /**
+     * @param defaultType specifies type of the object that will be selected by default
+     */
+    public ObjectBrowserPanel(String id, final Class<? extends O> defaultType, List<QName> supportedTypes, boolean multiselect,
+                              PageBase parentPage) {
+        this(id, defaultType, supportedTypes, multiselect, parentPage, null);
+    }
 
-	/**
-	 * @param defaultType specifies type of the object that will be selected by default
-	 */
-	public ObjectBrowserPanel(String id, final Class<? extends O> defaultType, List<QName> supportedTypes, boolean multiselect,
-							  PageBase parentPage, ObjectFilter queryFilter) {
-		this(id, defaultType, supportedTypes, multiselect, parentPage, queryFilter, new ArrayList<O>());
-	}
+    /**
+     * @param defaultType specifies type of the object that will be selected by default
+     */
+    public ObjectBrowserPanel(String id, final Class<? extends O> defaultType, List<QName> supportedTypes, boolean multiselect,
+                              PageBase parentPage, ObjectFilter queryFilter) {
+        this(id, defaultType, supportedTypes, multiselect, parentPage, queryFilter, new ArrayList<>());
+    }
 
-	public ObjectBrowserPanel(String id, final Class<? extends O> defaultType, List<QName> supportedTypes, boolean multiselect,
-							  PageBase parentPage, ObjectFilter queryFilter, List<O> selectedData) {
-		super(id);
-		this.parentPage = parentPage;
-		this.queryFilter = queryFilter;
-		this.selectedObjectsList = selectedData;
-		typeModel = new LoadableModel<QName>(false) {
-			private static final long serialVersionUID = 1L;
+    public ObjectBrowserPanel(String id, final Class<? extends O> defaultType, List<QName> supportedTypes, boolean multiselect,
+                              PageBase parentPage, ObjectFilter queryFilter, List<O> selectedData) {
+        super(id);
+        this.parentPage = parentPage;
+        this.queryFilter = queryFilter;
+        this.selectedObjectsList = selectedData;
+        typeModel = new LoadableModel<ObjectTypes>(false) {
 
-			@Override
-			protected QName load() {
-				return compileTimeClassToQName(defaultType);
-			}
+            private static final long serialVersionUID = 1L;
 
-		};
+            @Override
+            protected ObjectTypes load() {
+                if (defaultType == null) {
+                    return null;
+                }
+                return ObjectTypes.getObjectType(defaultType);
+            }
 
-		initLayout(defaultType, supportedTypes, multiselect);
-	}
+        };
 
-	private void initLayout(Class<? extends O> type, final List<QName> supportedTypes, final boolean multiselect) {
+        this.defaultType = defaultType;
+        this.supportedTypes = supportedTypes;
+        this.multiselect = multiselect;
+    }
 
-		WebMarkupContainer typePanel = new WebMarkupContainer(ID_TYPE_PANEL);
-		typePanel.setOutputMarkupId(true);
-		typePanel.add(new VisibleEnableBehaviour() {
-			private static final long serialVersionUID = 1L;
+    protected void onInitialize(){
+        super.onInitialize();
+        initLayout();
+    }
 
-			@Override
-			public boolean isVisible() {
-				return supportedTypes.size() != 1;
-			}
-		});
-		add(typePanel);
-		DropDownChoice<QName> typeSelect = new DropDownChoice<QName>(ID_TYPE, typeModel,
-				new ListModel<QName>(supportedTypes), new QNameChoiceRenderer());
-		typeSelect.add(new OnChangeAjaxBehavior() {
-			private static final long serialVersionUID = 1L;
+    private void initLayout() {
+        List<ObjectTypes> supported = new ArrayList<>();
+        for (QName qname : supportedTypes) {
+            supported.add(ObjectTypes.getObjectTypeFromTypeQName(qname));
+        }
 
-			@Override
-			protected void onUpdate(AjaxRequestTarget target) {
+        WebMarkupContainer typePanel = new WebMarkupContainer(ID_TYPE_PANEL);
+        typePanel.setOutputMarkupId(true);
+        typePanel.add(new VisibleEnableBehaviour() {
 
-				ObjectListPanel<O> listPanel = (ObjectListPanel<O>) get(ID_TABLE);
+            private static final long serialVersionUID = 1L;
 
-				listPanel = createObjectListPanel(qnameToCompileTimeClass(typeModel.getObject()),
-						multiselect);
-				addOrReplace(listPanel);
-				target.add(listPanel);
-			}
-		});
-		typePanel.add(typeSelect);
+            @Override
+            public boolean isVisible() {
+                return supportedTypes.size() != 1;
+            }
+        });
+        add(typePanel);
 
-		ObjectListPanel<O> listPanel = createObjectListPanel(type, multiselect);
-		add(listPanel);
+        DropDownChoice<ObjectTypes> typeSelect = new DropDownChoice<>(ID_TYPE, typeModel,
+            new ListModel<>(supported), new EnumChoiceRenderer<>(this));
+        typeSelect.add(new OnChangeAjaxBehavior() {
 
-		AjaxButton addButton = new AjaxButton(ID_BUTTON_ADD,
-				createStringResource("userBrowserDialog.button.addButton")) {
+            private static final long serialVersionUID = 1L;
 
-			private static final long serialVersionUID = 1L;
+            @Override
+            protected void onUpdate(AjaxRequestTarget target) {
+                ObjectListPanel<O> listPanel = (ObjectListPanel<O>) get(ID_TABLE);
 
-			@Override
-			public void onClick(AjaxRequestTarget target) {
-				List<O> selected = ((PopupObjectListPanel) getParent().get(ID_TABLE)).getSelectedObjects();
-				QName type = ObjectBrowserPanel.this.typeModel.getObject();
-				ObjectBrowserPanel.this.addPerformed(target, type, selected);
-			}
-		};
+                listPanel = createObjectListPanel(typeModel.getObject(), multiselect);
+                addOrReplace(listPanel);
+                target.add(listPanel);
+            }
+        });
+        typePanel.add(typeSelect);
 
-		addButton.add(new VisibleEnableBehaviour() {
-			private static final long serialVersionUID = 1L;
+        ObjectTypes objType = defaultType != null ? ObjectTypes.getObjectType(defaultType) : null;
+        ObjectListPanel<O> listPanel = createObjectListPanel(objType, multiselect);
+        add(listPanel);
 
-			@Override
-			public boolean isVisible() {
-				return multiselect;
-			}
-		});
+        AjaxButton addButton = new AjaxButton(ID_BUTTON_ADD,
+                createStringResource("userBrowserDialog.button.addButton")) {
 
-		add(addButton);
-	}
+            private static final long serialVersionUID = 1L;
 
-	protected void onClick(AjaxRequestTarget target, O focus) {
-		parentPage.hideMainPopup(target);
-	}
+            @Override
+            public void onClick(AjaxRequestTarget target) {
+                List<O> selected = ((PopupObjectListPanel) getParent().get(ID_TABLE)).getSelectedObjects();
+                ObjectTypes type = ObjectBrowserPanel.this.typeModel.getObject();
+                QName qname = type != null ? type.getTypeQName() : null;
+                ObjectBrowserPanel.this.addPerformed(target, qname, selected);
+            }
+        };
 
-	protected void onSelectPerformed(AjaxRequestTarget target, O focus) {
-		parentPage.hideMainPopup(target);
-	}
+        addButton.add(new VisibleEnableBehaviour() {
 
-	private ObjectListPanel<O> createObjectListPanel(Class<? extends O> type, final boolean multiselect) {
+            private static final long serialVersionUID = 1L;
 
-		PopupObjectListPanel<O> listPanel = new PopupObjectListPanel<O>(ID_TABLE, type, getOptions(),
-				multiselect, parentPage, selectedObjectsList) {
-			private static final long serialVersionUID = 1L;
+            @Override
+            public boolean isVisible() {
+                return multiselect;
+            }
+        });
 
-			@Override
-			protected void onSelectPerformed(AjaxRequestTarget target, O object) {
-				ObjectBrowserPanel.this.onSelectPerformed(target, object);
-			}
+        add(addButton);
+    }
 
-			@Override
-			protected ObjectQuery addFilterToContentQuery(ObjectQuery query) {
-				if (queryFilter != null) {
-					if (query == null) {
-						query = new ObjectQuery();
-					}
-					query.addFilter(queryFilter);
-				}
-				return query;
-			}
-		};
-		listPanel.setOutputMarkupId(true);
-		return listPanel;
-	}
+    protected void onClick(AjaxRequestTarget target, O focus) {
+        parentPage.hideMainPopup(target);
+    }
 
-	protected void addPerformed(AjaxRequestTarget target, QName type, List<O> selected) {
-		parentPage.hideMainPopup(target);
-	}
+    protected void onSelectPerformed(AjaxRequestTarget target, O focus) {
+        parentPage.hideMainPopup(target);
+    }
 
-	private Class qnameToCompileTimeClass(QName typeName) {
-		return parentPage.getPrismContext().getSchemaRegistry().getCompileTimeClassForObjectType(typeName);
-	}
+    private ObjectListPanel<O> createObjectListPanel(ObjectTypes type, final boolean multiselect) {
+        Class typeClass = type.getClassDefinition();
 
-	private Collection<SelectorOptions<GetOperationOptions>> getOptions() {
-		if (ObjectTypes.SHADOW.getTypeQName().equals(typeModel.getObject())) {
-			return SelectorOptions.createCollection(ItemPath.EMPTY_PATH, GetOperationOptions.createNoFetch());
-		}
-		return null;
+        PopupObjectListPanel<O> listPanel = new PopupObjectListPanel<O>(ID_TABLE, typeClass, getOptions(),
+                multiselect, parentPage) {
 
-	}
+            private static final long serialVersionUID = 1L;
 
-	private QName compileTimeClassToQName(Class<? extends O> type) {
-		PrismObjectDefinition def = parentPage.getPrismContext().getSchemaRegistry()
-				.findObjectDefinitionByCompileTimeClass(type);
-		if (def == null) {
-			return UserType.COMPLEX_TYPE;
-		}
+            @Override
+            protected void onSelectPerformed(AjaxRequestTarget target, O object) {
+                ObjectBrowserPanel.this.onSelectPerformed(target, object);
+            }
 
-		return def.getTypeName();
-	}
+            @Override
+            protected ObjectQuery addFilterToContentQuery(ObjectQuery query) {
+                if (queryFilter != null) {
+                    if (query == null) {
+                        query = parentPage.getPrismContext().queryFactory().createQuery();
+                    }
+                    query.addFilter(queryFilter);
+                }
+                return query;
+            }
 
-	@Override
-	public int getWidth() {
-		return 900;
-	}
+            @Override
+            protected List<O> getPreselectedObjectList(){
+                return selectedObjectsList;
+            }
+        };
+        listPanel.setOutputMarkupId(true);
+        return listPanel;
+    }
 
-	@Override
-	public int getHeight() {
-		return 700;
-	}
+    protected void addPerformed(AjaxRequestTarget target, QName type, List<O> selected) {
+        parentPage.hideMainPopup(target);
+    }
 
-	@Override
-	public StringResourceModel getTitle() {
-		return parentPage.createStringResource("ObjectBrowserPanel.chooseObject");
-	}
+    private Collection<SelectorOptions<GetOperationOptions>> getOptions() {
+        if (ObjectTypes.SHADOW.getTypeQName().equals(typeModel.getObject() != null ? typeModel.getObject().getTypeQName() : null)) {
+            return getSchemaHelper().getOperationOptionsBuilder().noFetch().build();
+        }
+        return null;
+    }
 
-	@Override
-	public Component getComponent() {
-		return this;
-	}
+    @Override
+    public int getWidth() {
+        return 900;
+    }
+
+    @Override
+    public int getHeight() {
+        return 700;
+    }
+
+    @Override
+    public String getWidthUnit(){
+        return "px";
+    }
+
+    @Override
+    public String getHeightUnit(){
+        return "px";
+    }
+
+    @Override
+    public StringResourceModel getTitle() {
+        return parentPage.createStringResource("ObjectBrowserPanel.chooseObject");
+    }
+
+    @Override
+    public Component getComponent() {
+        return this;
+    }
 
 }

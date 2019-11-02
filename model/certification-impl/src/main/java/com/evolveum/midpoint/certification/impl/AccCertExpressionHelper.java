@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.certification.impl;
@@ -27,14 +18,9 @@ import com.evolveum.midpoint.repo.common.expression.ExpressionUtil;
 import com.evolveum.midpoint.repo.common.expression.ExpressionVariables;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.result.OperationResult;
+import com.evolveum.midpoint.schema.util.MiscSchemaUtil;
 import com.evolveum.midpoint.task.api.Task;
-import com.evolveum.midpoint.util.exception.CommunicationException;
-import com.evolveum.midpoint.util.exception.ConfigurationException;
-import com.evolveum.midpoint.util.exception.ExpressionEvaluationException;
-import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
-import com.evolveum.midpoint.util.exception.SchemaException;
-import com.evolveum.midpoint.util.exception.SecurityViolationException;
-import com.evolveum.midpoint.util.exception.SystemException;
+import com.evolveum.midpoint.util.exception.*;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
@@ -56,34 +42,32 @@ public class AccCertExpressionHelper {
 
     private static final transient Trace LOGGER = TraceManager.getTrace(AccCertExpressionHelper.class);
 
-    @Autowired
-    private PrismContext prismContext;
+    @Autowired private PrismContext prismContext;
+    @Autowired private ExpressionFactory expressionFactory;
 
-    @Autowired
-    private ExpressionFactory expressionFactory;
+//    public <T> List<T> evaluateExpressionChecked(Class<T> resultClass, ExpressionType expressionType, ExpressionVariables expressionVariables,
+//                                                  String shortDesc, Task task, OperationResult result) {
+//
+//        try {
+//            return evaluateExpression(resultClass, expressionType, expressionVariables, shortDesc, task, result);
+//        } catch (ObjectNotFoundException|SchemaException|ExpressionEvaluationException | CommunicationException | ConfigurationException | SecurityViolationException e) {
+//            LoggingUtils.logException(LOGGER, "Couldn't evaluate {} {}", e, shortDesc, expressionType);
+//            result.recordFatalError("Couldn't evaluate " + shortDesc, e);
+//            throw new SystemException(e);
+//        }
+//    }
 
-    public <T> List<T> evaluateExpressionChecked(Class<T> resultClass, ExpressionType expressionType, ExpressionVariables expressionVariables,
-                                                  String shortDesc, Task task, OperationResult result) {
-
-        try {
-            return evaluateExpression(resultClass, expressionType, expressionVariables, shortDesc, task, result);
-        } catch (ObjectNotFoundException|SchemaException|ExpressionEvaluationException | CommunicationException | ConfigurationException | SecurityViolationException e) {
-            LoggingUtils.logException(LOGGER, "Couldn't evaluate {} {}", e, shortDesc, expressionType);
-            result.recordFatalError("Couldn't evaluate " + shortDesc, e);
-            throw new SystemException(e);
-        }
-    }
-
+    @SuppressWarnings("SameParameterValue")
     private <T> List<T> evaluateExpression(Class<T> resultClass, ExpressionType expressionType, ExpressionVariables expressionVariables,
             String shortDesc, Task task, OperationResult result) throws ObjectNotFoundException, SchemaException, ExpressionEvaluationException, CommunicationException, ConfigurationException, SecurityViolationException {
 
         QName xsdType = XsdTypeMapper.toXsdType(resultClass);
 
         QName resultName = new QName(SchemaConstants.NS_C, "result");
-        PrismPropertyDefinition<T> resultDef = new PrismPropertyDefinitionImpl<>(resultName, xsdType, prismContext);
+        PrismPropertyDefinition<T> resultDef = prismContext.definitionFactory().createPropertyDefinition(resultName, xsdType);
 
-        Expression<PrismPropertyValue<T>,PrismPropertyDefinition<T>> expression = expressionFactory.makeExpression(expressionType, resultDef, shortDesc, task, result);
-        ExpressionEvaluationContext params = new ExpressionEvaluationContext(null, expressionVariables, shortDesc, task, result);
+        Expression<PrismPropertyValue<T>,PrismPropertyDefinition<T>> expression = expressionFactory.makeExpression(expressionType, resultDef, MiscSchemaUtil.getExpressionProfile(), shortDesc, task, result);
+        ExpressionEvaluationContext params = new ExpressionEvaluationContext(null, expressionVariables, shortDesc, task);
 
         PrismValueDeltaSetTriple<PrismPropertyValue<T>> exprResult = ModelExpressionThreadLocalHolder.evaluateExpressionInContext(expression, params, task, result);
 
@@ -94,12 +78,11 @@ public class AccCertExpressionHelper {
         return retval;
     }
 
-    public List<ObjectReferenceType> evaluateRefExpressionChecked(ExpressionType expressionType,
-			ExpressionVariables expressionVariables, String shortDesc, Task task, OperationResult result) {
-
+    List<ObjectReferenceType> evaluateRefExpressionChecked(ExpressionType expressionType,
+            ExpressionVariables expressionVariables, String shortDesc, Task task, OperationResult result) {
         try {
             return evaluateRefExpression(expressionType, expressionVariables, shortDesc, task, result);
-        } catch (ObjectNotFoundException|SchemaException|ExpressionEvaluationException | CommunicationException | ConfigurationException | SecurityViolationException e) {
+        } catch (CommonException|RuntimeException e) {
             LoggingUtils.logException(LOGGER, "Couldn't evaluate {} {}", e, shortDesc, expressionType);
             result.recordFatalError("Couldn't evaluate " + shortDesc, e);
             throw new SystemException(e);
@@ -107,41 +90,41 @@ public class AccCertExpressionHelper {
     }
 
     private List<ObjectReferenceType> evaluateRefExpression(ExpressionType expressionType, ExpressionVariables expressionVariables,
-			String shortDesc, Task task, OperationResult result)
-			throws ObjectNotFoundException, SchemaException, ExpressionEvaluationException, CommunicationException, ConfigurationException, SecurityViolationException {
+            String shortDesc, Task task, OperationResult result)
+            throws ObjectNotFoundException, SchemaException, ExpressionEvaluationException, CommunicationException, ConfigurationException, SecurityViolationException {
 
         QName resultName = new QName(SchemaConstants.NS_C, "result");
-        PrismReferenceDefinition resultDef = new PrismReferenceDefinitionImpl(resultName, ObjectReferenceType.COMPLEX_TYPE, prismContext);
+        PrismReferenceDefinition resultDef = prismContext.definitionFactory().createReferenceDefinition(resultName, ObjectReferenceType.COMPLEX_TYPE);
 
-        Expression<PrismReferenceValue,PrismReferenceDefinition> expression = expressionFactory.makeExpression(expressionType, resultDef, shortDesc, task, result);
-        ExpressionEvaluationContext context = new ExpressionEvaluationContext(null, expressionVariables, shortDesc, task, result);
-		context.setAdditionalConvertor(ExpressionUtil.createRefConvertor(UserType.COMPLEX_TYPE));
+        Expression<PrismReferenceValue,PrismReferenceDefinition> expression = expressionFactory.makeExpression(expressionType, resultDef, MiscSchemaUtil.getExpressionProfile(), shortDesc, task, result);
+        ExpressionEvaluationContext context = new ExpressionEvaluationContext(null, expressionVariables, shortDesc, task);
+        context.setAdditionalConvertor(ExpressionUtil.createRefConvertor(UserType.COMPLEX_TYPE));
         PrismValueDeltaSetTriple<PrismReferenceValue> exprResult =
                 ModelExpressionThreadLocalHolder.evaluateRefExpressionInContext(expression, context, task, result);
 
         List<ObjectReferenceType> retval = new ArrayList<>();
         for (PrismReferenceValue value : exprResult.getZeroSet()) {
-        	ObjectReferenceType ort = new ObjectReferenceType();
-        	ort.setupReferenceValue(value);
+            ObjectReferenceType ort = new ObjectReferenceType();
+            ort.setupReferenceValue(value);
             retval.add(ort);
         }
         return retval;
     }
 
-    public boolean evaluateBooleanExpressionChecked(ExpressionType expressionType, ExpressionVariables expressionVariables,
-                                                       String shortDesc, Task task, OperationResult result) {
-
-        try {
-            return evaluateBooleanExpression(expressionType, expressionVariables, shortDesc, task, result);
-        } catch (ObjectNotFoundException|SchemaException|ExpressionEvaluationException | CommunicationException | ConfigurationException | SecurityViolationException e) {
-            LoggingUtils.logException(LOGGER, "Couldn't evaluate {} {}", e, shortDesc, expressionType);
-            result.recordFatalError("Couldn't evaluate " + shortDesc, e);
-            throw new SystemException(e);
-        }
-    }
+//    public boolean evaluateBooleanExpressionChecked(ExpressionType expressionType, ExpressionVariables expressionVariables,
+//                                                       String shortDesc, Task task, OperationResult result) {
+//
+//        try {
+//            return evaluateBooleanExpression(expressionType, expressionVariables, shortDesc, task, result);
+//        } catch (ObjectNotFoundException|SchemaException|ExpressionEvaluationException | CommunicationException | ConfigurationException | SecurityViolationException e) {
+//            LoggingUtils.logException(LOGGER, "Couldn't evaluate {} {}", e, shortDesc, expressionType);
+//            result.recordFatalError("Couldn't evaluate " + shortDesc, e);
+//            throw new SystemException(e);
+//        }
+//    }
 
     public boolean evaluateBooleanExpression(ExpressionType expressionType, ExpressionVariables expressionVariables, String shortDesc,
-			Task task, OperationResult result) throws ObjectNotFoundException, SchemaException, ExpressionEvaluationException, CommunicationException, ConfigurationException, SecurityViolationException {
+            Task task, OperationResult result) throws ObjectNotFoundException, SchemaException, ExpressionEvaluationException, CommunicationException, ConfigurationException, SecurityViolationException {
         List<Boolean> exprResult = evaluateExpression(Boolean.class, expressionType, expressionVariables, shortDesc, task, result);
         if (exprResult.size() == 0) {
             return false;

@@ -1,23 +1,15 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.input;
 
 import com.evolveum.midpoint.gui.api.component.BasePanel;
 import com.evolveum.midpoint.gui.api.model.LoadableModel;
+import com.evolveum.midpoint.gui.api.page.PageBase;
 import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.gui.api.util.WebModelServiceUtils;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
@@ -40,7 +32,6 @@ import org.apache.wicket.markup.html.form.DropDownChoice;
 import org.apache.wicket.markup.html.form.EnumChoiceRenderer;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.TextArea;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.PropertyModel;
 
@@ -78,9 +69,9 @@ public class ExpressionEditorPanel extends BasePanel<ExpressionType> {
     private IModel<ExpressionTypeDto> dtoModel;
     private Map<String, String> policyMap = new HashMap<>();
 
-    public ExpressionEditorPanel(String id, IModel<ExpressionType> model, PageResourceWizard parentPage) {
+    public ExpressionEditorPanel(String id, IModel<ExpressionType> model, PageBase parentPage) {
         super(id, model);
-		initLayout(parentPage);
+        initLayout(parentPage);
     }
 
     protected IModel<ExpressionTypeDto> getExpressionDtoModel(){
@@ -98,36 +89,34 @@ public class ExpressionEditorPanel extends BasePanel<ExpressionType> {
         }
     }
 
-    protected void initLayout(PageResourceWizard parentPage) {
-		parentPage.addEditingEnabledBehavior(this);
-
-		setOutputMarkupId(true);
+    protected void initLayout(PageBase parentPage) {
+        setOutputMarkupId(true);
 
         loadDtoModel();
 
-		Label descriptionLabel = new Label(ID_LABEL_DESCRIPTION, createStringResource(getDescriptionLabelKey()));
-		add(descriptionLabel);
+        Label descriptionLabel = new Label(ID_LABEL_DESCRIPTION, createStringResource(getDescriptionLabelKey()));
+        add(descriptionLabel);
 
-		TextArea description = new TextArea<>(ID_DESCRIPTION, new PropertyModel<String>(dtoModel, ExpressionTypeDto.F_DESCRIPTION));
-		description.setOutputMarkupId(true);
-		//parentPage.addEditingEnabledBehavior(description);
-		add(description);
+        TextArea description = new TextArea<>(ID_DESCRIPTION, new PropertyModel<String>(dtoModel, ExpressionTypeDto.F_DESCRIPTION));
+        description.setOutputMarkupId(true);
+        //parentPage.addEditingEnabledBehavior(description);
+        add(description);
 
-		Label typeLabel = new Label(ID_LABEL_TYPE, createStringResource(getTypeLabelKey()));
+        Label typeLabel = new Label(ID_LABEL_TYPE, createStringResource(getTypeLabelKey()));
         add(typeLabel);
 
         DropDownChoice type = new DropDownChoice<>(ID_TYPE,
-                new PropertyModel<ExpressionUtil.ExpressionEvaluatorType>(dtoModel, ExpressionTypeDto.F_TYPE),
+            new PropertyModel<>(dtoModel, ExpressionTypeDto.F_TYPE),
                 WebComponentUtil.createReadonlyModelFromEnum(ExpressionUtil.ExpressionEvaluatorType.class),
-                new EnumChoiceRenderer<ExpressionUtil.ExpressionEvaluatorType>(this));
-		//parentPage.addEditingEnabledBehavior(type);
-		type.add(new AjaxFormComponentUpdatingBehavior("change") {
+            new EnumChoiceRenderer<>(this));
+        //parentPage.addEditingEnabledBehavior(type);
+        type.add(new AjaxFormComponentUpdatingBehavior("change") {
 
             @Override
             protected void onUpdate(AjaxRequestTarget target) {
                 dtoModel.getObject().updateExpressionType();
                 //target.add(get(ID_LANGUAGE_CONTAINER), get(ID_POLICY_CONTAINER), get(ID_EXPRESSION));
-				target.add(ExpressionEditorPanel.this);				// because of ACE editor
+                target.add(ExpressionEditorPanel.this);                // because of ACE editor
             }
         });
         type.setOutputMarkupId(true);
@@ -145,21 +134,21 @@ public class ExpressionEditorPanel extends BasePanel<ExpressionType> {
                 return ExpressionUtil.ExpressionEvaluatorType.SCRIPT.equals(dtoModel.getObject().getType());
             }
         });
-		//parentPage.addEditingEnabledBehavior(languageContainer);
-		add(languageContainer);
+        //parentPage.addEditingEnabledBehavior(languageContainer);
+        add(languageContainer);
 
         DropDownChoice language = new DropDownChoice<>(ID_LANGUAGE,
-                new PropertyModel<ExpressionUtil.Language>(dtoModel, ExpressionTypeDto.F_LANGUAGE),
+            new PropertyModel<>(dtoModel, ExpressionTypeDto.F_LANGUAGE),
                 WebComponentUtil.createReadonlyModelFromEnum(ExpressionUtil.Language.class),
-                new EnumChoiceRenderer<ExpressionUtil.Language>(this));
-		//parentPage.addEditingEnabledBehavior(language);
-		language.add(new AjaxFormComponentUpdatingBehavior("change") {
+            new EnumChoiceRenderer<>(this));
+        //parentPage.addEditingEnabledBehavior(language);
+        language.add(new AjaxFormComponentUpdatingBehavior("change") {
 
             @Override
             protected void onUpdate(AjaxRequestTarget target) {
                 dtoModel.getObject().updateExpressionLanguage();
                 //target.add(get(ID_LANGUAGE_CONTAINER), get(ID_POLICY_CONTAINER), get(ID_EXPRESSION));
-				target.add(ExpressionEditorPanel.this);			// because of ACE editor
+                target.add(ExpressionEditorPanel.this);            // because of ACE editor
             }
         });
         language.setNullValid(false);
@@ -178,16 +167,16 @@ public class ExpressionEditorPanel extends BasePanel<ExpressionType> {
         add(policyContainer);
 
         DropDownChoice policyRef = new DropDownChoice<>(ID_POLICY_REF,
-                new PropertyModel<ObjectReferenceType>(dtoModel, ExpressionTypeDto.F_POLICY_REF),
-                new AbstractReadOnlyModel<List<ObjectReferenceType>>() {
+            new PropertyModel<>(dtoModel, ExpressionTypeDto.F_POLICY_REF),
+                new IModel<List<ObjectReferenceType>>() {
 
                     @Override
                     public List<ObjectReferenceType> getObject() {
                         return WebModelServiceUtils.createObjectReferenceList(ValuePolicyType.class, getPageBase(), policyMap);
                     }
                 }, new ObjectReferenceChoiceRenderer(policyMap));
-		//parentPage.addEditingEnabledBehavior(policyRef);
-		policyRef.add(new AjaxFormComponentUpdatingBehavior("change") {
+        //parentPage.addEditingEnabledBehavior(policyRef);
+        policyRef.add(new AjaxFormComponentUpdatingBehavior("change") {
 
             @Override
             protected void onUpdate(AjaxRequestTarget target) {
@@ -201,23 +190,26 @@ public class ExpressionEditorPanel extends BasePanel<ExpressionType> {
         Label expressionLabel = new Label(ID_LABEL_EXPRESSION, createStringResource(getExpressionLabelKey()));
         add(expressionLabel);
 
-        AceEditor expression = new AceEditor(ID_EXPRESSION, new PropertyModel<String>(dtoModel, ExpressionTypeDto.F_EXPRESSION));
+        AceEditor expression = new AceEditor(ID_EXPRESSION, new PropertyModel<>(dtoModel, ExpressionTypeDto.F_EXPRESSION));
         expression.setOutputMarkupId(true);
-		//parentPage.addEditingEnabledBehavior(expression);
-		add(expression);
+        //parentPage.addEditingEnabledBehavior(expression);
+        add(expression);
 
         AjaxSubmitLink update = new AjaxSubmitLink(ID_BUTTON_UPDATE) {
 
             @Override
-            protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            protected void onSubmit(AjaxRequestTarget target) {
                 updateExpressionPerformed(target);
             }
         };
-		Label updateLabel = new Label(ID_LABEL_UPDATE, createStringResource(getUpdateLabelKey()));
-		updateLabel.setRenderBodyOnly(true);
-		update.add(updateLabel);
-		parentPage.addEditingVisibleBehavior(update);
-		add(update);
+        Label updateLabel = new Label(ID_LABEL_UPDATE, createStringResource(getUpdateLabelKey()));
+        updateLabel.setRenderBodyOnly(true);
+        update.add(updateLabel);
+        if (parentPage instanceof PageResourceWizard) {
+            ((PageResourceWizard)parentPage).addEditingEnabledBehavior(this);
+            ((PageResourceWizard)parentPage).addEditingVisibleBehavior(update);
+        }
+        add(update);
 
         add(WebComponentUtil.createHelp(ID_T_TYPE));
         languageContainer.add(WebComponentUtil.createHelp(ID_T_LANGUAGE));
@@ -251,18 +243,18 @@ public class ExpressionEditorPanel extends BasePanel<ExpressionType> {
         return "ExpressionEditorPanel.label.type";
     }
 
-	public String getDescriptionLabelKey(){
-		return "ExpressionEditorPanel.label.description";
-	}
+    public String getDescriptionLabelKey(){
+        return "ExpressionEditorPanel.label.description";
+    }
 
-	/**
+    /**
      *  Provide key for expression label
      * */
     public String getExpressionLabelKey(){
         return "ExpressionEditorPanel.label.expression";
     }
 
-	public String getUpdateLabelKey() {
+    public String getUpdateLabelKey() {
         return "ExpressionEditorPanel.button.expressionSave";
     }
 }

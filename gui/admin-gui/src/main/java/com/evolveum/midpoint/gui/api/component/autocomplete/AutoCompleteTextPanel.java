@@ -1,23 +1,17 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.gui.api.component.autocomplete;
 
-import com.evolveum.midpoint.web.component.prism.PrismValuePanel;
+import com.evolveum.midpoint.gui.api.page.PageBase;
+import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.web.model.LookupPropertyModel;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.LookupTableRowType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.LookupTableType;
 
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.attributes.AjaxRequestAttributes;
@@ -25,11 +19,16 @@ import org.apache.wicket.ajax.attributes.ThrottlingSettings;
 import org.apache.wicket.ajax.form.OnChangeAjaxBehavior;
 import org.apache.wicket.extensions.ajax.markup.html.autocomplete.AutoCompleteSettings;
 import org.apache.wicket.extensions.ajax.markup.html.autocomplete.AutoCompleteTextField;
+import org.apache.wicket.extensions.ajax.markup.html.autocomplete.IAutoCompleteRenderer;
+import org.apache.wicket.extensions.ajax.markup.html.autocomplete.StringAutoCompleteRenderer;
 import org.apache.wicket.markup.html.form.FormComponent;
 import org.apache.wicket.model.IModel;
+import org.apache.wicket.util.convert.ConversionException;
+import org.apache.wicket.util.convert.IConverter;
 import org.apache.wicket.util.time.Duration;
 
 import java.util.Iterator;
+import java.util.Locale;
 
 /**
  * Autocomplete field for Strings.
@@ -40,18 +39,31 @@ import java.util.Iterator;
  *  @author semancik
  * */
 public abstract class AutoCompleteTextPanel<T> extends AbstractAutoCompletePanel {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private static final String ID_INPUT = "input";
+    private static final String ID_INPUT = "input";
 
-    public AutoCompleteTextPanel(String id, final IModel<T> model, Class<T> type) {
-    	super(id);
+    private LookupTableType lookupTable = null;
+    private boolean strict;
+
+//    public AutoCompleteTextPanel(String id, final IModel<T> model, Class<T> type) {
+//        this(id, model, type, StringAutoCompleteRenderer.INSTANCE);
+//    }
+
+    public AutoCompleteTextPanel(String id, final IModel<T> model, Class<T> type, boolean strict, LookupTableType lookuptable) {
+        this(id, model, type, StringAutoCompleteRenderer.INSTANCE);
+        this.lookupTable = lookuptable;
+        this.strict = strict;
+    }
+
+    public AutoCompleteTextPanel(String id, final IModel<T> model, Class<T> type, IAutoCompleteRenderer<T> renderer) {
+        super(id);
 
         AutoCompleteSettings autoCompleteSettings = createAutoCompleteSettings();
 
         // this has to be copied because the  AutoCompleteTextField dies if renderer=null
-        final AutoCompleteTextField<T> input = new AutoCompleteTextField<T>(ID_INPUT, model, type, autoCompleteSettings) {
-        	private static final long serialVersionUID = 1L;
+        final AutoCompleteTextField<T> input = new AutoCompleteTextField<T>(ID_INPUT, model, type, renderer, autoCompleteSettings) {
+            private static final long serialVersionUID = 1L;
 
             @Override
             protected Iterator<T> getChoices(String input) {
@@ -63,12 +75,52 @@ public abstract class AutoCompleteTextPanel<T> extends AbstractAutoCompletePanel
                 super.updateAjaxAttributes(attributes);
                 attributes.setThrottlingSettings(new ThrottlingSettings(Duration.ONE_SECOND, true));
             }
+
+            @Override
+            public <C> IConverter<C> getConverter(Class<C> type) {
+                return new IConverter<C>() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public C convertToObject(String value, Locale arg1) throws ConversionException {
+                        if (lookupTable == null) {
+                            return (C) value;
+                        }
+
+                        for (LookupTableRowType row : lookupTable.getRow()) {
+                            if (value.equals(WebComponentUtil.getLocalizedOrOriginPolyStringValue(row.getLabel() != null ? row.getLabel().toPolyString() : null))) {
+                                return (C) row.getKey();
+                            }
+                        }
+
+                        if (strict) {
+                            throw new ConversionException("Cannot convert " + value);
+                        }
+
+                        return (C) value;
+
+                    }
+
+                    @Override
+                    public String convertToString(C key, Locale arg1) {
+                        if (lookupTable != null) {
+                            for (LookupTableRowType row : lookupTable.getRow()) {
+                                if (key.equals(row.getKey())) {
+                                    return (String) WebComponentUtil.getLocalizedOrOriginPolyStringValue(row.getLabel() != null ? row.getLabel().toPolyString() : null);
+                                }
+                            }
+                        }
+                        return (String) key;
+                    }
+                };
+            }
         };
 
         input.setType(type);
         if (model instanceof LookupPropertyModel) {
             input.add(new OnChangeAjaxBehavior() {
-            	private static final long serialVersionUID = 1L;
+                private static final long serialVersionUID = 1L;
 
                 @Override
                 protected void onUpdate(AjaxRequestTarget target) {
@@ -104,7 +156,9 @@ public abstract class AutoCompleteTextPanel<T> extends AbstractAutoCompletePanel
         if (input.getInput() == null || input.getInput().trim().equals("")){
             model.setObject(input.getInput());
         }
-        if (getIterator(input.getInput()).hasNext() && getIterator(input.getInput()).next() instanceof String) {
+        if (!getIterator(input.getInput()).hasNext()) {
+            updateFeedbackPanel(input, true, target);
+        } else {
             Iterator<String> lookupTableValuesIterator = (Iterator<String>) getIterator(input.getInput());
 
             String value = input.getInput();
@@ -135,5 +189,9 @@ public abstract class AutoCompleteTextPanel<T> extends AbstractAutoCompletePanel
 
     protected void updateFeedbackPanel(AutoCompleteTextField input, boolean isError, AjaxRequestTarget target){
 
+
     }
+
+
 }
+

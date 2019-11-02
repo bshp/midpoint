@@ -1,24 +1,16 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.init;
 
 import com.evolveum.midpoint.common.configuration.api.MidpointConfiguration;
-import com.evolveum.midpoint.prism.crypto.ProtectorImpl;
+import com.evolveum.midpoint.prism.impl.crypto.KeyStoreBasedProtectorImpl;
 import com.evolveum.midpoint.prism.crypto.Protector;
+import com.evolveum.midpoint.util.SystemUtil;
 import com.evolveum.midpoint.util.exception.SystemException;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
@@ -30,6 +22,7 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.security.KeyStore;
 
 /**
@@ -37,14 +30,12 @@ import java.security.KeyStore;
  */
 public class ConfigurableProtectorFactory {
 
-    private static final String PROTECTOR_CONFIGURATION = "midpoint.keystore";
     private static final Trace LOGGER = TraceManager.getTrace(ConfigurableProtectorFactory.class);
-    @Autowired(required = true)
-    private MidpointConfiguration configuration;
+    @Autowired private MidpointConfiguration configuration;
     private ProtectorConfiguration protectorConfig;
 
     public void init() {
-        Configuration config = configuration.getConfiguration(PROTECTOR_CONFIGURATION);
+        Configuration config = configuration.getConfiguration(MidpointConfiguration.PROTECTOR_CONFIGURATION);
         protectorConfig = new ProtectorConfiguration(config);
 
         //Extract file if not exists
@@ -52,7 +43,12 @@ public class ConfigurableProtectorFactory {
             return;
         }
 
-        File ks = new File(protectorConfig.getKeyStorePath());
+        String keyStorePath = protectorConfig.getKeyStorePath();
+        if (keyStorePath == null) {
+            throw new SystemException("Keystore path not defined");
+        }
+
+        File ks = new File(keyStorePath);
         if (ks.exists()) {
             return;
         }
@@ -71,7 +67,13 @@ public class ConfigurableProtectorFactory {
 
             keystore.setKeyEntry("default", secretKey, "midpoint".toCharArray(), null);
 
-            fos = new FileOutputStream(protectorConfig.getKeyStorePath());
+            fos = new FileOutputStream(keyStorePath);
+            try {
+                SystemUtil.setPrivateFilePermissions(keyStorePath);
+            } catch (IOException e) {
+                LOGGER.warn("Unable to set file permissions for keystore {}: {}", keyStorePath, e.getMessage(), e);
+                // Non-critical, continue
+            }
             keystore.store(fos, password);
             fos.close();
         } catch (Exception ex) {
@@ -81,14 +83,23 @@ public class ConfigurableProtectorFactory {
         }
     }
 
+    public MidpointConfiguration getConfiguration() {
+        return configuration;
+    }
+
+    public void setConfiguration(MidpointConfiguration configuration) {
+        this.configuration = configuration;
+    }
+
     public Protector getProtector() {
-        ProtectorImpl protector = new ProtectorImpl();
+        // We cannot use KeyStoreBasedProtectorBuilder here, because there is no prism context yet.
+        // This means that system-init will depend on prism-impl.
+        KeyStoreBasedProtectorImpl protector = new KeyStoreBasedProtectorImpl();
         protector.setEncryptionKeyAlias(protectorConfig.getEncryptionKeyAlias());
         protector.setKeyStorePassword(protectorConfig.getKeyStorePassword());
         protector.setKeyStorePath(protectorConfig.getKeyStorePath());
         protector.setEncryptionAlgorithm(protectorConfig.getXmlCipher());
         protector.init();
-
         return protector;
     }
 }

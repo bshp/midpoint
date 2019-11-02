@@ -1,21 +1,11 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.model.intest.security;
 
-import static com.evolveum.midpoint.test.IntegrationTestTools.display;
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertNotNull;
 import static org.testng.AssertJUnit.assertTrue;
@@ -25,7 +15,6 @@ import org.springframework.test.annotation.DirtiesContext.ClassMode;
 import org.springframework.test.context.ContextConfiguration;
 import org.testng.annotations.Test;
 
-import com.evolveum.midpoint.model.intest.rbac.TestRbac;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.security.api.AuthorizationConstants;
@@ -43,14 +32,14 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 @DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 public class TestSecurityPrincipal extends AbstractSecurityTest {
 
-	@Override
-	public void initSystem(Task initTask, OperationResult initResult) throws Exception {
-		super.initSystem(initTask, initResult);
-	}
+    @Override
+    public void initSystem(Task initTask, OperationResult initResult) throws Exception {
+        super.initSystem(initTask, initResult);
+    }
 
-	@Test
+    @Test
     public void test010GetUserAdministrator() throws Exception {
-		final String TEST_NAME = "test010GetUserAdministrator";
+        final String TEST_NAME = "test010GetUserAdministrator";
         displayTestTitle(TEST_NAME);
         resetAuthentication();
 
@@ -60,15 +49,15 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
         // THEN
         display("Administrator principal", principal);
         assertEquals("Wrong number of authorizations", 1, principal.getAuthorities().size());
-        assertHasAuthotizationAllow(principal.getAuthorities().iterator().next(), AuthorizationConstants.AUTZ_ALL_URL);
+        assertHasAuthorizationAllow(principal.getAuthorities().iterator().next(), AuthorizationConstants.AUTZ_ALL_URL);
 
         assertAuthorized(principal, AUTZ_LOOT_URL);
         assertAuthorized(principal, AUTZ_COMMAND_URL);
-	}
+    }
 
-	@Test
+    @Test
     public void test050GetUserJack() throws Exception {
-		final String TEST_NAME = "test050GetUserJack";
+        final String TEST_NAME = "test050GetUserJack";
         displayTestTitle(TEST_NAME);
         resetAuthentication();
 
@@ -84,11 +73,11 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
         assertNotAuthorized(principal, AUTZ_LOOT_URL);
         assertNotAuthorized(principal, AUTZ_COMMAND_URL);
         assertNoAuthentication();
-	}
+    }
 
-	@Test
+    @Test
     public void test051GetUserBarbossa() throws Exception {
-		final String TEST_NAME = "test051GetUserBarbossa";
+        final String TEST_NAME = "test051GetUserBarbossa";
         displayTestTitle(TEST_NAME);
         resetAuthentication();
 
@@ -107,11 +96,11 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
 
         assertNotAuthorized(principal, AUTZ_LOOT_URL);
         assertNotAuthorized(principal, AUTZ_COMMAND_URL);
-	}
+    }
 
-	@Test
+    @Test
     public void test052GetUserGuybrush() throws Exception {
-		final String TEST_NAME = "test052GetUserGuybrush";
+        final String TEST_NAME = "test052GetUserGuybrush";
         displayTestTitle(TEST_NAME);
         resetAuthentication();
 
@@ -129,11 +118,11 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
 
         assertNotAuthorized(principal, AUTZ_LOOT_URL);
         assertNotAuthorized(principal, AUTZ_COMMAND_URL);
-	}
+    }
 
-	@Test
+    @Test
     public void test060GuybrushConditionalRoleFalse() throws Exception {
-		final String TEST_NAME = "test060GuybrushConditionalRoleFalse";
+        final String TEST_NAME = "test060GuybrushConditionalRoleFalse";
         displayTestTitle(TEST_NAME);
         login(USER_ADMINISTRATOR_USERNAME);
 
@@ -157,17 +146,17 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
         assertNotAuthorized(principal, AUTZ_COMMAND_URL);
         assertNotAuthorized(principal, AUTZ_SUPERSPECIAL_URL);
         assertNotAuthorized(principal, AUTZ_NONSENSE_URL);
-	}
+    }
 
-	@Test
+    @Test
     public void test061GuybrushConditionalRoleTrue() throws Exception {
-		final String TEST_NAME = "test061GuybrushConditionalRoleTrue";
+        final String TEST_NAME = "test061GuybrushConditionalRoleTrue";
         displayTestTitle(TEST_NAME);
         login(USER_ADMINISTRATOR_USERNAME);
 
         Task task = createTask(TEST_NAME);
         OperationResult result = task.getResult();
-        modifyUserReplace(USER_GUYBRUSH_OID, UserType.F_EMPLOYEE_TYPE, task, result, "special");
+        modifyUserReplace(USER_GUYBRUSH_OID, UserType.F_SUBTYPE, task, result, "special");
 
         resetAuthentication();
 
@@ -189,11 +178,11 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
         assertNotAuthorized(principal, AUTZ_COMMAND_URL);
         assertNotAuthorized(principal, AUTZ_CAPSIZE_URL);
         assertNotAuthorized(principal, AUTZ_NONSENSE_URL);
-	}
+    }
 
-	@Test
+    @Test
     public void test062GuybrushConditionalRoleUnassign() throws Exception {
-		final String TEST_NAME = "test062GuybrushConditionalRoleUnassign";
+        final String TEST_NAME = "test062GuybrushConditionalRoleUnassign";
         displayTestTitle(TEST_NAME);
         login(USER_ADMINISTRATOR_USERNAME);
 
@@ -215,11 +204,11 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
 
         assertNotAuthorized(principal, AUTZ_LOOT_URL);
         assertNotAuthorized(principal, AUTZ_COMMAND_URL);
-	}
+    }
 
-	@Test
+    @Test
     public void test100JackRolePirate() throws Exception {
-		final String TEST_NAME = "test100JackRolePirate";
+        final String TEST_NAME = "test100JackRolePirate";
         displayTestTitle(TEST_NAME);
         // GIVEN
         login(USER_ADMINISTRATOR_USERNAME);
@@ -236,19 +225,24 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
         assertJack(principal);
 
         assertEquals("Wrong number of authorizations", 1, principal.getAuthorities().size());
-        assertHasAuthotizationAllow(principal.getAuthorities().iterator().next(), AUTZ_LOOT_URL);
+        assertHasAuthorizationAllow(principal.getAuthorities().iterator().next(), AUTZ_LOOT_URL);
 
         assertAuthorized(principal, AUTZ_LOOT_URL, AuthorizationPhaseType.EXECUTION);
         assertNotAuthorized(principal, AUTZ_LOOT_URL, AuthorizationPhaseType.REQUEST);
         assertNotAuthorized(principal, AUTZ_LOOT_URL, null);
         assertNotAuthorized(principal, AUTZ_COMMAND_URL);
 
-        assertAdminGuiConfigurations(principal, 1, 2, 3, 2, 2);
-	}
+        assertCompiledUserProfile(principal)
+            .assertAdditionalMenuLinks(1)
+            .assertUserDashboardLinks(2)
+            .assertObjectCollectionViews(3)
+            .assertObjectForms(2)
+            .assertUserDashboardWidgets(2);
+    }
 
-	@Test
+    @Test
     public void test109JackUnassignRolePirate() throws Exception {
-		final String TEST_NAME = "test109JackUnassignRolePirate";
+        final String TEST_NAME = "test109JackUnassignRolePirate";
         displayTestTitle(TEST_NAME);
         // GIVEN
         login(USER_ADMINISTRATOR_USERNAME);
@@ -269,12 +263,17 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
         assertNotAuthorized(principal, AUTZ_LOOT_URL);
         assertNotAuthorized(principal, AUTZ_COMMAND_URL);
 
-        assertAdminGuiConfigurations(principal, 0, 1, 3, 1, 0);
-	}
+        assertCompiledUserProfile(principal)
+            .assertAdditionalMenuLinks(0)
+            .assertUserDashboardLinks(1)
+            .assertObjectCollectionViews(3)
+            .assertObjectForms(1)
+            .assertUserDashboardWidgets(0);
+    }
 
-	@Test
+    @Test
     public void test110GuybrushRoleNicePirate() throws Exception {
-		final String TEST_NAME = "test110GuybrushRoleNicePirate";
+        final String TEST_NAME = "test110GuybrushRoleNicePirate";
         displayTestTitle(TEST_NAME);
         // GIVEN
         login(USER_ADMINISTRATOR_USERNAME);
@@ -295,11 +294,11 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
 
         assertNotAuthorized(principal, AUTZ_LOOT_URL);
         assertNotAuthorized(principal, AUTZ_COMMAND_URL);
-	}
+    }
 
-	@Test
+    @Test
     public void test111GuybrushRoleCaptain() throws Exception {
-		final String TEST_NAME = "test111GuybrushRoleCaptain";
+        final String TEST_NAME = "test111GuybrushRoleCaptain";
         displayTestTitle(TEST_NAME);
         // GIVEN
         login(USER_ADMINISTRATOR_USERNAME);
@@ -320,11 +319,11 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
 
         assertNotAuthorized(principal, AUTZ_LOOT_URL);
         assertAuthorized(principal, AUTZ_COMMAND_URL);
-	}
+    }
 
-	@Test
+    @Test
     public void test119GuybrushUnassignRoles() throws Exception {
-		final String TEST_NAME = "test119GuybrushUnassignRoles";
+        final String TEST_NAME = "test119GuybrushUnassignRoles";
         displayTestTitle(TEST_NAME);
         // GIVEN
         login(USER_ADMINISTRATOR_USERNAME);
@@ -345,14 +344,14 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
 
         assertNotAuthorized(principal, AUTZ_LOOT_URL);
         assertNotAuthorized(principal, AUTZ_COMMAND_URL);
-	}
+    }
 
-	/**
-	 * MID-3650
-	 */
-	@Test
+    /**
+     * MID-3650
+     */
+    @Test
     public void test120JackRoleIndirectPirate() throws Exception {
-		final String TEST_NAME = "test120JackRoleIndirectPirate";
+        final String TEST_NAME = "test120JackRoleIndirectPirate";
         displayTestTitle(TEST_NAME);
         // GIVEN
         login(USER_ADMINISTRATOR_USERNAME);
@@ -378,14 +377,14 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
 
         login(USER_ADMINISTRATOR_USERNAME);
         unassignRole(USER_JACK_OID, ROLE_INDIRECT_PIRATE_OID);
-	}
+    }
 
-	/**
-	 * MID-3650
-	 */
-	@Test
+    /**
+     * MID-3650
+     */
+    @Test
     public void test122JackOrgIndirectPirate() throws Exception {
-		final String TEST_NAME = "test122JackOrgIndirectPirate";
+        final String TEST_NAME = "test122JackOrgIndirectPirate";
         displayTestTitle(TEST_NAME);
         // GIVEN
         login(USER_ADMINISTRATOR_USERNAME);
@@ -411,5 +410,5 @@ public class TestSecurityPrincipal extends AbstractSecurityTest {
 
         login(USER_ADMINISTRATOR_USERNAME);
         unassignOrg(USER_JACK_OID, ORG_INDIRECT_PIRATE_OID);
-	}
+    }
 }

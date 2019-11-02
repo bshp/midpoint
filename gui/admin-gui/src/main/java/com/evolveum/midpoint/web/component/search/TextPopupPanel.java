@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2018 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.search;
@@ -35,12 +26,15 @@ import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
 
+import java.io.Serializable;
 import java.util.*;
 
 /**
  * @author Viliam Repan (lazyman)
  */
-public class TextPopupPanel extends SearchPopupPanel<DisplayableValue> {
+public class TextPopupPanel<T extends Serializable> extends SearchPopupPanel<T> {
+
+   private static final long serialVersionUID = 1L;
 
     private static final String ID_TEXT_INPUT = "textInput";
 
@@ -48,7 +42,7 @@ public class TextPopupPanel extends SearchPopupPanel<DisplayableValue> {
 
     private PrismObject<LookupTableType> lookup;
 
-    public TextPopupPanel(String id, IModel<DisplayableValue> model, PrismObject<LookupTableType> lookup) {
+    public TextPopupPanel(String id, IModel<DisplayableValue<T>> model, PrismObject<LookupTableType> lookup) {
         super(id, model);
         this.lookup = lookup;
 
@@ -60,12 +54,16 @@ public class TextPopupPanel extends SearchPopupPanel<DisplayableValue> {
 
         input.add(new AjaxFormComponentUpdatingBehavior("blur") {
 
+            private static final long serialVersionUID = 1L;
+
             @Override
             protected void onUpdate(AjaxRequestTarget target) {
                 //nothing to do, just update model data
             }
         });
         input.add(new Behavior() {
+
+            private static final long serialVersionUID = 1L;
 
             @Override
             public void bind(Component component) {
@@ -86,22 +84,25 @@ public class TextPopupPanel extends SearchPopupPanel<DisplayableValue> {
             return new TextField(ID_TEXT_INPUT, new PropertyModel(getModel(), SearchValue.F_VALUE));
         }
 
-        LookupPropertyModel<String> lookupPropertyModel = new LookupPropertyModel<String>(getModel(), SearchValue.F_VALUE, lookup.asObjectable()) {
-
-        	private static final long serialVersionUID = 1L;
-
-			@Override
-        	public boolean isSupportsDisplayName() {
-        		return true;
-        	}
-        };
+        //TODO: displayName
+//        LookupPropertyModel<String> lookupPropertyModel = new LookupPropertyModel<String>(getModel(), SearchValue.F_VALUE, lookup.asObjectable()) {
+//
+//            private static final long serialVersionUID = 1L;
+//
+//            @Override
+//            public boolean isSupportsDisplayName() {
+//                return true;
+//            }
+//        };
 
         AutoCompleteSettings settings = new AutoCompleteSettings();
         settings.setShowListOnEmptyInput(true);
 
-        return new AutoCompleteTextField<String>(ID_TEXT_INPUT, lookupPropertyModel, settings) {
 
-        	private static final long serialVersionUID = 1L;
+        //TODO: converter
+        return new AutoCompleteTextField<String>(ID_TEXT_INPUT, new PropertyModel<>(getModel(), SearchValue.F_VALUE), settings) {
+
+            private static final long serialVersionUID = 1L;
             @Override
             protected Iterator<String> getChoices(String input) {
                 return prepareAutoCompleteList(input).iterator();

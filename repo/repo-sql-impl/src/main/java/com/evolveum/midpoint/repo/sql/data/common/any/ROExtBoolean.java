@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.data.common.any;
@@ -19,33 +10,24 @@ package com.evolveum.midpoint.repo.sql.data.common.any;
 import com.evolveum.midpoint.repo.sql.data.common.RObject;
 import com.evolveum.midpoint.repo.sql.data.common.id.ROExtBooleanId;
 import com.evolveum.midpoint.repo.sql.data.common.type.RObjectExtensionType;
+import com.evolveum.midpoint.repo.sql.helpers.modify.Ignore;
 import com.evolveum.midpoint.repo.sql.query2.definition.NotQueryable;
 import com.evolveum.midpoint.repo.sql.util.RUtil;
 import org.hibernate.annotations.ForeignKey;
-import org.hibernate.annotations.Index;
 
 import javax.persistence.*;
+import java.util.Objects;
 
 /**
  * @author lazyman
  */
+@Ignore
 @Entity
 @IdClass(ROExtBooleanId.class)
-@Table(name = "m_object_ext_boolean")
-@org.hibernate.annotations.Table(appliesTo = "m_object_ext_boolean",
-        indexes = {@Index(name = "iExtensionBoolean", columnNames = {"ownerType", "eName", "booleanValue"}),
-                @Index(name = "iExtensionBooleanDef", columnNames = {"owner_oid", "ownerType"})})
-public class ROExtBoolean implements ROExtValue {
-
-    //owner entity
-    private RObject owner;
-    private String ownerOid;
-    private RObjectExtensionType ownerType;
-
-    private boolean dynamic;
-    private String name;
-    private String type;
-    private RValueType valueType;
+@Table(name = "m_object_ext_boolean", indexes = {
+        @Index(name = "iExtensionBoolean", columnList = "booleanValue")
+})
+public class ROExtBoolean extends ROExtBase<Boolean> {
 
     private Boolean value;
 
@@ -57,54 +39,34 @@ public class ROExtBoolean implements ROExtValue {
     }
 
     @Id
-    @ForeignKey(name = "fk_object_ext_boolean")
+    @ForeignKey(name = "fk_o_ext_boolean_owner")
     @MapsId("owner")
     @ManyToOne(fetch = FetchType.LAZY)
     @NotQueryable
     public RObject getOwner() {
-        return owner;
+        return super.getOwner();
     }
 
     @Id
     @Column(name = "owner_oid", length = RUtil.COLUMN_LENGTH_OID)
     public String getOwnerOid() {
-        if (ownerOid == null && owner != null) {
-            ownerOid = owner.getOid();
-        }
-        return ownerOid;
+        return super.getOwnerOid();
     }
 
     @Id
     @Column(name = "ownerType")
     @Enumerated(EnumType.ORDINAL)
     public RObjectExtensionType getOwnerType() {
-        return ownerType;
+        return super.getOwnerType();
     }
 
     @Id
-    @Column(name = "eName", length = RUtil.COLUMN_LENGTH_QNAME)
-    public String getName() {
-        return name;
+    @Column(name = "item_id")
+    public Integer getItemId() {
+        return super.getItemId();
     }
 
-    @Column(name = "eType", length = RUtil.COLUMN_LENGTH_QNAME)
-    public String getType() {
-        return type;
-    }
-
-    @Enumerated(EnumType.ORDINAL)
-    public RValueType getValueType() {
-        return valueType;
-    }
-
-    /**
-     * @return true if this property has dynamic definition
-     */
-    @Column(name = "dynamicDef")
-    public boolean isDynamic() {
-        return dynamic;
-    }
-
+    @Id
     @Column(name = "booleanValue")
     public Boolean getValue() {
         return value;
@@ -114,57 +76,22 @@ public class ROExtBoolean implements ROExtValue {
         this.value = value;
     }
 
-    public void setValueType(RValueType valueType) {
-        this.valueType = valueType;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public void setType(String type) {
-        this.type = type;
-    }
-
-    public void setDynamic(boolean dynamic) {
-        this.dynamic = dynamic;
-    }
-
-    public void setOwner(RObject owner) {
-        this.owner = owner;
-    }
-
-    public void setOwnerOid(String ownerOid) {
-        this.ownerOid = ownerOid;
-    }
-
-    public void setOwnerType(RObjectExtensionType ownerType) {
-        this.ownerType = ownerType;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-
+        if (!super.equals(o)) return false;
         ROExtBoolean that = (ROExtBoolean) o;
-
-        if (dynamic != that.dynamic) return false;
-        if (name != null ? !name.equals(that.name) : that.name != null) return false;
-        if (type != null ? !type.equals(that.type) : that.type != null) return false;
-        if (valueType != that.valueType) return false;
-        if (value != null ? !value.equals(that.value) : that.value != null) return false;
-
-        return true;
+        return Objects.equals(value, that.value);
     }
 
     @Override
     public int hashCode() {
-        int result = (dynamic ? 1 : 0);
-        result = 31 * result + (name != null ? name.hashCode() : 0);
-        result = 31 * result + (type != null ? type.hashCode() : 0);
-        result = 31 * result + (valueType != null ? valueType.hashCode() : 0);
-        result = 31 * result + (value != null ? value.hashCode() : 0);
-        return result;
+        return Objects.hash(super.hashCode(), value);
+    }
+
+    @Override
+    public ROExtBooleanId createId() {
+        return ROExtBooleanId.createFromValue(this);
     }
 }

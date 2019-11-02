@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.notifications.impl.notifiers;
@@ -118,13 +109,13 @@ public class SimpleResourceObjectNotifier extends GeneralNotifier {
 
         boolean isAccount = resourceObjectEvent.isShadowKind(ShadowKindType.ACCOUNT);
         String objectTypeDescription = isAccount ? "account" : "resource object";
-		String userOrOwner = owner instanceof UserType ? "User" : "Owner";
+        String userOrOwner = owner instanceof UserType ? "User" : "Owner";
 
         body.append("Notification about ").append(objectTypeDescription).append("-related operation\n\n");
         if (isAccount) {
             if (owner != null) {
                 body.append(userOrOwner).append(": ").append(resourceObjectEvent.getRequesteeDisplayName());
-				body.append(" (").append(owner.getName()).append(", oid ").append(owner.getOid()).append(")\n");
+                body.append(" (").append(owner.getName()).append(", oid ").append(owner.getOid()).append(")\n");
             } else {
                 body.append(userOrOwner).append(": unknown\n");
             }
@@ -155,16 +146,16 @@ public class SimpleResourceObjectNotifier extends GeneralNotifier {
             case FAILURE: body.append("FAILED to be "); break;
         }
 
-		final boolean watchSynchronizationAttributes = isWatchSynchronizationAttributes((SimpleResourceObjectNotifierType) generalNotifierType);
-		final boolean watchAuxiliaryAttributes = isWatchAuxiliaryAttributes(generalNotifierType);
+        final boolean watchSynchronizationAttributes = isWatchSynchronizationAttributes((SimpleResourceObjectNotifierType) generalNotifierType);
+        final boolean watchAuxiliaryAttributes = isWatchAuxiliaryAttributes(generalNotifierType);
 
-		if (delta.isAdd()) {
+        if (delta.isAdd()) {
             body.append("created on the resource with attributes:\n");
-			body.append(resourceObjectEvent.getContentAsFormattedList(watchSynchronizationAttributes, watchAuxiliaryAttributes));
+            body.append(resourceObjectEvent.getContentAsFormattedList(watchSynchronizationAttributes, watchAuxiliaryAttributes));
             body.append("\n");
         } else if (delta.isModify()) {
             body.append("modified on the resource. Modified attributes are:\n");
-			body.append(resourceObjectEvent.getContentAsFormattedList(watchSynchronizationAttributes, watchAuxiliaryAttributes));
+            body.append(resourceObjectEvent.getContentAsFormattedList(watchSynchronizationAttributes, watchAuxiliaryAttributes));
             body.append("\n");
         } else if (delta.isDelete()) {
             body.append("removed from the resource.\n\n");

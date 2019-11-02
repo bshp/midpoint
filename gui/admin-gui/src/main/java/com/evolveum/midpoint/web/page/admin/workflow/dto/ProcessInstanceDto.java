@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.workflow.dto;
@@ -19,13 +10,14 @@ package com.evolveum.midpoint.web.page.admin.workflow.dto;
 import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.xml.XmlTypeConverter;
-import com.evolveum.midpoint.schema.util.WfContextUtil;
-import com.evolveum.midpoint.web.component.DateLabelComponent;
+import com.evolveum.midpoint.schema.util.ApprovalContextUtil;
 import com.evolveum.midpoint.web.component.util.Selectable;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.CaseType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectReferenceType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.TaskType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.ApprovalContextType;
 import org.apache.commons.lang.Validate;
 import org.apache.wicket.datetime.PatternDateConverter;
+import org.jetbrains.annotations.NotNull;
 
 import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.namespace.QName;
@@ -35,30 +27,31 @@ import javax.xml.namespace.QName;
  */
 public class ProcessInstanceDto extends Selectable {
 
-	public static final String F_OBJECT_NAME = "objectName";
-	public static final String F_TARGET_NAME = "targetName";
+    public static final String F_OBJECT_NAME = "objectName";
+    public static final String F_TARGET_NAME = "targetName";
     public static final String F_NAME = "name";
     public static final String F_START_FORMATTED = "startFormatted";
     public static final String F_END_FORMATTED = "endFormatted";
     //public static final String F_STATE = "state";
     public static final String F_STAGE = "stage";
 
-    private TaskType task;
-    private PatternDateConverter converter = new PatternDateConverter
-            (WebComponentUtil.getLocalizedDatePattern(DateLabelComponent.LONG_MEDIUM_STYLE), true );
+    @NotNull private final CaseType aCase;
 
-    public ProcessInstanceDto(TaskType task) {
-        Validate.notNull(task, "Task is null");
-        Validate.notNull(task.getWorkflowContext(), "Task has no workflow context");
-        this.task = task;
+    private PatternDateConverter converter;
+
+    public ProcessInstanceDto(@NotNull CaseType aCase, String dateTimeStyle) {
+        this.aCase = aCase;
+        converter = new PatternDateConverter
+                (WebComponentUtil.getLocalizedDatePattern(dateTimeStyle), true );
+        Validate.notNull(aCase.getApprovalContext(), "Case has no workflow context");
     }
 
     public XMLGregorianCalendar getStartTimestamp() {
-        return task.getWorkflowContext().getStartTimestamp();
+        return aCase.getMetadata() != null ? aCase.getMetadata().getCreateTimestamp() : null;
     }
 
     public XMLGregorianCalendar getEndTimestamp() {
-        return task.getWorkflowContext().getEndTimestamp();
+        return aCase.getCloseTimestamp();
     }
 
     public String getStartFormatted() {
@@ -71,49 +64,50 @@ public class ProcessInstanceDto extends Selectable {
                 WebComponentUtil.getCurrentLocale()) : "";
     }
 
+    @NotNull
+    public ApprovalContextType getApprovalContext() {
+        return aCase.getApprovalContext();
+    }
+
     public String getName() {
-        return PolyString.getOrig(task.getName());
+        return PolyString.getOrig(aCase.getName());
     }
 
     public String getOutcome() {
-        return task.getWorkflowContext().getOutcome();
+        return aCase.getOutcome();
     }
 
-	public String getObjectName() {
-		return WebComponentUtil.getName(task.getWorkflowContext().getObjectRef());
-	}
+    public String getObjectName() {
+        return WebComponentUtil.getName(aCase.getObjectRef());
+    }
 
-	public ObjectReferenceType getObjectRef() {
-		return task.getWorkflowContext().getObjectRef();
-	}
+    public ObjectReferenceType getObjectRef() {
+        return aCase.getObjectRef();
+    }
 
-	public ObjectReferenceType getTargetRef() {
-		return task.getWorkflowContext().getTargetRef();
-	}
+    public ObjectReferenceType getTargetRef() {
+        return aCase.getTargetRef();
+    }
 
-	public QName getObjectType() {
-		return getObjectRef() != null ? getObjectRef().getType() : null;
-	}
+    public QName getObjectType() {
+        return getObjectRef() != null ? getObjectRef().getType() : null;
+    }
 
-	public QName getTargetType() {
-		return getTargetRef() != null ? getTargetRef().getType() : null;
-	}
+    public QName getTargetType() {
+        return getTargetRef() != null ? getTargetRef().getType() : null;
+    }
 
-	public String getTargetName() {
-		return WebComponentUtil.getName(task.getWorkflowContext().getTargetRef());
-	}
+    public String getTargetName() {
+        return WebComponentUtil.getName(aCase.getTargetRef());
+    }
 
-	//public String getState() {
-	//		return task.getWorkflowContext().getState();
-	//}
+    public String getStage() {
+        return ApprovalContextUtil.getStageInfo(aCase);
+    }
 
-	public String getStage() {
-    	return WfContextUtil.getStageInfo(task.getWorkflowContext());
-	}
-
-	public String getProcessInstanceId() {
-		return task.getWorkflowContext().getProcessInstanceId();
-	}
+    public String getProcessInstanceId() {
+        return aCase.getOid();
+    }
 
 //    public List<WorkItemDto> getWorkItems() {
 //        List<WorkItemDto> retval = new ArrayList<WorkItemDto>();
@@ -155,7 +149,7 @@ public class ProcessInstanceDto extends Selectable {
 
 
     public String getTaskOid() {
-        return task.getOid();
+        return aCase.getOid();
     }
 
 }

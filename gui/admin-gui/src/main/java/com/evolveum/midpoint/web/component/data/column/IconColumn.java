@@ -1,35 +1,25 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2018 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.data.column;
 
-import org.apache.wicket.Component;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.DisplayType;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.wicket.extensions.markup.html.repeater.data.grid.ICellPopulator;
 import org.apache.wicket.extensions.markup.html.repeater.data.table.AbstractColumn;
 import org.apache.wicket.extensions.markup.html.repeater.data.table.export.IExportableColumn;
-import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.repeater.Item;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
-import org.apache.wicket.model.PropertyModel;
 
 /**
  * @author lazyman
  */
-public class IconColumn<T> extends AbstractColumn<T, String> implements IExportableColumn<T, String> {
+public abstract class IconColumn<T> extends AbstractColumn<T, String> {//implements IExportableColumn<T, String> {
     private static final long serialVersionUID = 1L;
 
     public IconColumn(IModel<String> displayModel) {
@@ -38,24 +28,23 @@ public class IconColumn<T> extends AbstractColumn<T, String> implements IExporta
 
     @Override
     public String getCssClass() {
+        IModel<String> display = getDisplayModel();
+        if (display != null && StringUtils.isNotEmpty(display.getObject())) {
+            return null;
+        }
+
         return "icon";
     }
 
     @Override
     public void populateItem(Item<ICellPopulator<T>> cellItem, String componentId, IModel<T> rowModel) {
-        cellItem.add(new ImagePanel(componentId, createIconModel(rowModel), createTitleModel(rowModel)));
+        cellItem.add(new ImagePanel(componentId, getIconDisplayType(rowModel)));
     }
 
-    protected IModel<String> createTitleModel(final IModel<T> rowModel) {
-        return null;
-    }
+    protected abstract DisplayType getIconDisplayType(final IModel<T> rowModel);
 
-    protected IModel<String> createIconModel(final IModel<T> rowModel) {
-        throw new UnsupportedOperationException("Not implemented, please implement in your column.");
-    }
-
-    @Override
-    public IModel<String> getDataModel(IModel<T> rowModel) {
-        return Model.of("");
-    }
+//    @Override
+//    public IModel<String> getDataModel(IModel<T> rowModel) {
+//        return Model.of("");
+//    }
 }

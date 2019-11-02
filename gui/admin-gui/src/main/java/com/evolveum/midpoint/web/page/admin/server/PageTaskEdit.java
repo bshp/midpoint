@@ -1,26 +1,38 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.server;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import javax.xml.namespace.QName;
+
+import org.apache.wicket.Component;
+import org.apache.wicket.RestartResponseException;
+import org.apache.wicket.ajax.AjaxRequestTarget;
+import org.apache.wicket.markup.html.form.Form;
+import org.apache.wicket.model.IModel;
+import org.apache.wicket.model.Model;
+import org.apache.wicket.request.mapper.parameter.PageParameters;
+
 import com.evolveum.midpoint.gui.api.model.LoadableModel;
+import com.evolveum.midpoint.gui.api.prism.ItemStatus;
+import com.evolveum.midpoint.gui.api.prism.PrismObjectWrapper;
+import com.evolveum.midpoint.gui.impl.factory.PrismObjectWrapperFactory;
+import com.evolveum.midpoint.gui.impl.factory.WrapperContext;
 import com.evolveum.midpoint.model.api.ModelAuthorizationAction;
 import com.evolveum.midpoint.prism.ItemDefinition;
 import com.evolveum.midpoint.prism.PrismContainerDefinition;
 import com.evolveum.midpoint.prism.PrismObject;
+import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.schema.GetOperationOptions;
 import com.evolveum.midpoint.schema.SelectorOptions;
@@ -28,15 +40,18 @@ import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.security.api.AuthorizationConstants;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.task.api.TaskManager;
-import com.evolveum.midpoint.util.exception.*;
+import com.evolveum.midpoint.util.exception.CommunicationException;
+import com.evolveum.midpoint.util.exception.ConfigurationException;
+import com.evolveum.midpoint.util.exception.ExpressionEvaluationException;
+import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
+import com.evolveum.midpoint.util.exception.SchemaException;
+import com.evolveum.midpoint.util.exception.SecurityViolationException;
+import com.evolveum.midpoint.util.exception.SystemException;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.application.AuthorizationAction;
 import com.evolveum.midpoint.web.application.PageDescriptor;
-import com.evolveum.midpoint.web.component.prism.ContainerStatus;
-import com.evolveum.midpoint.web.component.prism.ObjectWrapper;
-import com.evolveum.midpoint.web.component.prism.ObjectWrapperFactory;
 import com.evolveum.midpoint.web.component.refresh.AutoRefreshDto;
 import com.evolveum.midpoint.web.component.refresh.AutoRefreshPanel;
 import com.evolveum.midpoint.web.component.refresh.Refreshable;
@@ -48,466 +63,457 @@ import com.evolveum.midpoint.web.page.admin.server.dto.TaskDtoProviderOptions;
 import com.evolveum.midpoint.web.util.OnePageParameterEncoder;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.NodeType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.TaskType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.WfContextType;
-import org.apache.wicket.Component;
-import org.apache.wicket.ajax.AjaxRequestTarget;
-import org.apache.wicket.markup.html.form.Form;
-import org.apache.wicket.model.AbstractReadOnlyModel;
-import org.apache.wicket.model.IModel;
-import org.apache.wicket.model.Model;
-import org.apache.wicket.request.mapper.parameter.PageParameters;
-
-import javax.xml.namespace.QName;
-import java.util.*;
 
 /**
  * @author mederly
  */
 @PageDescriptor(url = "/admin/task2", encoder = OnePageParameterEncoder.class, action = {
-		@AuthorizationAction(actionUri = PageAdminTasks.AUTHORIZATION_TASKS_ALL,
-				label = PageAdminTasks.AUTH_TASKS_ALL_LABEL,
-				description = PageAdminTasks.AUTH_TASKS_ALL_DESCRIPTION),
-		@AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_TASK_URL,
-				label = "PageTaskEdit.auth.task.label",
-				description = "PageTaskEdit.auth.task.description")})
+        @AuthorizationAction(actionUri = PageAdminTasks.AUTHORIZATION_TASKS_ALL,
+                label = PageAdminTasks.AUTH_TASKS_ALL_LABEL,
+                description = PageAdminTasks.AUTH_TASKS_ALL_DESCRIPTION),
+        @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_TASK_URL,
+                label = "PageTaskEdit.auth.task.label",
+                description = "PageTaskEdit.auth.task.description")})
 
 public class PageTaskEdit extends PageAdmin implements Refreshable {
 
-	private static final int REFRESH_INTERVAL_IF_RUNNABLE = 2000;
-	private static final int REFRESH_INTERVAL_IF_SUSPENDED = 60000;
-	private static final int REFRESH_INTERVAL_IF_WAITING = 60000;
-	private static final int REFRESH_INTERVAL_IF_CLOSED = 60000;
+    private static final int REFRESH_INTERVAL_IF_RUNNING = 2000;
+    private static final int REFRESH_INTERVAL_IF_RUNNABLE = 60000;
+    private static final int REFRESH_INTERVAL_IF_SUSPENDED = 60000;
+    private static final int REFRESH_INTERVAL_IF_WAITING = 60000;
+    private static final int REFRESH_INTERVAL_IF_CLOSED = 60000;
 
-	public static final String DOT_CLASS = PageTaskEdit.class.getName() + ".";
-	private static final String OPERATION_LOAD_TASK = DOT_CLASS + "loadTask";
-	private static final String OPERATION_LOAD_NODES = DOT_CLASS + "loadNodes";
-	static final String OPERATION_SAVE_TASK = DOT_CLASS + "saveTask";
-	static final String OPERATION_DELETE_SYNC_TOKEN = DOT_CLASS + "deleteSyncToken";
+    public static final String DOT_CLASS = PageTaskEdit.class.getName() + ".";
+    private static final String OPERATION_LOAD_TASK = DOT_CLASS + "loadTask";
+    private static final String OPERATION_LOAD_NODES = DOT_CLASS + "loadNodes";
+    static final String OPERATION_SAVE_TASK = DOT_CLASS + "saveTask";
+    static final String OPERATION_DELETE_SYNC_TOKEN = DOT_CLASS + "deleteSyncToken";
 
-	public static final String ID_SUMMARY_PANEL = "summaryPanel";
-	public static final String ID_MAIN_PANEL = "mainPanel";
+    public static final String ID_SUMMARY_PANEL = "summaryPanel";
+    public static final String ID_MAIN_PANEL = "mainPanel";
 
-	private static final Trace LOGGER = TraceManager.getTrace(PageTaskEdit.class);
+    private static final Trace LOGGER = TraceManager.getTrace(PageTaskEdit.class);
 
-	private String taskOid;
-	private IModel<TaskDto> taskDtoModel;
-	private LoadableModel<ObjectWrapper<TaskType>> objectWrapperModel;
-	private boolean edit = false;
+    private String taskOid;
+    private IModel<TaskDto> taskDtoModel;
+    private LoadableModel<PrismObjectWrapper<TaskType>> objectWrapperModel;
+    private boolean edit = false;
 
-	private TaskDto currentTaskDto, previousTaskDto;
+    private TaskDto currentTaskDto, previousTaskDto;
 
-	private PageTaskController controller = new PageTaskController(this);
+    private PageTaskController controller = new PageTaskController(this);
 
-	private TaskMainPanel mainPanel;
-	private IModel<AutoRefreshDto> refreshModel;
-	private IModel<Boolean> showAdvancedFeaturesModel;
-	private IModel<List<NodeType>> nodeListModel;
+    private TaskMainPanel mainPanel;
+    private IModel<AutoRefreshDto> refreshModel;
+    private IModel<Boolean> showAdvancedFeaturesModel;
+    private IModel<List<NodeType>> nodeListModel;
 
-	public PageTaskEdit(PageParameters parameters) {
-		taskOid = parameters.get(OnePageParameterEncoder.PARAMETER).toString();
-		taskDtoModel = new LoadableModel<TaskDto>(false) {
-			@Override
-			protected TaskDto load() {
-				try {
-					previousTaskDto = currentTaskDto;
-					final OperationResult result = new OperationResult(OPERATION_LOAD_TASK);
-					final Task operationTask = getTaskManager().createTaskInstance(OPERATION_LOAD_TASK);
-					final TaskType taskType = loadTaskTypeChecked(taskOid, operationTask, result);
-					currentTaskDto = prepareTaskDto(taskType, operationTask, result);
-					return currentTaskDto;
-				} catch (SchemaException|ObjectNotFoundException|ExpressionEvaluationException e) {
-					throw new SystemException("Couldn't prepare task DTO: " + e.getMessage(), e);
-				}
-			}
-		};
-		objectWrapperModel = new LoadableModel<ObjectWrapper<TaskType>>() {
-			@Override
-			protected ObjectWrapper<TaskType> load() {
-				final Task operationTask = getTaskManager().createTaskInstance(OPERATION_LOAD_TASK);
-				return loadObjectWrapper(taskDtoModel.getObject().getTaskType().asPrismObject(), operationTask, new OperationResult("loadObjectWrapper"));
-			}
-		};
-		showAdvancedFeaturesModel = new Model<>(false);		// todo save setting in session
-		nodeListModel = new LoadableModel<List<NodeType>>(false) {
-			@Override
-			protected List<NodeType> load() {
-				OperationResult result = new OperationResult(OPERATION_LOAD_NODES);
-				Task opTask = getTaskManager().createTaskInstance(OPERATION_LOAD_NODES);
-				try {
-					return PrismObject.asObjectableList(
-							getModelService().searchObjects(NodeType.class, null, null, opTask, result));
-				} catch (Throwable t) {
-					LoggingUtils.logUnexpectedException(LOGGER, "Couldn't retrieve nodes", t);
-					return Collections.emptyList();
-				}
-			}
-		};
-		edit = false;
-		initLayout();
-	}
+    public PageTaskEdit(PageParameters parameters) {
+        taskOid = parameters.get(OnePageParameterEncoder.PARAMETER).toString();
+    }
 
-	@Override
-	protected IModel<String> createPageTitleModel() {
-		TaskDto taskDto = taskDtoModel != null ? taskDtoModel.getObject() : null;
-		String suffix;
-		if (taskDto != null && taskDto.isWorkflowParent()) {
-			suffix = ".wfOperation";
-		} else if (taskDto != null && taskDto.isWorkflowChild()) {
-			suffix = ".wfRequest";
-		} else {
-			suffix = "";
-		}
-		return createStringResource("PageTaskEdit.title" + suffix);
-	}
+    @Override
+    protected IModel<String> createPageTitleModel() {
+        TaskDto taskDto = taskDtoModel != null ? taskDtoModel.getObject() : null;
+        String suffix;
+        if (taskDto != null && taskDto.isWorkflow()) {
+            suffix = ".wfOperation";
+        } else {
+            suffix = "";
+        }
+        return createStringResource("PageTaskEdit.title" + suffix);
+    }
 
-	private TaskType loadTaskTypeChecked(String taskOid, Task operationTask, OperationResult result) {
-		TaskType taskType = loadTaskType(taskOid, operationTask, result);
+    private TaskType loadTaskTypeChecked(String taskOid, Task operationTask, OperationResult result) {
+        TaskType taskType = loadTaskType(taskOid, operationTask, result);
+        if (taskType == null) {
+            getSession().error(getString("pageTaskEdit.message.cantTaskDetails"));
+            showResult(result, false);
+            throw getRestartResponseException(PageTasks.class);
+        }
 
-		if (!result.isSuccess()) {
-			showResult(result);
-		}
+        return taskType;
+    }
 
-		if (taskType == null) {
-			getSession().error(getString("pageTaskEdit.message.cantTaskDetails"));
-			showResult(result, false);
-			throw getRestartResponseException(PageTasks.class);
-		}
+    public IModel<List<NodeType>> getNodeListModel() {
+        return nodeListModel;
+    }
 
-		return taskType;
-	}
+    private TaskType loadTaskType(String taskOid, Task operationTask, OperationResult result) {
+        TaskType taskType = null;
+        try {
+            Collection<SelectorOptions<GetOperationOptions>> options = getOperationOptionsBuilder()
+                    // retrieve
+                    .item(TaskType.F_SUBTASK).retrieve()
+                    .item(TaskType.F_NODE_AS_OBSERVED).retrieve()
+                    .item(TaskType.F_NEXT_RUN_START_TIMESTAMP).retrieve()
+                    .item(TaskType.F_NEXT_RETRY_TIMESTAMP).retrieve()
+                    .item(TaskType.F_RESULT).retrieve()         // todo maybe only when it is to be displayed
+                    //.item(TaskType.F_WORKFLOW_CONTEXT, WfContextType.F_WORK_ITEM).retrieve() // todo do this in case
+                    // resolve
+                    //.item(TaskType.F_WORKFLOW_CONTEXT, WfContextType.F_REQUESTOR_REF).resolve()   // todo do this in case
+                    .build();
+            taskType = getModelService().getObject(TaskType.class, taskOid, options, operationTask, result).asObjectable();
+        } catch (Exception ex) {
+            result.recordFatalError(getString("PageTaskEdit.message.loadTaskType.fatalError"), ex);
+        }
+        return taskType;
+    }
 
-	public IModel<List<NodeType>> getNodeListModel() {
-		return nodeListModel;
-	}
-
-	private TaskType loadTaskType(String taskOid, Task operationTask, OperationResult result) {
-		TaskType taskType = null;
-
-		try {
-			Collection<SelectorOptions<GetOperationOptions>> options = GetOperationOptions.retrieveItemsNamed(
-					TaskType.F_SUBTASK,
-					TaskType.F_NODE_AS_OBSERVED,
-					TaskType.F_NEXT_RUN_START_TIMESTAMP,
-					TaskType.F_NEXT_RETRY_TIMESTAMP,
-					new ItemPath(TaskType.F_WORKFLOW_CONTEXT, WfContextType.F_WORK_ITEM));
-			options.addAll(GetOperationOptions.resolveItemsNamed(
-					new ItemPath(TaskType.F_WORKFLOW_CONTEXT, WfContextType.F_REQUESTER_REF)
-			));
-			taskType = getModelService().getObject(TaskType.class, taskOid, options, operationTask, result).asObjectable();
-			result.computeStatus();
-		} catch (Exception ex) {
-			result.recordFatalError("Couldn't get task.", ex);
-		}
-		return taskType;
-	}
-
-	private TaskDto prepareTaskDto(TaskType task, Task operationTask, OperationResult result) throws SchemaException, ObjectNotFoundException, ExpressionEvaluationException {
-		TaskDto taskDto = new TaskDto(task, getModelService(), getTaskService(), getModelInteractionService(),
-				getTaskManager(), getWorkflowManager(), TaskDtoProviderOptions.fullOptions(), operationTask, result, this);
-		return taskDto;
-	}
+    private TaskDto prepareTaskDto(TaskType task, boolean subtasksLoaded, Task operationTask, OperationResult result) throws SchemaException {
+        return new TaskDto(task, null, getModelService(), getTaskService(), getModelInteractionService(),
+                getTaskManager(), getWorkflowManager(), TaskDtoProviderOptions.fullOptions(), subtasksLoaded, operationTask, result, this);
+    }
 
 
-	protected void initLayout() {
-		refreshModel = new Model(new AutoRefreshDto());
-		refreshModel.getObject().setInterval(getRefreshInterval());
+    @Override
+    protected void onInitialize() {
+        super.onInitialize();
 
-		IModel<PrismObject<TaskType>> prismObjectModel = new AbstractReadOnlyModel<PrismObject<TaskType>>() {
-			@Override
-			public PrismObject<TaskType> getObject() {
-				return objectWrapperModel.getObject().getObject();
-			}
-		};
-		final TaskSummaryPanel summaryPanel = new TaskSummaryPanel(ID_SUMMARY_PANEL, prismObjectModel, refreshModel, this);
-		summaryPanel.setOutputMarkupId(true);
-		add(summaryPanel);
+        taskDtoModel = new LoadableModel<TaskDto>(false) {
+            @Override
+            protected TaskDto load() {
+                try {
+                    previousTaskDto = currentTaskDto;
+                    final OperationResult result = new OperationResult(OPERATION_LOAD_TASK);
+                    final Task operationTask = getTaskManager().createTaskInstance(OPERATION_LOAD_TASK);
+                    final TaskType taskType = loadTaskTypeChecked(taskOid, operationTask, result);
+                    currentTaskDto = prepareTaskDto(taskType, true, operationTask, result);
+                    result.computeStatusIfUnknown();
+                    if (!result.isSuccess()) {
+                        showResult(result);
+                    }
+                    return currentTaskDto;
+                } catch (SchemaException e) {
+                    throw new SystemException("Couldn't prepare task DTO: " + e.getMessage(), e);
+                }
+            }
+        };
+        objectWrapperModel = new LoadableModel<PrismObjectWrapper<TaskType>>() {
+            @Override
+            protected PrismObjectWrapper<TaskType> load() {
+                final Task operationTask = getTaskManager().createTaskInstance(OPERATION_LOAD_TASK);
+                return loadObjectWrapper(taskDtoModel.getObject().getTaskType().asPrismObject(), operationTask, new OperationResult("loadObjectWrapper"));
+            }
+        };
+        showAdvancedFeaturesModel = new Model<>(false);        // todo save setting in session
+        nodeListModel = new LoadableModel<List<NodeType>>(false) {
+            @Override
+            protected List<NodeType> load() {
+                OperationResult result = new OperationResult(OPERATION_LOAD_NODES);
+                Task opTask = getTaskManager().createTaskInstance(OPERATION_LOAD_NODES);
+                try {
+                    return PrismObject.asObjectableList(
+                            getModelService().searchObjects(NodeType.class, null, null, opTask, result));
+                } catch (Throwable t) {
+                    LoggingUtils.logUnexpectedException(LOGGER, "Couldn't retrieve nodes", t);
+                    return Collections.emptyList();
+                }
+            }
+        };
+        refreshModel = new Model<>(new AutoRefreshDto());
+        refreshModel.getObject().setInterval(getRefreshInterval());
 
-		mainPanel = new TaskMainPanel(ID_MAIN_PANEL, objectWrapperModel, taskDtoModel, showAdvancedFeaturesModel, this);
-		mainPanel.setOutputMarkupId(true);
-		add(mainPanel);
 
-		summaryPanel.getRefreshPanel().startRefreshing(this, null);
-	}
 
-	@Override
-	public int getRefreshInterval() {
-		TaskDtoExecutionStatus exec = getTaskDto().getExecution();
-		if (exec == null) {
-			return REFRESH_INTERVAL_IF_CLOSED;
-		}
-		switch (exec) {
-			case RUNNABLE:
-			case RUNNING:
-			case RUNNING_OR_RUNNABLE:
-			case SUSPENDING: return REFRESH_INTERVAL_IF_RUNNABLE;
-			case SUSPENDED: return REFRESH_INTERVAL_IF_SUSPENDED;
-			case WAITING: return REFRESH_INTERVAL_IF_WAITING;
-			case CLOSED: return REFRESH_INTERVAL_IF_CLOSED;
-		}
-		return REFRESH_INTERVAL_IF_RUNNABLE;
-	}
+        final TaskSummaryPanel summaryPanel = new TaskSummaryPanel(ID_SUMMARY_PANEL,
+                Model.of(objectWrapperModel.getObject().getObject().asObjectable()), refreshModel, this);
+        summaryPanel.setOutputMarkupId(true);
+        add(summaryPanel);
 
-	public void refresh(AjaxRequestTarget target) {
-		TaskTabsVisibility tabsVisibilityOld = new TaskTabsVisibility();
-		tabsVisibilityOld.computeAll(this);
-		TaskButtonsVisibility buttonsVisibilityOld = new TaskButtonsVisibility();
-		buttonsVisibilityOld.computeAll(this);
+        mainPanel = new TaskMainPanel(ID_MAIN_PANEL, objectWrapperModel, taskDtoModel, showAdvancedFeaturesModel, this);
+        mainPanel.setOutputMarkupId(true);
+        add(mainPanel);
 
-		refreshTaskModels();
+        summaryPanel.getRefreshPanel().startRefreshing(this, null);
+    }
 
-		TaskTabsVisibility tabsVisibilityNew = new TaskTabsVisibility();
-		tabsVisibilityNew.computeAll(this);
-		TaskButtonsVisibility buttonsVisibilityNew = new TaskButtonsVisibility();
-		buttonsVisibilityNew.computeAll(this);
+    @Override
+    public int getRefreshInterval() {
+        TaskDtoExecutionStatus exec = getTaskDto().getExecution();
+        if (exec == null) {
+            return REFRESH_INTERVAL_IF_CLOSED;
+        }
+        switch (exec) {
+            case RUNNING:
+            case SUSPENDING: return REFRESH_INTERVAL_IF_RUNNING;
+            case RUNNABLE:return REFRESH_INTERVAL_IF_RUNNABLE;
+            case SUSPENDED: return REFRESH_INTERVAL_IF_SUSPENDED;
+            case WAITING: return REFRESH_INTERVAL_IF_WAITING;
+            case CLOSED: return REFRESH_INTERVAL_IF_CLOSED;
+        }
+        return REFRESH_INTERVAL_IF_RUNNABLE;
+    }
 
-		if (!buttonsVisibilityNew.equals(buttonsVisibilityOld)) {
-			target.add(mainPanel.getButtonPanel());
-		}
-		if (tabsVisibilityNew.equals(tabsVisibilityOld)) {
-			// soft version
-			for (Component component : mainPanel.getTabPanel()) {
-				if (component instanceof TaskTabPanel) {
-					for (Component c : ((TaskTabPanel) component).getComponentsToUpdate()) {
-						target.add(c);
-					}
-				}
-			}
-		} else {
-			// hard version
-			target.add(mainPanel.getTabPanel());
-		}
-		target.add(getSummaryPanel());
+    public void refresh(AjaxRequestTarget target) {
+        TaskTabsVisibility tabsVisibilityOld = new TaskTabsVisibility();
+        tabsVisibilityOld.computeAll(this);
+        TaskButtonsVisibility buttonsVisibilityOld = new TaskButtonsVisibility();
+        buttonsVisibilityOld.computeAll(this);
 
-		AutoRefreshDto refreshDto = refreshModel.getObject();
-		refreshDto.recordRefreshed();
+        refreshTaskModels();
 
-		if (isEdit() || !refreshDto.isEnabled()) {
-			getRefreshPanel().stopRefreshing(this, target);
-		} else {
-			getRefreshPanel().startRefreshing(this, target);
-		}
-	}
+        TaskTabsVisibility tabsVisibilityNew = new TaskTabsVisibility();
+        tabsVisibilityNew.computeAll(this);
+        TaskButtonsVisibility buttonsVisibilityNew = new TaskButtonsVisibility();
+        buttonsVisibilityNew.computeAll(this);
 
-	public TaskDto getCurrentTaskDto() {
-		return currentTaskDto;
-	}
+        if (!buttonsVisibilityNew.equals(buttonsVisibilityOld)) {
+            target.add(mainPanel.getButtonPanel());
+        }
+        if (tabsVisibilityNew.equals(tabsVisibilityOld)) {
+            // soft version
+            for (Component component : mainPanel.getTabPanel()) {
+                if (component instanceof TaskTabPanel) {
+                    for (Component c : ((TaskTabPanel) component).getComponentsToUpdate()) {
+                        target.add(c);
+                    }
+                }
+            }
+        } else {
+            // hard version
+            target.add(mainPanel.getTabPanel());
+        }
+        target.add(getSummaryPanel());
 
-	public TaskDto getPreviousTaskDto() {
-		return previousTaskDto;
-	}
+        AutoRefreshDto refreshDto = refreshModel.getObject();
+        refreshDto.recordRefreshed();
 
-	@Override
-	public Component getRefreshingBehaviorParent() {
-		return getRefreshPanel();
-	}
+        if (isEdit() || !refreshDto.isEnabled()) {
+            getRefreshPanel().stopRefreshing(this, target);
+        } else {
+            getRefreshPanel().startRefreshing(this, target);
+        }
+    }
 
-	public void refreshTaskModels() {
-		TaskDto oldTaskDto = taskDtoModel.getObject();
-		if (oldTaskDto == null) {
-			LOGGER.warn("Null or empty taskModel");
-			return;
-		}
-		TaskManager taskManager = getTaskManager();
-		OperationResult result = new OperationResult("refresh");
-		Task operationTask = taskManager.createTaskInstance("refresh");
+    public TaskDto getCurrentTaskDto() {
+        return currentTaskDto;
+    }
 
-		try {
-			LOGGER.debug("Refreshing task {}", oldTaskDto);
-			TaskType taskType = loadTaskType(oldTaskDto.getOid(), operationTask, result);
-			TaskDto newTaskDto = prepareTaskDto(taskType, operationTask, result);
-			final ObjectWrapper<TaskType> newWrapper = loadObjectWrapper(taskType.asPrismObject(), operationTask, result);
-			previousTaskDto = currentTaskDto;
-			currentTaskDto = newTaskDto;
-			taskDtoModel.setObject(newTaskDto);
-			objectWrapperModel.setObject(newWrapper);
-		} catch (ObjectNotFoundException|SchemaException|ExpressionEvaluationException|RuntimeException|Error e) {
-			LoggingUtils.logUnexpectedException(LOGGER, "Couldn't refresh task {}", e, oldTaskDto);
-		}
-	}
+    public TaskDto getPreviousTaskDto() {
+        return previousTaskDto;
+    }
 
-	protected ObjectWrapper<TaskType> loadObjectWrapper(PrismObject<TaskType> object, Task task, OperationResult result) {
-		ObjectWrapper<TaskType> wrapper;
-		ObjectWrapperFactory owf = new ObjectWrapperFactory(this);
-		try {
-			object.revive(getPrismContext());		// just to be sure (after deserialization the context is missing in this object)
-			wrapper = owf.createObjectWrapper("pageAdminFocus.focusDetails", null, object, ContainerStatus.MODIFYING, task);
-		} catch (Exception ex) {
-			result.recordFatalError("Couldn't get user.", ex);
-			LoggingUtils.logUnexpectedException(LOGGER, "Couldn't load user", ex);
-			wrapper = owf.createObjectWrapper("pageAdminFocus.focusDetails", null, object, null, null, ContainerStatus.MODIFYING);
-		}
-		showResult(wrapper.getResult(), false);
+    @Override
+    public Component getRefreshingBehaviorParent() {
+        return getRefreshPanel();
+    }
 
-		return wrapper;
-	}
+    private void refreshTaskModels() {
+        TaskDto oldTaskDto = taskDtoModel.getObject();
+        if (oldTaskDto == null) {
+            LOGGER.warn("Null or empty taskModel");
+            return;
+        }
+        TaskManager taskManager = getTaskManager();
+        OperationResult result = new OperationResult("refresh");
+        Task operationTask = taskManager.createTaskInstance("refresh");
 
-	public boolean isEdit() {
-		return edit;
-	}
+        try {
+            LOGGER.debug("Refreshing task {}", oldTaskDto);
+            TaskType taskType = loadTaskType(oldTaskDto.getOid(), operationTask, result);
+            TaskDto newTaskDto = prepareTaskDto(taskType, true, operationTask, result);
+            final PrismObjectWrapper<TaskType> newWrapper = loadObjectWrapper(taskType.asPrismObject(), operationTask, result);
+            previousTaskDto = currentTaskDto;
+            currentTaskDto = newTaskDto;
+            taskDtoModel.setObject(newTaskDto);
+            objectWrapperModel.setObject(newWrapper);
+        } catch (SchemaException|RuntimeException|Error e) {
+            LoggingUtils.logUnexpectedException(LOGGER, "Couldn't refresh task {}", e, oldTaskDto);
+            result.recordFatalError(getString("PageTaskEdit.message.refreshTaskModels.fatalError", e.getMessage()), e);
+        }
+        result.computeStatusIfUnknown();
+        if (!result.isSuccess()) {
+            showResult(result);
+        }
+    }
 
-	public void setEdit(boolean edit) {
-		this.edit = edit;
-	}
+    protected PrismObjectWrapper<TaskType> loadObjectWrapper(PrismObject<TaskType> object, Task task, OperationResult result) {
+        PrismObjectWrapper<TaskType> wrapper;
+//        ObjectWrapperFactory owf = new ObjectWrapperFactory(this);
+        PrismObjectWrapperFactory<TaskType> owf = getRegistry().getObjectWrapperFactory(object.getDefinition());
+        try {
+            object.revive(getPrismContext());        // just to be sure (after deserialization the context is missing in this object)
+//            wrapper = owf.createObjectWrapper("pageAdminFocus.focusDetails", null, object, ContainerStatus.MODIFYING, task);
+            WrapperContext context = new WrapperContext(task, result);
+            wrapper = owf.createObjectWrapper(object, ItemStatus.NOT_CHANGED, context);
+        } catch (Exception ex) {
+            result.recordFatalError(getString("PageTaskEdit.message.loadObjectWrapper.fatalError"), ex);
+            LoggingUtils.logUnexpectedException(LOGGER, "Couldn't load task", ex);
+            try {
+                WrapperContext context = new WrapperContext(task, result);
+                wrapper = owf.createObjectWrapper(object, ItemStatus.NOT_CHANGED, context);
+//                wrapper = owf.createObjectWrapper("pageAdminFocus.focusDetails", null, object, null, null, ContainerStatus.MODIFYING, task);
+            } catch (SchemaException e) {
+                result.recordFatalError(e.getMessage(), e);
+                showResult(result, false);
+                throw new RestartResponseException(PageTasks.class);
+            }
+        }
+        showResult(result, false);
 
-	public IModel<TaskDto> getTaskDtoModel() {
-		return taskDtoModel;
-	}
+        return wrapper;
+    }
 
-	public LoadableModel<ObjectWrapper<TaskType>> getObjectWrapperModel() {
-		return objectWrapperModel;
-	}
+    public boolean isEdit() {
+        return edit;
+    }
 
-	public TaskDto getTaskDto() {
-		return taskDtoModel.getObject();
-	}
+    public void setEdit(boolean edit) {
+        this.edit = edit;
+    }
 
-	public PageTaskController getController() {
-		return controller;
-	}
+    public IModel<TaskDto> getTaskDtoModel() {
+        return taskDtoModel;
+    }
 
-	public TaskSummaryPanel getSummaryPanel() {
-		return (TaskSummaryPanel) get(ID_SUMMARY_PANEL);
-	}
+    public LoadableModel<PrismObjectWrapper<TaskType>> getObjectWrapperModel() {
+        return objectWrapperModel;
+    }
 
-	public AutoRefreshPanel getRefreshPanel() {
-		return getSummaryPanel().getRefreshPanel();
-	}
+    public TaskDto getTaskDto() {
+        return taskDtoModel.getObject();
+    }
 
-	public boolean isShowAdvanced() {
-		return showAdvancedFeaturesModel.getObject();
-	}
+    public PageTaskController getController() {
+        return controller;
+    }
 
-	public VisibleEnableBehaviour createVisibleIfEdit(final ItemPath itemPath) {
-		return new VisibleEnableBehaviour() {
-			@Override
-			public boolean isVisible() {
-				return isEdit() && isEditable(itemPath);
-			}
-		};
-	}
+    public TaskSummaryPanel getSummaryPanel() {
+        return (TaskSummaryPanel) get(ID_SUMMARY_PANEL);
+    }
 
-	public VisibleEnableBehaviour createEnabledIfEdit(final ItemPath itemPath) {
-		return new VisibleEnableBehaviour() {
-			@Override
-			public boolean isEnabled() {
-				return isEdit() && isEditable(itemPath);
-			}
-		};
-	}
-	public VisibleEnableBehaviour createVisibleIfView(final ItemPath itemPath) {
-		return new VisibleEnableBehaviour() {
-			@Override
-			public boolean isVisible() {
-				return isReadable(itemPath) && (!isEdit() || !isEditable(itemPath));
-			}
-		};
-	}
+    public AutoRefreshPanel getRefreshPanel() {
+        return getSummaryPanel().getRefreshPanel();
+    }
 
-	public VisibleEnableBehaviour createVisibleIfAccessible(QName... names) {
-		return createVisibleIfAccessible(ItemPath.asPathArray(names));
-	}
+    public boolean isShowAdvanced() {
+        return showAdvancedFeaturesModel.getObject();
+    }
 
-	public VisibleEnableBehaviour createVisibleIfAccessible(final ItemPath... itemPaths) {
-		return new VisibleEnableBehaviour() {
-			@Override
-			public boolean isVisible() {
-				for (ItemPath itemPath : itemPaths) {
-					if (!isReadable(itemPath)) {
-						return false;
-					}
-				}
-				return true;
-			}
-		};
-	}
+    public VisibleEnableBehaviour createVisibleIfEdit(final ItemPath itemPath) {
+        return new VisibleEnableBehaviour() {
+            @Override
+            public boolean isVisible() {
+                return isEdit() && isEditable(itemPath);
+            }
+        };
+    }
 
-	protected boolean isEditable() {
-		return isEditable(objectWrapperModel.getObject().getDefinition());
-	}
+    public VisibleEnableBehaviour createEnabledIfEdit(final ItemPath itemPath) {
+        return new VisibleEnableBehaviour() {
+            @Override
+            public boolean isEnabled() {
+                return isEdit() && isEditable(itemPath);
+            }
+        };
+    }
+    public VisibleEnableBehaviour createVisibleIfView(final ItemPath itemPath) {
+        return new VisibleEnableBehaviour() {
+            @Override
+            public boolean isVisible() {
+                return isReadable(itemPath) && (!isEdit() || !isEditable(itemPath));
+            }
+        };
+    }
 
-	private boolean isEditable(ItemDefinition<?> definition) {
-		return isEditable(definition, new HashSet<>());
-	}
+    public VisibleEnableBehaviour createVisibleIfAccessible(final ItemPath... itemPaths) {
+        return new VisibleEnableBehaviour() {
+            @Override
+            public boolean isVisible() {
+                for (ItemPath itemPath : itemPaths) {
+                    if (!isReadable(itemPath)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        };
+    }
 
-	private boolean isEditable(ItemDefinition<?> definition, Set<ItemDefinition<?>> seen) {
-		if (definition.canModify()) {
-			return true;
-		} else if (definition instanceof PrismContainerDefinition) {
-			for (ItemDefinition<?> subdef : ((PrismContainerDefinition<?>) definition).getDefinitions()) {
-				if (seen.contains(subdef)) {
-					return false;
-				}
-				if (isEditable(subdef, seen)) {
-					return true;
-				}
-				seen.add(subdef);
-			}
-		}
-		return false;
-	}
+    protected boolean isEditable() {
+        return isEditable(objectWrapperModel.getObject());
+    }
 
-	protected boolean isEditable(QName name) {
-		return isEditable(new ItemPath(name));
-	}
+    private boolean isEditable(ItemDefinition<?> definition) {
+        return isEditable(definition, new HashSet<>());
+    }
 
-	protected boolean isEditable(ItemPath itemPath) {
-		ItemDefinition<?> itemDefinition = objectWrapperModel.getObject().getDefinition().findItemDefinition(itemPath);
-		if (itemDefinition != null) {
-			return itemDefinition.canRead() && itemDefinition.canModify();
-		} else {
-			return true;
-		}
-	}
+    private boolean isEditable(ItemDefinition<?> definition, Set<ItemDefinition<?>> seen) {
+        if (definition.canModify()) {
+            return true;
+        } else if (definition instanceof PrismContainerDefinition) {
+            for (ItemDefinition<?> subdef : ((PrismContainerDefinition<?>) definition).getDefinitions()) {
+                if (seen.contains(subdef)) {
+                    return false;
+                }
+                if (isEditable(subdef, seen)) {
+                    return true;
+                }
+                seen.add(subdef);
+            }
+        }
+        return false;
+    }
 
-	protected boolean isReadable(ItemPath itemPath) {
-		ItemDefinition<?> itemDefinition = objectWrapperModel.getObject().getDefinition().findItemDefinition(itemPath);
-		if (itemDefinition != null) {
-			return itemDefinition.canRead();
-		} else {
-			return true;
-		}
-	}
+    protected boolean isEditable(ItemPath itemPath) {
+        ItemDefinition<?> itemDefinition = objectWrapperModel.getObject().findItemDefinition(itemPath);
+        if (itemDefinition != null) {
+            return itemDefinition.canRead() && itemDefinition.canModify();
+        } else {
+            return true;
+        }
+    }
 
-	public boolean isExtensionReadable(QName name) {
-		return isReadable(new ItemPath(TaskType.F_EXTENSION, name));
-	}
+    protected boolean isReadable(ItemPath itemPath) {
+        ItemDefinition<?> itemDefinition =  objectWrapperModel.getObject().findItemDefinition(itemPath);
+        if (itemDefinition != null) {
+            return itemDefinition.canRead();
+        } else {
+            return true;
+        }
+    }
 
-	boolean isReadableSomeOf(QName... names) {
-		for (QName name : names) {
-			if (isReadable(new ItemPath(name))) {
-				return true;
-			}
-		}
-		return false;
-	}
+    public boolean isExtensionReadable(ItemName name) {
+        return isReadable(ItemPath.create(TaskType.F_EXTENSION, name));
+    }
 
-	public Form getForm() {
-		return mainPanel.getMainForm();
-	}
+    boolean isReadableSomeOf(QName... names) {
+        for (QName name : names) {
+            if (isReadable(ItemName.fromQName(name))) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-	boolean canSuspend() {
-		return isAuthorized(ModelAuthorizationAction.SUSPEND_TASK);
-	}
+    public Form getForm() {
+        return mainPanel.getMainForm();
+    }
 
-	boolean canResume() {
-		return isAuthorized(ModelAuthorizationAction.RESUME_TASK);
-	}
+    boolean canSuspend() {
+        return isAuthorized(ModelAuthorizationAction.SUSPEND_TASK);
+    }
 
-	boolean canRunNow() {
-		return isAuthorized(ModelAuthorizationAction.RUN_TASK_IMMEDIATELY);
-	}
+    boolean canResume() {
+        return isAuthorized(ModelAuthorizationAction.RESUME_TASK);
+    }
 
-	boolean canStop() {
-		return isAuthorized(ModelAuthorizationAction.STOP_APPROVAL_PROCESS_INSTANCE);
-	}
+    boolean canRunNow() {
+        return isAuthorized(ModelAuthorizationAction.RUN_TASK_IMMEDIATELY);
+    }
 
-	private boolean isAuthorized(ModelAuthorizationAction action) {
-		try {
-			return isAuthorized(AuthorizationConstants.AUTZ_ALL_URL, null, null, null, null, null)
-					|| isAuthorized(action.getUrl(), null, taskDtoModel.getObject().getTaskType().asPrismObject(), null, null, null);
-		} catch (SchemaException | ExpressionEvaluationException | ObjectNotFoundException | CommunicationException | ConfigurationException | SecurityViolationException e) {
-			LoggingUtils.logUnexpectedException(LOGGER, "Couldn't determine authorization for {}", e, action);
-			return true;			// it is only GUI thing
-		}
-	}
+    boolean canStop() {
+        return isAuthorized(ModelAuthorizationAction.STOP_APPROVAL_PROCESS_INSTANCE);
+    }
+
+    private boolean isAuthorized(ModelAuthorizationAction action) {
+        try {
+            return isAuthorized(AuthorizationConstants.AUTZ_ALL_URL, null, null, null, null, null)
+                    || isAuthorized(action.getUrl(), null, taskDtoModel.getObject().getTaskType().asPrismObject(), null, null, null);
+        } catch (SchemaException | ExpressionEvaluationException | ObjectNotFoundException | CommunicationException | ConfigurationException | SecurityViolationException e) {
+            LoggingUtils.logUnexpectedException(LOGGER, "Couldn't determine authorization for {}", e, action);
+            return true;            // it is only GUI thing
+        }
+    }
 }

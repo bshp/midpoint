@@ -1,35 +1,18 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.schema.xjc.schema;
 
-import com.evolveum.midpoint.prism.Containerable;
-import com.evolveum.midpoint.prism.Objectable;
-import com.evolveum.midpoint.prism.PrismContainer;
-import com.evolveum.midpoint.prism.PrismContainerDefinition;
-import com.evolveum.midpoint.prism.PrismContainerValue;
-import com.evolveum.midpoint.prism.PrismContext;
-import com.evolveum.midpoint.prism.PrismObject;
-import com.evolveum.midpoint.prism.PrismReference;
-import com.evolveum.midpoint.prism.PrismReferenceValue;
-import com.evolveum.midpoint.prism.Raw;
-import com.evolveum.midpoint.prism.Referencable;
-import com.evolveum.midpoint.prism.xjc.PrismContainerArrayList;
-import com.evolveum.midpoint.prism.xjc.PrismForJAXBUtil;
-import com.evolveum.midpoint.prism.xjc.PrismReferenceArrayList;
+import com.evolveum.midpoint.prism.*;
+import com.evolveum.midpoint.prism.impl.*;
+import com.evolveum.midpoint.prism.impl.xjc.PrismContainerArrayList;
+import com.evolveum.midpoint.prism.impl.xjc.PrismForJAXBUtil;
+import com.evolveum.midpoint.prism.impl.xjc.PrismReferenceArrayList;
+import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.xml.XmlTypeConverter;
 import com.evolveum.midpoint.schema.xjc.PrefixMapper;
 import com.evolveum.midpoint.schema.xjc.Processor;
@@ -46,12 +29,7 @@ import com.sun.tools.xjc.outline.ClassOutline;
 import com.sun.tools.xjc.outline.Outline;
 import com.sun.tools.xjc.reader.xmlschema.bindinfo.BIDeclaration;
 import com.sun.tools.xjc.reader.xmlschema.bindinfo.BIXPluginCustomization;
-import com.sun.xml.xsom.XSComponent;
-import com.sun.xml.xsom.XSElementDecl;
-import com.sun.xml.xsom.XSSchema;
-import com.sun.xml.xsom.XSSchemaSet;
-import com.sun.xml.xsom.XSType;
-
+import com.sun.xml.xsom.*;
 import org.apache.commons.lang.Validate;
 import org.jetbrains.annotations.NotNull;
 import org.jvnet.jaxb2_commons.lang.Equals;
@@ -63,19 +41,11 @@ import org.xml.sax.SAXException;
 import javax.xml.bind.annotation.*;
 import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.namespace.QName;
-
 import java.io.Serializable;
 import java.io.StringWriter;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.function.Function;
 
 import static com.evolveum.midpoint.schema.xjc.util.ProcessorUtils.*;
@@ -88,7 +58,7 @@ import static com.evolveum.midpoint.schema.xjc.util.ProcessorUtils.*;
  */
 public class SchemaProcessor implements Processor {
 
-	private static final boolean PRINT_DEBUG_INFO = false;
+    private static final boolean PRINT_DEBUG_INFO = false;
 
     //qname for object reference type
     private static final QName OBJECT_REFERENCE_TYPE = new QName(PrefixMapper.C.getNamespace(), "ObjectReferenceType");
@@ -106,12 +76,15 @@ public class SchemaProcessor implements Processor {
     // The "as" prefix is chosen to avoid clash with usual "get" for the fields and also to indicate that
     //   the it returns the same object in a different representation and not a composed/aggregated object
     public static final String METHOD_AS_PRISM_OBJECT = "asPrismObject";
+    public static final String METHOD_AS_PRISM_OBJECT_VALUE = "asPrismObjectValue";
     public static final String METHOD_AS_PRISM_CONTAINER_VALUE = "asPrismContainerValue";
     private static final String METHOD_AS_PRISM_CONTAINER = "asPrismContainer";
     // The "setup" prefix is chosen avoid collision with regular setters for generated fields
     public static final String METHOD_SETUP_CONTAINER_VALUE = "setupContainerValue";
     public static final String METHOD_SETUP_CONTAINER = "setupContainer";
     public static final String METHOD_AS_REFERENCE_VALUE = "asReferenceValue";
+    public static final String METHOD_GET_OBJECT = "getObject";
+    public static final String METHOD_GET_OBJECTABLE = "getObjectable";
     public static final String METHOD_SETUP_REFERENCE_VALUE = "setupReferenceValue";
 
     // Internal fields and methods. Although some of these fields needs to be public (so they can be used by
@@ -132,6 +105,7 @@ public class SchemaProcessor implements Processor {
     private static final String METHOD_PRISM_UTIL_SET_FIELD_CONTAINER_VALUE = "setFieldContainerValue";
     private static final String METHOD_PRISM_UTIL_GET_REFERENCE = "getReference";
     private static final String METHOD_PRISM_UTIL_GET_REFERENCE_VALUE = "getReferenceValue";
+    private static final String METHOD_PRISM_UTIL_GET_REFERENCE_OBJECTABLE = "getReferenceObjectable";
     private static final String METHOD_PRISM_UTIL_SET_REFERENCE_VALUE_AS_REF = "setReferenceValueAsRef";
     private static final String METHOD_PRISM_UTIL_SET_REFERENCE_VALUE_AS_OBJECT = "setReferenceValueAsObject";
     private static final String METHOD_PRISM_UTIL_GET_REFERENCE_FILTER_CLAUSE_XNODE = "getReferenceFilterClauseXNode";
@@ -139,20 +113,24 @@ public class SchemaProcessor implements Processor {
     private static final String METHOD_PRISM_UTIL_GET_REFERENCE_TARGET_NAME = "getReferenceTargetName";
     private static final String METHOD_PRISM_UTIL_SET_REFERENCE_TARGET_NAME = "setReferenceTargetName";
     private static final String METHOD_PRISM_UTIL_OBJECTABLE_AS_REFERENCE_VALUE = "objectableAsReferenceValue";
-	private static final String METHOD_PRISM_UTIL_SETUP_CONTAINER_VALUE = "setupContainerValue";
+    private static final String METHOD_PRISM_UTIL_SETUP_CONTAINER_VALUE = "setupContainerValue";
     private static final String METHOD_PRISM_UTIL_CREATE_TARGET_INSTANCE = "createTargetInstance";
+    private static final String METHOD_PRISM_UTIL_ACCEPT = "accept";
+
+    private static final String METHOD_ACCEPT = "accept";
+    private static final String METHOD_VISIT = "visit";
 
     // ???
     private static final String METHOD_PRISM_GET_ANY = "getAny";
 
-	private static final String METHOD_CONTAINER_GET_VALUE = "getValue";
+    private static final String METHOD_CONTAINER_GET_VALUE = "getValue";
 
-	private static final String CONTAINER_VALUE_LOCAL_VAR_NAME = "containerValue";
-	private static final String FIELD_CONTAINER_VALUE_LOCAL_VAR_NAME = "fieldContainerValue";
-	private static final String OBJECT_LOCAL_FIELD_NAME = "object";
-	private static final String REFERENCE_LOCAL_VARIABLE_NAME = "reference";
+    private static final String CONTAINER_VALUE_LOCAL_VAR_NAME = "containerValue";
+    private static final String FIELD_CONTAINER_VALUE_LOCAL_VAR_NAME = "fieldContainerValue";
+    private static final String OBJECT_LOCAL_FIELD_NAME = "object";
+    private static final String REFERENCE_LOCAL_VARIABLE_NAME = "reference";
 
-	//equals, toString, hashCode methods
+    //equals, toString, hashCode methods
     private static final String METHOD_TO_STRING = "toString";
     private static final String METHOD_DEBUG_DUMP = "debugDump";
     private static final int METHOD_DEBUG_DUMP_INDENT = 3;
@@ -174,19 +152,27 @@ public class SchemaProcessor implements Processor {
     @Override
     public boolean run(Outline outline, Options options, ErrorHandler errorHandler) throws SAXException {
         try {
-            createClassMap(CLASS_MAP, outline, PrismReferenceValue.class, PrismReference.class, PrismObject.class,
+            createClassMap(CLASS_MAP, outline,
+                    PrismReferenceValue.class, PrismReferenceValueImpl.class,
+                    PrismReference.class, PrismReferenceImpl.class,
+                    PrismObject.class, PrismObjectImpl.class,
                     String.class, Object.class, XmlTransient.class, Override.class, IllegalArgumentException.class,
-                    QName.class, PrismForJAXBUtil.class, PrismReferenceArrayList.class, PrismContainerValue.class,
+                    ItemName.class,
+                    QName.class, PrismForJAXBUtil.class, PrismReferenceArrayList.class,
+                    PrismContainerValue.class, PrismContainerValueImpl.class,
                     List.class, Objectable.class, StringBuilder.class, XmlAccessorType.class, XmlElement.class, XmlType.class,
-                    XmlAttribute.class, XmlAnyAttribute.class, XmlAnyElement.class, PrismContainer.class, Equals.class,
+                    XmlAttribute.class, XmlAnyAttribute.class, XmlAnyElement.class,
+                    PrismContainer.class, PrismContainerImpl.class,
+                    Equals.class,
                     PrismContainerArrayList.class, HashCode.class, PrismContainerDefinition.class, Containerable.class,
-					Referencable.class, Raw.class, Enum.class, XmlEnum.class, PolyStringType.class, XmlTypeConverter.class);
+                    Referencable.class, Raw.class, Enum.class, XmlEnum.class, PolyStringType.class, XmlTypeConverter.class,
+                    PrismObjectValue.class, PrismObjectValueImpl.class);
 
             StepSchemaConstants stepSchemaConstants = new StepSchemaConstants();
             stepSchemaConstants.run(outline, options, errorHandler);
 
             Map<String, JFieldVar> namespaceFields = stepSchemaConstants.getNamespaceFields();
-            addComplextType(outline, namespaceFields);
+            addComplexType(outline, namespaceFields);
             addContainerName(outline, namespaceFields);
             addFieldQNames(outline, namespaceFields);
 
@@ -197,6 +183,8 @@ public class SchemaProcessor implements Processor {
             updateObjectReferenceType(outline);
 
             updateObjectFactoryElements(outline);
+
+            createAcceptMethods(outline);
         } catch (Exception ex) {
             ex.printStackTrace();
             throw new RuntimeException("Couldn't process MidPoint JAXB customisation, reason: "
@@ -237,11 +225,11 @@ public class SchemaProcessor implements Processor {
 
         //add prism reference and get/set method for it
         JVar reference = definedClass.field(JMod.PRIVATE, PrismReferenceValue.class, REFERENCE_VALUE_FIELD_NAME);
-        JMethod getReference = definedClass.method(JMod.PUBLIC, PrismReferenceValue.class, METHOD_AS_REFERENCE_VALUE);
+        JMethod asReferenceValueMethod = definedClass.method(JMod.PUBLIC, PrismReferenceValue.class, METHOD_AS_REFERENCE_VALUE);
 //        getReference.annotate(CLASS_MAP.get(XmlTransient.class));
-        JBlock body = getReference.body();
+        JBlock body = asReferenceValueMethod.body();
         JBlock then = body._if(reference.eq(JExpr._null()))._then();
-        JInvocation newReference = JExpr._new(CLASS_MAP.get(PrismReferenceValue.class));
+        JInvocation newReference = JExpr._new(CLASS_MAP.get(PrismReferenceValueImpl.class));
         then.assign(reference, newReference);
         body._return(reference);
 
@@ -252,15 +240,17 @@ public class SchemaProcessor implements Processor {
         body._return(JExpr._this());
 
         //update for oid methods
-        updateObjectReferenceOid(definedClass, getReference);
+        updateObjectReferenceOid(definedClass, asReferenceValueMethod);
         //update for type methods
-        updateObjectReferenceType(definedClass, getReference);
-        updateObjectReferenceRelation(definedClass, getReference);
-        updateObjectReferenceDescription(definedClass, getReference);
-        updateObjectReferenceFilter(definedClass, getReference);
-        updateObjectReferenceResolutionTime(definedClass, getReference);
+        updateObjectReferenceType(definedClass, asReferenceValueMethod);
+        updateObjectReferenceRelation(definedClass, asReferenceValueMethod);
+        updateObjectReferenceDescription(definedClass, asReferenceValueMethod);
+        updateObjectReferenceFilter(definedClass, asReferenceValueMethod);
+        updateObjectReferenceResolutionTime(definedClass, asReferenceValueMethod);
+        updateObjectReferenceGetObject(definedClass, asReferenceValueMethod);
+        updateObjectReferenceGetObjectable(definedClass, asReferenceValueMethod);
 
-		createReferenceFluentEnd(objectReferenceOutline);
+        createReferenceFluentEnd(objectReferenceOutline);
     }
 
     private void updateObjectReferenceType(JDefinedClass definedClass, JMethod getReference) {
@@ -295,17 +285,17 @@ public class SchemaProcessor implements Processor {
         setTagetNameInvocation.arg(setTargetName.listParams()[0]);
     }
 
-    private void updateObjectReferenceRelation(JDefinedClass definedClass, JMethod getReference) {
+    private void updateObjectReferenceRelation(JDefinedClass definedClass, JMethod asReferenceMethod) {
         JFieldVar typeField = definedClass.fields().get("relation");
         JMethod getType = recreateMethod(findMethod(definedClass, "getRelation"), definedClass);
         copyAnnotations(getType, typeField);
         JBlock body = getType.body();
-        body._return(JExpr.invoke(JExpr.invoke(getReference), "getRelation"));
+        body._return(JExpr.invoke(JExpr.invoke(asReferenceMethod), "getRelation"));
 
         definedClass.removeField(typeField);
         JMethod setType = recreateMethod(findMethod(definedClass, "setRelation"), definedClass);
         body = setType.body();
-        JInvocation invocation = body.invoke(JExpr.invoke(getReference), "setRelation");
+        JInvocation invocation = body.invoke(JExpr.invoke(asReferenceMethod), "setRelation");
         invocation.arg(setType.listParams()[0]);
     }
 
@@ -360,18 +350,33 @@ public class SchemaProcessor implements Processor {
         body.add(invocation);
     }
 
-    private void updateObjectReferenceResolutionTime(JDefinedClass definedClass, JMethod getReference) {
+    private void updateObjectReferenceResolutionTime(JDefinedClass definedClass, JMethod asReferenceMethod) {
         JFieldVar typeField = definedClass.fields().get("resolutionTime");
         JMethod getType = recreateMethod(findMethod(definedClass, "getResolutionTime"), definedClass);
         copyAnnotations(getType, typeField);
         JBlock body = getType.body();
-        body._return(JExpr.invoke(JExpr.invoke(getReference), "getResolutionTime"));
+        body._return(JExpr.invoke(JExpr.invoke(asReferenceMethod), "getResolutionTime"));
 
         definedClass.removeField(typeField);
         JMethod setType = recreateMethod(findMethod(definedClass, "setResolutionTime"), definedClass);
         body = setType.body();
-        JInvocation invocation = body.invoke(JExpr.invoke(getReference), "setResolutionTime");
+        JInvocation invocation = body.invoke(JExpr.invoke(asReferenceMethod), "setResolutionTime");
         invocation.arg(setType.listParams()[0]);
+    }
+
+
+    private void updateObjectReferenceGetObject(JDefinedClass definedClass, JMethod asReferenceMethod) {
+        JMethod method = definedClass.method(JMod.PUBLIC, PrismObject.class, METHOD_GET_OBJECT);
+        JBlock body = method.body();
+        body._return(JExpr.invoke(JExpr.invoke(asReferenceMethod), "getObject"));
+    }
+
+    private void updateObjectReferenceGetObjectable(JDefinedClass definedClass, JMethod asReferenceMethod) {
+        JMethod method = definedClass.method(JMod.PUBLIC, Objectable.class, METHOD_GET_OBJECTABLE);
+        JBlock body = method.body();
+        JInvocation invocation = CLASS_MAP.get(PrismForJAXBUtil.class).staticInvoke(METHOD_PRISM_UTIL_GET_REFERENCE_OBJECTABLE);
+        invocation.arg(JExpr.invoke(asReferenceMethod));
+        body._return(invocation);
     }
 
     private JMethod findMethod(JDefinedClass definedClass, String methodName) {
@@ -386,7 +391,7 @@ public class SchemaProcessor implements Processor {
     }
 
     private Set<JDefinedClass> updatePrismContainer(Outline outline) {
-        Set<JDefinedClass> containers = new HashSet<JDefinedClass>();
+        Set<JDefinedClass> containers = new HashSet<>();
         Set<Map.Entry<NClass, CClassInfo>> set = outline.getModel().beans().entrySet();
         for (Map.Entry<NClass, CClassInfo> entry : set) {
             ClassOutline classOutline = outline.getClazz(entry.getValue());
@@ -449,7 +454,7 @@ public class SchemaProcessor implements Processor {
 
         JBlock body = constructor.body();
         body.invoke(setupContainerMethod)                                                        // setupContainerValue(
-                .arg(JExpr._new(CLASS_MAP.get(PrismContainerValue.class).narrow(new JClass[0]))  //    new PrismContainerValue<>(
+                .arg(JExpr._new(CLASS_MAP.get(PrismContainerValueImpl.class).narrow(new JClass[0]))  //    new PrismContainerValueImpl<>(
                         .arg(JExpr._this())                                                      //       this,
                         .arg(constructor.params().get(0)));                                      //       prismContext);
         return constructor;
@@ -467,7 +472,7 @@ public class SchemaProcessor implements Processor {
 
         JBlock body = constructor.body();
         body.invoke("setupContainer")
-                .arg(JExpr._new(CLASS_MAP.get(PrismObject.class))
+                .arg(JExpr._new(CLASS_MAP.get(PrismObjectImpl.class))
                         .arg(JExpr.invoke("_getContainerName"))
                         .arg(JExpr.invoke("getClass"))
                         .arg(constructor.params().get(0)));
@@ -486,7 +491,7 @@ public class SchemaProcessor implements Processor {
 
     private void createAsPrismContainerValue(JDefinedClass definedClass, JVar containerValueVar) {
         JMethod getContainer = definedClass.method(JMod.PUBLIC, CLASS_MAP.get(PrismContainerValue.class),
-        		METHOD_AS_PRISM_CONTAINER_VALUE);
+                METHOD_AS_PRISM_CONTAINER_VALUE);
 //        getContainer.annotate(CLASS_MAP.get(XmlTransient.class));
 
         //create method body
@@ -494,14 +499,14 @@ public class SchemaProcessor implements Processor {
         body._if(containerValueVar.eq(JExpr._null())).                                              // if (_containerValue == null) {
             _then()                                                                                 //
                 .assign(containerValueVar,                                                          //    _containerValue =
-                        JExpr._new(CLASS_MAP.get(PrismContainerValue.class).narrow(new JClass[0]))  //       new PrismContainerValue<>(
+                        JExpr._new(CLASS_MAP.get(PrismContainerValueImpl.class).narrow(new JClass[0]))  //       new PrismContainerValueImpl<>(
                                 .arg(JExpr._this())                                                 //          this)
                 );
         body._return(containerValueVar);
     }
 
     private Set<JDefinedClass> updatePrismObject(Outline outline) {
-        Set<JDefinedClass> containers = new HashSet<JDefinedClass>();
+        Set<JDefinedClass> containers = new HashSet<>();
         Set<Map.Entry<NClass, CClassInfo>> set = outline.getModel().beans().entrySet();
         for (Map.Entry<NClass, CClassInfo> entry : set) {
             ClassOutline classOutline = outline.getClazz(entry.getValue());
@@ -611,16 +616,16 @@ public class SchemaProcessor implements Processor {
     }
 
     private void createAsPrismObject(JDefinedClass definedClass) {
-    	JClass prismObjectClass = CLASS_MAP.get(PrismObject.class);
-    	JType returnType;
-    	if (definedClass.isAbstract()) {
-			returnType = prismObjectClass.narrow(definedClass.wildcard());
-		} else {
-    		// e.g. PrismObject<TaskType> for TaskType
-			// we assume that we don't subclass a non-abstract object class into another one
-    		returnType = prismObjectClass.narrow(definedClass);
-		}
-		JMethod asPrismObject = definedClass.method(JMod.PUBLIC, returnType, METHOD_AS_PRISM_OBJECT);
+        JClass prismObjectClass = CLASS_MAP.get(PrismObject.class);
+        JType returnType;
+        if (definedClass.isAbstract()) {
+            returnType = prismObjectClass.narrow(definedClass.wildcard());
+        } else {
+            // e.g. PrismObject<TaskType> for TaskType
+            // we assume that we don't subclass a non-abstract object class into another one
+            returnType = prismObjectClass.narrow(definedClass);
+        }
+        JMethod asPrismObject = definedClass.method(JMod.PUBLIC, returnType, METHOD_AS_PRISM_OBJECT);
         asPrismObject.annotate(CLASS_MAP.get(Override.class));
 
         //create method body
@@ -634,37 +639,37 @@ public class SchemaProcessor implements Processor {
             List<JAnnotationUse> existingAnnotations = getAnnotations(definedClass);
             for (JAnnotationUse annotation : existingAnnotations) {
                 if (isAnnotationTypeOf(annotation, XmlAccessorType.class)) {
-	                Field field = getField(JAnnotationUse.class, "memberValues");
-	                field.setAccessible(true);
-	                Map<String, Object> map = (Map<String, Object>) field.get(annotation);
-	                field.setAccessible(false);
-	                map.clear();
-	                annotation.param("value", XmlAccessType.PROPERTY);
+                    Field field = getField(JAnnotationUse.class, "memberValues");
+                    field.setAccessible(true);
+                    Map<String, Object> map = (Map<String, Object>) field.get(annotation);
+                    field.setAccessible(false);
+                    map.clear();
+                    annotation.param("value", XmlAccessType.PROPERTY);
                 }
                 if (isAnnotationTypeOf(annotation, XmlType.class)) {
-	                Field field = getField(JAnnotationUse.class, "memberValues");
-	                field.setAccessible(true);
-	                Map<String, Object> map = (Map<String, Object>) field.get(annotation);
-	                Object propOrder = map.get("propOrder");
-	                if (propOrder != null) {
-	                	JAnnotationArrayMember paramArray = (JAnnotationArrayMember)propOrder;
-	                	Field valField = getField(JAnnotationArrayMember.class, "values");
-	                	valField.setAccessible(true);
-	                	List<JAnnotationValue> values = (List<JAnnotationValue>) valField.get(paramArray);
-	                	for (int i=0; i < values.size(); i++) {
-	                		JAnnotationValue jAnnValue = values.get(i);
-							String value = extractString(jAnnValue);
-							if (value.startsWith("_")) {
-								paramArray.param(value.substring(1));
-								values.set(i, values.get(values.size() - 1));
-								values.remove(values.size() - 1);
-							}
-//							String valAfter = extractString(values.get(i));
-//							print("PPPPPPPPPPPPPPPPPPP: "+value+" -> "+valAfter);
-	                	}
-	                	valField.setAccessible(false);
-	                }
-	                field.setAccessible(false);
+                    Field field = getField(JAnnotationUse.class, "memberValues");
+                    field.setAccessible(true);
+                    Map<String, Object> map = (Map<String, Object>) field.get(annotation);
+                    Object propOrder = map.get("propOrder");
+                    if (propOrder != null) {
+                        JAnnotationArrayMember paramArray = (JAnnotationArrayMember)propOrder;
+                        Field valField = getField(JAnnotationArrayMember.class, "values");
+                        valField.setAccessible(true);
+                        List<JAnnotationValue> values = (List<JAnnotationValue>) valField.get(paramArray);
+                        for (int i=0; i < values.size(); i++) {
+                            JAnnotationValue jAnnValue = values.get(i);
+                            String value = extractString(jAnnValue);
+                            if (value.startsWith("_")) {
+                                paramArray.param(value.substring(1));
+                                values.set(i, values.get(values.size() - 1));
+                                values.remove(values.size() - 1);
+                            }
+//                            String valAfter = extractString(values.get(i));
+//                            print("PPPPPPPPPPPPPPPPPPP: "+value+" -> "+valAfter);
+                        }
+                        valField.setAccessible(false);
+                    }
+                    field.setAccessible(false);
                 }
             }
         } catch (Exception ex) {
@@ -673,11 +678,11 @@ public class SchemaProcessor implements Processor {
     }
 
     private String extractString(JAnnotationValue jAnnValue) {
-    	StringWriter writer = new StringWriter();
-		JFormatter formatter = new JFormatter(writer);
-		jAnnValue.generate(formatter);
-		String value = writer.getBuffer().toString();
-		return value.substring(1, value.length() - 1);
+        StringWriter writer = new StringWriter();
+        JFormatter formatter = new JFormatter(writer);
+        jAnnValue.generate(formatter);
+        String value = writer.getBuffer().toString();
+        return value.substring(1, value.length() - 1);
     }
 
     private boolean isAnnotationTypeOf(JAnnotationUse annotation, Class clazz) {
@@ -875,8 +880,8 @@ public class SchemaProcessor implements Processor {
     }
 
     private void createSetContainerValueMethodInObject(JDefinedClass definedClass, JVar container) {
-    	JMethod setContainerValue = definedClass.method(JMod.PUBLIC, void.class, METHOD_SETUP_CONTAINER_VALUE);
-    	setContainerValue.annotate(CLASS_MAP.get(Override.class));
+        JMethod setContainerValue = definedClass.method(JMod.PUBLIC, void.class, METHOD_SETUP_CONTAINER_VALUE);
+        setContainerValue.annotate(CLASS_MAP.get(Override.class));
         JVar containerValue = setContainerValue.param(PrismContainerValue.class, "containerValue");
         //create method body
         JBlock body = setContainerValue.body();
@@ -889,13 +894,13 @@ public class SchemaProcessor implements Processor {
     private void createAsPrismContainer(ClassOutline classOutline, JVar container) {
         JDefinedClass definedClass = classOutline.implClass;
         JMethod getContainer = definedClass.method(JMod.PUBLIC, CLASS_MAP.get(PrismObject.class),
-        		METHOD_AS_PRISM_CONTAINER);
+                METHOD_AS_PRISM_CONTAINER);
 
         //create method body
         JBlock body = getContainer.body();
         JBlock then = body._if(container.eq(JExpr._null()))._then();
 
-        JInvocation newContainer = JExpr._new(CLASS_MAP.get(PrismObject.class));
+        JInvocation newContainer = JExpr._new(CLASS_MAP.get(PrismObjectImpl.class));
         newContainer.arg(JExpr.invoke(METHOD_GET_CONTAINER_NAME));
         newContainer.arg(JExpr._this().invoke("getClass"));
 //        newContainer.arg(JExpr.dotclass(definedClass));
@@ -973,7 +978,7 @@ public class SchemaProcessor implements Processor {
             JFieldVar var = namespaceFields.get(qname.getNamespaceURI());
             JInvocation invocation = JExpr._new(CLASS_MAP.get(QName.class));
             if (var != null) {
-                JClass schemaClass = outline.getModel().codeModel._getClass(StepSchemaConstants.CLASS_NAME);
+                JClass schemaClass = outline.getModel().codeModel._getClass(StepSchemaConstants.SCHEMA_CONSTANTS_GENERATED_CLASS_NAME);
                 invocation.arg(schemaClass.staticRef(var));
                 invocation.arg(qname.getLocalPart());
             } else {
@@ -999,7 +1004,7 @@ public class SchemaProcessor implements Processor {
         return hasAnnotation(classOutline, annotation) || hasParentAnnotation(classOutline.getSuperClass(), annotation);
     }
 
-    private void addComplextType(Outline outline, Map<String, JFieldVar> namespaceFields) {
+    private void addComplexType(Outline outline, Map<String, JFieldVar> namespaceFields) {
         Set<Map.Entry<NClass, CClassInfo>> set = outline.getModel().beans().entrySet();
         for (Map.Entry<NClass, CClassInfo> entry : set) {
             ClassOutline classOutline = outline.getClazz(entry.getValue());
@@ -1007,18 +1012,13 @@ public class SchemaProcessor implements Processor {
             if (qname == null) {
                 continue;
             }
-
-            JFieldVar var = namespaceFields.get(qname.getNamespaceURI());
-            if (var != null) {
-                createQNameDefinition(outline, classOutline.implClass, COMPLEX_TYPE_FIELD_NAME, var, qname);
-            } else {
-                createPSFField(outline, classOutline.implClass, COMPLEX_TYPE_FIELD_NAME, qname);
-            }
+            JFieldVar namespaceField = namespaceFields.get(qname.getNamespaceURI());
+            createQName(outline, classOutline.implClass, COMPLEX_TYPE_FIELD_NAME, qname, namespaceField, false, false);
         }
     }
 
     private Map<QName, List<QName>> getComplexTypeToElementName(ClassOutline classOutline) {
-        Map<QName, List<QName>> complexTypeToElementName = new HashMap<QName, List<QName>>();
+        Map<QName, List<QName>> complexTypeToElementName = new HashMap<>();
 
         XSSchemaSet schemaSet = classOutline.target.getSchemaComponent().getRoot();
         for (XSSchema schema : schemaSet.getSchemas()) {
@@ -1034,7 +1034,7 @@ public class SchemaProcessor implements Processor {
                 List<QName> qnames = complexTypeToElementName.get(type);
 
                 if (qnames == null) {
-                    qnames = new ArrayList<QName>();
+                    qnames = new ArrayList<>();
                     complexTypeToElementName.put(type, qnames);
                 }
                 qnames.add(new QName(decl.getTargetNamespace(), decl.getName()));
@@ -1042,18 +1042,6 @@ public class SchemaProcessor implements Processor {
         }
 
         return complexTypeToElementName;
-    }
-
-    private JFieldVar createQNameDefinition(Outline outline, JDefinedClass definedClass, String fieldName,
-            JFieldVar namespaceField, QName reference) {
-        JClass schemaClass = outline.getModel().codeModel._getClass(StepSchemaConstants.CLASS_NAME);
-
-        JInvocation invocation = JExpr._new(CLASS_MAP.get(QName.class));
-        invocation.arg(schemaClass.staticRef(namespaceField));
-        invocation.arg(reference.getLocalPart());
-
-        int psf = JMod.PUBLIC | JMod.STATIC | JMod.FINAL;
-        return definedClass.field(psf, QName.class, fieldName, invocation);
     }
 
     private void addFieldQNames(Outline outline, Map<String, JFieldVar> namespaceFields) {
@@ -1074,11 +1062,11 @@ public class SchemaProcessor implements Processor {
 
             boolean isObject = hasAnnotation(classOutline, A_PRISM_OBJECT);
 
-            List<FieldBox<QName>> boxes = new ArrayList<FieldBox<QName>>();
+            List<FieldBox<QName>> boxes = new ArrayList<>();
             for (Entry<String, JFieldVar> fieldEntry : fields.entrySet()) {
                 String field = normalizeFieldName(fieldEntry.getKey());
                 if ((isObject && ("oid".equals(field) || "version".equals(field)) ||
-                		"serialVersionUID".equals(field) || "id".equals(field) || COMPLEX_TYPE_FIELD_NAME.equals(field))) {
+                        "serialVersionUID".equals(field) || "id".equals(field) || COMPLEX_TYPE_FIELD_NAME.equals(field))) {
                     continue;
                 }
 
@@ -1090,19 +1078,15 @@ public class SchemaProcessor implements Processor {
                 boxes.add(new FieldBox<>(fieldName, new QName(qname.getNamespaceURI(), field)));
             }
 
+            JFieldVar var = namespaceFields.get(qname.getNamespaceURI());
             for (FieldBox<QName> box : boxes) {
-                JFieldVar var = namespaceFields.get(qname.getNamespaceURI());
-                if (var != null) {
-                    createQNameDefinition(outline, implClass, box.getFieldName(), var, box.getValue());
-                } else {
-                    createPSFField(outline, implClass, box.getFieldName(), box.getValue());
-                }
+                createQName(outline, implClass, box.getFieldName(), box.getValue(), var, false, true);
             }
         }
     }
 
-	private void updateFields(Outline outline) {
-    	Map<JDefinedClass, List<JFieldVar>> allFieldsToBeRemoved = new HashMap<>();
+    private void updateFields(Outline outline) {
+        Map<JDefinedClass, List<JFieldVar>> allFieldsToBeRemoved = new HashMap<>();
 
         Set<Map.Entry<NClass, CClassInfo>> set = outline.getModel().beans().entrySet();
         for (Map.Entry<NClass, CClassInfo> entry : set) {
@@ -1115,103 +1099,104 @@ public class SchemaProcessor implements Processor {
                 continue;
             }
 
-			print("Updating fields and get/set methods: " + classOutline.implClass.fullName());
+            print("Updating fields and get/set methods: " + classOutline.implClass.fullName());
 
-			for (String field : fields.keySet()) {
-                JFieldVar fieldVar = fields.get(field);
-				// marks a:rawType fields with @Raw - this has to be executed for any bean, not only for prism containers
+            for (Map.Entry<String, JFieldVar> field : fields.entrySet()) {
+                JFieldVar fieldVar = field.getValue();
+                // marks a:rawType fields with @Raw - this has to be executed for any bean, not only for prism containers
                 if (hasAnnotation(classOutline, fieldVar, A_RAW_TYPE) != null) {
                     annotateFieldAsRaw(fieldVar);
                 }
             }
 
-			if (isContainer(classOutline.implClass, outline)) {
-				processContainerFields(classOutline, allFieldsToBeRemoved);
-			}
-			createFluentFieldMethods(classOutline, classOutline);
+            if (isContainer(classOutline.implClass, outline)) {
+                processContainerFields(classOutline, allFieldsToBeRemoved);
+            }
+            createFluentFieldMethods(classOutline, classOutline);
 
-			print("Finished updating fields and get/set methods for " + classOutline.implClass.fullName());
+            print("Finished updating fields and get/set methods for " + classOutline.implClass.fullName());
         }
 
         allFieldsToBeRemoved.forEach((jDefinedClass, jFieldVars) -> {
-        	jFieldVars.forEach(field -> jDefinedClass.removeField(field));
-		});
+            jFieldVars.forEach(jDefinedClass::removeField);
+        });
     }
 
-	private void processContainerFields(ClassOutline classOutline, Map<JDefinedClass, List<JFieldVar>> allFieldsToBeRemoved) {
-		JDefinedClass implClass = classOutline.implClass;
-		Map<String, JFieldVar> fields = implClass.fields();
+    private void processContainerFields(ClassOutline classOutline, Map<JDefinedClass, List<JFieldVar>> allFieldsToBeRemoved) {
+        JDefinedClass implClass = classOutline.implClass;
+        Map<String, JFieldVar> fields = implClass.fields();
 
-		createContainerFluentEnd(classOutline);            // not available for beans (no parent there)
+        createContainerFluentEnd(classOutline);            // not available for beans (no parent there)
 
-		updateClassAnnotation(classOutline);
-		boolean isObject = hasAnnotation(classOutline, A_PRISM_OBJECT);
+        updateClassAnnotation(classOutline);
+        boolean isObject = hasAnnotation(classOutline, A_PRISM_OBJECT);
 
-		List<JFieldVar> fieldsToBeRemoved = new ArrayList<>();
-		for (String field : fields.keySet()) {
-			JFieldVar fieldVar = fields.get(field);
-			if (isAuxiliaryField(fieldVar)) {
-				continue;
-			}
+        List<JFieldVar> fieldsToBeRemoved = new ArrayList<>();
+        // WARNING: cannot change to entrySet. For some reason entrySet does not work here.
+        for (String field : fields.keySet()) {
+            JFieldVar fieldVar = fields.get(field);
+            if (isAuxiliaryField(fieldVar)) {
+                continue;
+            }
 
-			boolean remove;
-			if (isObject && ("oid".equals(field) || "version".equals(field))) {
-				print("Updating simple field: " + fieldVar.name());
-				remove = updateSimpleField(fieldVar, classOutline, METHOD_AS_PRISM_CONTAINER);
-			} else if ("id".equals(field)) {
-				print("Updating container id field: " + fieldVar.name());
-				remove = updateIdField(fieldVar, classOutline);
-			} else if (isFieldReference(fieldVar, classOutline)) {
-				print("Updating field (reference): " + fieldVar.name());
-				remove = updateFieldReference(fieldVar, classOutline);
-			} else if (isFieldReferenceUse(fieldVar, classOutline)) {
-				print("Updating field (reference usage): " + fieldVar.name());
-				remove = updateFieldReferenceUse(fieldVar, classOutline);
-			} else if (isFieldTypeContainer(fieldVar, classOutline)) {
-				print("Updating container field: " + fieldVar.name());
-				remove = updateContainerFieldType(fieldVar, classOutline);
-			} else {
-				print("Updating field: " + fieldVar.name());
-				remove = updateField(fieldVar, classOutline);
-			}
-			if (remove) {
-				fieldsToBeRemoved.add(fieldVar);
-			}
-		}
-		allFieldsToBeRemoved.put(implClass, fieldsToBeRemoved);
-	}
+            boolean remove;
+            if (isObject && ("oid".equals(field) || "version".equals(field))) {
+                print("Updating simple field: " + fieldVar.name());
+                remove = updateSimpleField(fieldVar, classOutline, METHOD_AS_PRISM_CONTAINER);
+            } else if ("id".equals(field)) {
+                print("Updating container id field: " + fieldVar.name());
+                remove = updateIdField(fieldVar, classOutline);
+            } else if (isFieldReference(fieldVar, classOutline)) {
+                print("Updating field (reference): " + fieldVar.name());
+                remove = updateFieldReference(fieldVar, classOutline);
+            } else if (isFieldReferenceUse(fieldVar, classOutline)) {
+                print("Updating field (reference usage): " + fieldVar.name());
+                remove = updateFieldReferenceUse(fieldVar, classOutline);
+            } else if (isFieldTypeContainer(fieldVar, classOutline)) {
+                print("Updating container field: " + fieldVar.name());
+                remove = updateContainerFieldType(fieldVar, classOutline);
+            } else {
+                print("Updating field: " + fieldVar.name());
+                remove = updateField(fieldVar, classOutline);
+            }
+            if (remove) {
+                fieldsToBeRemoved.add(fieldVar);
+            }
+        }
+        allFieldsToBeRemoved.put(implClass, fieldsToBeRemoved);
+    }
 
-	private void createFluentFieldMethods(ClassOutline targetClass, ClassOutline sourceClass) {
-		Map<String, JFieldVar> fields = sourceClass.implClass.fields();
-		for (String field : fields.keySet()) {
-			JFieldVar fieldVar = fields.get(field);
-			if (!isAuxiliaryField(fieldVar) && !hasAnnotationClass(fieldVar, XmlAnyElement.class)) {
-				createFluentFieldMethods(fieldVar, targetClass, sourceClass);
-			}
-		}
-		if (sourceClass.getSuperClass() != null) {
-			createFluentFieldMethods(targetClass, sourceClass.getSuperClass());
-		}
-	}
+    private void createFluentFieldMethods(ClassOutline targetClass, ClassOutline sourceClass) {
+        Map<String, JFieldVar> fields = sourceClass.implClass.fields();
+        for (Map.Entry<String, JFieldVar> field : fields.entrySet()) {
+            JFieldVar fieldVar = field.getValue();
+            if (!isAuxiliaryField(fieldVar) && !hasAnnotationClass(fieldVar, XmlAnyElement.class)) {
+                createFluentFieldMethods(fieldVar, targetClass, sourceClass);
+            }
+        }
+        if (sourceClass.getSuperClass() != null) {
+            createFluentFieldMethods(targetClass, sourceClass.getSuperClass());
+        }
+    }
 
-	private boolean isAuxiliaryField(JFieldVar fieldVar) {
-    	String field = fieldVar.name();
-		return "serialVersionUID".equals(field) || COMPLEX_TYPE_FIELD_NAME.equals(field)
-				|| CONTAINER_FIELD_NAME.equals(field) || CONTAINER_VALUE_FIELD_NAME.equals(field)
-				|| "otherAttributes".equals(field) && fieldVar.type().name().equals("Map<QName,String>")
-				|| isFField(fieldVar);
-	}
+    private boolean isAuxiliaryField(JFieldVar fieldVar) {
+        String field = fieldVar.name();
+        return "serialVersionUID".equals(field) || COMPLEX_TYPE_FIELD_NAME.equals(field)
+                || CONTAINER_FIELD_NAME.equals(field) || CONTAINER_VALUE_FIELD_NAME.equals(field)
+                || "otherAttributes".equals(field) && fieldVar.type().name().equals("Map<QName,String>")
+                || isFField(fieldVar);
+    }
 
-	private boolean isFField(JFieldVar fieldVar) {
-		boolean isPublicStaticFinal = (fieldVar.mods().getValue() & (JMod.STATIC | JMod.FINAL)) != 0;
-		if (fieldVar.name().startsWith("F_") && isPublicStaticFinal) {
-			//our QName constant fields
-			return true;
-		}
-		return false;
-	}
+    private boolean isFField(JFieldVar fieldVar) {
+        boolean isPublicStaticFinal = (fieldVar.mods().getValue() & (JMod.STATIC | JMod.FINAL)) != 0;
+        if (fieldVar.name().startsWith("F_") && isPublicStaticFinal) {
+            //our QName constant fields
+            return true;
+        }
+        return false;
+    }
 
-	private boolean updateIdField(JFieldVar field, ClassOutline classOutline) {
+    private boolean updateIdField(JFieldVar field, ClassOutline classOutline) {
         JMethod method = recreateGetter(field, classOutline);
         JBlock body = method.body();
         body._return(JExpr.invoke(JExpr.invoke(METHOD_AS_PRISM_CONTAINER_VALUE), "getId"));
@@ -1226,29 +1211,29 @@ public class SchemaProcessor implements Processor {
 
     private JMethod recreateSetter(JFieldVar field, ClassOutline classOutline) {
         JDefinedClass definedClass = classOutline.implClass;
-		JMethod method = findSetterMethod(field, classOutline);
+        JMethod method = findSetterMethod(field, classOutline);
         return recreateMethod(method, definedClass);
     }
 
-	private JMethod findSetterMethod(JFieldVar field, ClassOutline classOutline) {
-		String methodName = getSetterMethodName(classOutline, field);
-		return classOutline.implClass.getMethod(methodName, new JType[]{field.type()});
-	}
+    private JMethod findSetterMethod(JFieldVar field, ClassOutline classOutline) {
+        String methodName = getSetterMethodName(classOutline, field);
+        return classOutline.implClass.getMethod(methodName, new JType[]{field.type()});
+    }
 
-	private JMethod recreateGetter(JFieldVar field, ClassOutline classOutline) {
+    private JMethod recreateGetter(JFieldVar field, ClassOutline classOutline) {
         JDefinedClass definedClass = classOutline.implClass;
-		JMethod method = findGetterMethod(field, classOutline);
+        JMethod method = findGetterMethod(field, classOutline);
         JMethod newGetter = recreateMethod(method, definedClass);
         copyAnnotations(newGetter, field);
         return newGetter;
     }
 
-	private JMethod findGetterMethod(JFieldVar field, ClassOutline classOutline) {
-		String methodName = getGetterMethodName(classOutline, field);
-		return classOutline.implClass.getMethod(methodName, new JType[]{});
-	}
+    private JMethod findGetterMethod(JFieldVar field, ClassOutline classOutline) {
+        String methodName = getGetterMethodName(classOutline, field);
+        return classOutline.implClass.getMethod(methodName, new JType[]{});
+    }
 
-	private boolean updateFieldReference(JFieldVar field, ClassOutline classOutline) {
+    private boolean updateFieldReference(JFieldVar field, ClassOutline classOutline) {
         JMethod getterMethod = recreateGetter(field, classOutline);
         annotateMethodWithXmlElement(getterMethod, field);
         boolean isList = isList(field.type());
@@ -1256,12 +1241,12 @@ public class SchemaProcessor implements Processor {
 
         //setter method update
         if (!isList) {
-			JMethod setterMethod = recreateSetter(field, classOutline);
-			JVar param = setterMethod.listParams()[0];
-			createFieldReferenceSetterBody(field, param, setterMethod.body());
-		} else {
-			createFieldListCreator(field, classOutline, getterMethod, "createReference");
-		}
+            JMethod setterMethod = recreateSetter(field, classOutline);
+            JVar param = setterMethod.listParams()[0];
+            createFieldReferenceSetterBody(field, param, setterMethod.body());
+        } else {
+            createFieldListCreator(field, classOutline, getterMethod, "createReference");
+        }
         return true;
     }
 
@@ -1269,7 +1254,7 @@ public class SchemaProcessor implements Processor {
         JVar cont = body.decl(CLASS_MAP.get(PrismReferenceValue.class), REFERENCE_VALUE_FIELD_NAME,
                 JOp.cond(param.ne(JExpr._null()), JExpr.invoke(param, METHOD_AS_REFERENCE_VALUE), JExpr._null()));
         JInvocation invocation = body.staticInvoke(CLASS_MAP.get(PrismForJAXBUtil.class),
-        		METHOD_PRISM_UTIL_SET_REFERENCE_VALUE_AS_REF);
+                METHOD_PRISM_UTIL_SET_REFERENCE_VALUE_AS_REF);
         invocation.arg(JExpr.invoke(METHOD_AS_PRISM_CONTAINER_VALUE));
         invocation.arg(JExpr.ref(fieldFPrefixUnderscoredUpperCase(field.name())));
         invocation.arg(cont);
@@ -1289,8 +1274,8 @@ public class SchemaProcessor implements Processor {
         anonymous._extends(clazz);
         JMethod constructor = anonymous.constructor(JMod.PUBLIC);
         constructor.param(CLASS_MAP.get(PrismReference.class), REFERENCE_LOCAL_VARIABLE_NAME);
-		constructor.param(CLASS_MAP.get(PrismContainerValue.class), "parent");
-		JBlock constructorBody = constructor.body();
+        constructor.param(CLASS_MAP.get(PrismContainerValue.class), "parent");
+        JBlock constructorBody = constructor.body();
         JInvocation invocation = constructorBody.invoke("super");
         invocation.arg(constructor.listParams()[0]);
         invocation.arg(constructor.listParams()[1]);
@@ -1370,10 +1355,10 @@ public class SchemaProcessor implements Processor {
         JFieldRef qnameRef = JExpr.ref(fieldFPrefixUnderscoredUpperCase(field.name()));
         if (isList) {
             //if it's List<ObjectReferenceType> ...
-			// PrismContainerValue pcv = asPrismContainerValue();
-			JVar pcv = body.decl(CLASS_MAP.get(PrismContainerValue.class), "pcv", JExpr.invoke(METHOD_AS_PRISM_CONTAINER_VALUE));
+            // PrismContainerValue pcv = asPrismContainerValue();
+            JVar pcv = body.decl(CLASS_MAP.get(PrismContainerValue.class), "pcv", JExpr.invoke(METHOD_AS_PRISM_CONTAINER_VALUE));
 
-			// PrismReference reference = PrismForJAXBUtil.getReference(pcv, F_LINK_REF);
+            // PrismReference reference = PrismForJAXBUtil.getReference(pcv, F_LINK_REF);
             JInvocation invoke = CLASS_MAP.get(PrismForJAXBUtil.class).staticInvoke(METHOD_PRISM_UTIL_GET_REFERENCE);
             invoke.arg(pcv);
             invoke.arg(qnameRef);
@@ -1411,7 +1396,7 @@ public class SchemaProcessor implements Processor {
         QName qname = getFieldReferenceUseAnnotationQName(field, classOutline);
         CPropertyInfo propertyInfo = classOutline.target.getProperty(qname.getLocalPart());
         if (propertyInfo == null) {
-        	throw new IllegalArgumentException("No property "+qname.getLocalPart()+" in "+classOutline.target);
+            throw new IllegalArgumentException("No property "+qname.getLocalPart()+" in "+classOutline.target);
         }
         return classOutline.implClass.fields().get(propertyInfo.getName(false));
     }
@@ -1426,11 +1411,11 @@ public class SchemaProcessor implements Processor {
 
         //setter method update
         if (!isList) {
-			JMethod setterMethod = recreateSetter(field, classOutline);
-			createFieldReferenceUseSetterBody(field, classOutline, setterMethod.listParams()[0], setterMethod.body());
-		} else {
-			createFieldListCreator(field, classOutline, getterMethod, "createReference");
-		}
+            JMethod setterMethod = recreateSetter(field, classOutline);
+            createFieldReferenceUseSetterBody(field, classOutline, setterMethod.listParams()[0], setterMethod.body());
+        } else {
+            createFieldListCreator(field, classOutline, getterMethod, "createReference");
+        }
         return true;
     }
 
@@ -1439,7 +1424,7 @@ public class SchemaProcessor implements Processor {
         JVar cont = body.decl(CLASS_MAP.get(PrismObject.class), OBJECT_LOCAL_FIELD_NAME, JOp.cond(param.ne(JExpr._null()),
                 JExpr.invoke(param, METHOD_AS_PRISM_CONTAINER), JExpr._null()));
         JInvocation invocation = body.staticInvoke(CLASS_MAP.get(PrismForJAXBUtil.class),
-        		METHOD_PRISM_UTIL_SET_REFERENCE_VALUE_AS_OBJECT);
+                METHOD_PRISM_UTIL_SET_REFERENCE_VALUE_AS_OBJECT);
         invocation.arg(JExpr.invoke(METHOD_AS_PRISM_CONTAINER_VALUE));
 
         JFieldVar referencedField = getReferencedField(field, classOutline);
@@ -1485,11 +1470,11 @@ public class SchemaProcessor implements Processor {
         JFieldRef qnameRef = JExpr.ref(fieldFPrefixUnderscoredUpperCase(refField.name()));
 
         if (isList) {
-        	// PrismContainerValue pcv = asPrismContainerValue()
-        	JVar pcv = body.decl(CLASS_MAP.get(PrismContainerValue.class), "pcv", JExpr.invoke(METHOD_AS_PRISM_CONTAINER_VALUE));
+            // PrismContainerValue pcv = asPrismContainerValue()
+            JVar pcv = body.decl(CLASS_MAP.get(PrismContainerValue.class), "pcv", JExpr.invoke(METHOD_AS_PRISM_CONTAINER_VALUE));
 
-        	// PrismReference reference = PrismForJAXBUtil.getReference(pcv, F_LINK_REF);
-        	JInvocation invocation = CLASS_MAP.get(PrismForJAXBUtil.class).staticInvoke(METHOD_PRISM_UTIL_GET_REFERENCE);
+            // PrismReference reference = PrismForJAXBUtil.getReference(pcv, F_LINK_REF);
+            JInvocation invocation = CLASS_MAP.get(PrismForJAXBUtil.class).staticInvoke(METHOD_PRISM_UTIL_GET_REFERENCE);
             invocation.arg(pcv);
             invocation.arg(qnameRef);
             JVar reference = body.decl(CLASS_MAP.get(PrismReference.class), REFERENCE_LOCAL_VARIABLE_NAME, invocation);
@@ -1621,107 +1606,107 @@ public class SchemaProcessor implements Processor {
         annotateMethodWithXmlElement(getterMethod, field);
         createContainerFieldGetterBody(field, classOutline, getterMethod);
 
-		//setter method update
+        //setter method update
         if (!isList(field.type())) {
-			JMethod setterMethod = recreateSetter(field, classOutline);
-			createContainerFieldSetterBody(field, classOutline, setterMethod);
-		} else {
-			createFieldListCreator(field, classOutline, getterMethod, "createContainer");
-		}
+            JMethod setterMethod = recreateSetter(field, classOutline);
+            createContainerFieldSetterBody(field, classOutline, setterMethod);
+        } else {
+            createFieldListCreator(field, classOutline, getterMethod, "createContainer");
+        }
         return true;
     }
 
     private void createFluentFieldMethods(JFieldVar field, ClassOutline targetClass, ClassOutline fieldsFromClass) {
-		print("createFluentFieldMethods for " + field.name() + " on " + targetClass.implClass.fullName() + " (from " + fieldsFromClass.implClass.fullName() + ")");
-		JMethod fluentSetter = createFluentSetter(field, targetClass, fieldsFromClass);
-		createMethodStringVersion(field, targetClass, fluentSetter);
+        print("createFluentFieldMethods for " + field.name() + " on " + targetClass.implClass.fullName() + " (from " + fieldsFromClass.implClass.fullName() + ")");
+        JMethod fluentSetter = createFluentSetter(field, targetClass, fieldsFromClass);
+        createMethodStringVersion(field, targetClass, fluentSetter);
 
-		// FIXME ugly hack - we create beginXYZ only for our own structures
-		// TODO not for all!
-		JType basicType = getContentType(field);
-		if (basicType.fullName().startsWith("com.evolveum.") && isInstantiable(basicType)) {
-			createFluentBegin(field, targetClass, fieldsFromClass, fluentSetter);
-		}
-	}
+        // FIXME ugly hack - we create beginXYZ only for our own structures
+        // TODO not for all!
+        JType basicType = getContentType(field);
+        if (basicType.fullName().startsWith("com.evolveum.") && isInstantiable(basicType)) {
+            createFluentBegin(field, targetClass, fieldsFromClass, fluentSetter);
+        }
+    }
 
-	/**
-	 * e.g. name(PolyStringType value) -> name(String value) { return name(PolyStringType.fromOrig(value); }
-	 * time(XmlGregorianCalendar value) -> time(String value) { return time(XmlTypeConverter.createXMLGregorianCalendar(value); }
-	 * also ObjectReferenceType: create by oid + type + [relation]
-	 */
-	private void createMethodStringVersion(JFieldVar field, ClassOutline classOutline, JMethod originalMethod) {
-		Function<JVar,JExpression> expression;
-		JVar param = originalMethod.params().get(0);
-		if (param.type().fullName().equals(PolyStringType.class.getName())) {
-			expression = value -> JExpr.invoke(originalMethod)
-					.arg(CLASS_MAP.get(PolyStringType.class).staticInvoke("fromOrig").arg(value));
-		} else if (param.type().fullName().equals(XMLGregorianCalendar.class.getName())) {
-			expression = value -> JExpr.invoke(originalMethod)
-					.arg(CLASS_MAP.get(XmlTypeConverter.class).staticInvoke("createXMLGregorianCalendar").arg(value));
-		} else if (param.type().name().equals(ObjectReferenceType.class.getSimpleName())) {
-			createReferenceStringVersionOidType(field, classOutline, originalMethod, param.type());
-			createReferenceStringVersionOidTypeRelation(field, classOutline, originalMethod, param.type());
-			return;
-		} else {
-			return;
-		}
-		JMethod newMethod = classOutline.implClass.method(JMod.PUBLIC, originalMethod.type(), originalMethod.name());
-		JVar value = newMethod.param(String.class, "value");
-		newMethod.body()._return(expression.apply(value));
-	}
+    /**
+     * e.g. name(PolyStringType value) -> name(String value) { return name(PolyStringType.fromOrig(value); }
+     * time(XmlGregorianCalendar value) -> time(String value) { return time(XmlTypeConverter.createXMLGregorianCalendar(value); }
+     * also ObjectReferenceType: create by oid + type + [relation]
+     */
+    private void createMethodStringVersion(JFieldVar field, ClassOutline classOutline, JMethod originalMethod) {
+        Function<JVar,JExpression> expression;
+        JVar param = originalMethod.params().get(0);
+        if (param.type().fullName().equals(PolyStringType.class.getName())) {
+            expression = value -> JExpr.invoke(originalMethod)
+                    .arg(CLASS_MAP.get(PolyStringType.class).staticInvoke("fromOrig").arg(value));
+        } else if (param.type().fullName().equals(XMLGregorianCalendar.class.getName())) {
+            expression = value -> JExpr.invoke(originalMethod)
+                    .arg(CLASS_MAP.get(XmlTypeConverter.class).staticInvoke("createXMLGregorianCalendar").arg(value));
+        } else if (param.type().name().equals(ObjectReferenceType.class.getSimpleName())) {
+            createReferenceStringVersionOidType(field, classOutline, originalMethod, param.type());
+            createReferenceStringVersionOidTypeRelation(field, classOutline, originalMethod, param.type());
+            return;
+        } else {
+            return;
+        }
+        JMethod newMethod = classOutline.implClass.method(JMod.PUBLIC, originalMethod.type(), originalMethod.name());
+        JVar value = newMethod.param(String.class, "value");
+        newMethod.body()._return(expression.apply(value));
+    }
 
-	private void createReferenceStringVersionOidType(JFieldVar field, ClassOutline classOutline, JMethod originalMethod, JType objectReferenceType) {
-		JMethod newMethod = classOutline.implClass.method(JMod.PUBLIC, originalMethod.type(), originalMethod.name());
-		JVar oid = newMethod.param(String.class, "oid");
-		JVar type = newMethod.param(QName.class, "type");
-		JBlock body = newMethod.body();
-		JVar refVal = body.decl(CLASS_MAP.get(PrismReferenceValue.class), "refVal",
-				JExpr._new(CLASS_MAP.get(PrismReferenceValue.class))
-						.arg(oid).arg(type));
-		JVar ort = body.decl(objectReferenceType, "ort", JExpr._new(objectReferenceType));
-		body.invoke(ort, METHOD_SETUP_REFERENCE_VALUE).arg(refVal);
-		body._return(JExpr.invoke(originalMethod).arg(ort));
-	}
+    private void createReferenceStringVersionOidType(JFieldVar field, ClassOutline classOutline, JMethod originalMethod, JType objectReferenceType) {
+        JMethod newMethod = classOutline.implClass.method(JMod.PUBLIC, originalMethod.type(), originalMethod.name());
+        JVar oid = newMethod.param(String.class, "oid");
+        JVar type = newMethod.param(QName.class, "type");
+        JBlock body = newMethod.body();
+        JVar refVal = body.decl(CLASS_MAP.get(PrismReferenceValue.class), "refVal",
+                JExpr._new(CLASS_MAP.get(PrismReferenceValueImpl.class))
+                        .arg(oid).arg(type));
+        JVar ort = body.decl(objectReferenceType, "ort", JExpr._new(objectReferenceType));
+        body.invoke(ort, METHOD_SETUP_REFERENCE_VALUE).arg(refVal);
+        body._return(JExpr.invoke(originalMethod).arg(ort));
+    }
 
-	private void createReferenceStringVersionOidTypeRelation(JFieldVar field, ClassOutline classOutline, JMethod originalMethod, JType objectReferenceType) {
-		JMethod newMethod = classOutline.implClass.method(JMod.PUBLIC, originalMethod.type(), originalMethod.name());
-		JVar oid = newMethod.param(String.class, "oid");
-		JVar type = newMethod.param(QName.class, "type");
-		JVar relation = newMethod.param(QName.class, "relation");
-		JBlock body = newMethod.body();
-		JVar refVal = body.decl(CLASS_MAP.get(PrismReferenceValue.class), "refVal",
-				JExpr._new(CLASS_MAP.get(PrismReferenceValue.class))
-						.arg(oid).arg(type));
-		body.invoke(refVal, "setRelation").arg(relation);
-		JVar ort = body.decl(objectReferenceType, "ort", JExpr._new(objectReferenceType));
-		body.invoke(ort, METHOD_SETUP_REFERENCE_VALUE).arg(refVal);
-		body._return(JExpr.invoke(originalMethod).arg(ort));
-	}
+    private void createReferenceStringVersionOidTypeRelation(JFieldVar field, ClassOutline classOutline, JMethod originalMethod, JType objectReferenceType) {
+        JMethod newMethod = classOutline.implClass.method(JMod.PUBLIC, originalMethod.type(), originalMethod.name());
+        JVar oid = newMethod.param(String.class, "oid");
+        JVar type = newMethod.param(QName.class, "type");
+        JVar relation = newMethod.param(QName.class, "relation");
+        JBlock body = newMethod.body();
+        JVar refVal = body.decl(CLASS_MAP.get(PrismReferenceValue.class), "refVal",
+                JExpr._new(CLASS_MAP.get(PrismReferenceValueImpl.class))
+                        .arg(oid).arg(type));
+        body.invoke(refVal, "setRelation").arg(relation);
+        JVar ort = body.decl(objectReferenceType, "ort", JExpr._new(objectReferenceType));
+        body.invoke(ort, METHOD_SETUP_REFERENCE_VALUE).arg(refVal);
+        body._return(JExpr.invoke(originalMethod).arg(ort));
+    }
 
-	private boolean isInstantiable(JType type) {
-		if (!(type instanceof JClass)) {
-			return false;
-		}
-		JClass clazz = (JClass) type;
-		if (clazz.isAbstract()) {
-			return false;
-		}
-		if (clazz instanceof JDefinedClass) {
-			if (hasAnnotationClass(((JDefinedClass) clazz), XmlEnum.class)) {
-				return false;
-			}
-		}
-		return true;
-	}
+    private boolean isInstantiable(JType type) {
+        if (!(type instanceof JClass)) {
+            return false;
+        }
+        JClass clazz = (JClass) type;
+        if (clazz.isAbstract()) {
+            return false;
+        }
+        if (clazz instanceof JDefinedClass) {
+            if (hasAnnotationClass(((JDefinedClass) clazz), XmlEnum.class)) {
+                return false;
+            }
+        }
+        return true;
+    }
 
-	private void createContainerFieldSetterBody(JFieldVar field, ClassOutline classOutline, JMethod method) {
+    private void createContainerFieldSetterBody(JFieldVar field, ClassOutline classOutline, JMethod method) {
         JVar param = method.listParams()[0];
         JBlock body = method.body();
 
         JVar cont;
         if (isPrismContainer(param.type(), classOutline.parent())) {
-            cont = body.decl(CLASS_MAP.get(PrismObject.class), FIELD_CONTAINER_VALUE_LOCAL_VAR_NAME, JOp.cond(param.ne(JExpr._null()),
-                    JExpr.invoke(param, METHOD_AS_PRISM_CONTAINER_VALUE), JExpr._null()));
+            cont = body.decl(CLASS_MAP.get(PrismContainerValue.class), FIELD_CONTAINER_VALUE_LOCAL_VAR_NAME,
+                    JOp.cond(param.ne(JExpr._null()), JExpr.invoke(param, METHOD_AS_PRISM_CONTAINER_VALUE), JExpr._null()));
         } else {
             cont = body.decl(CLASS_MAP.get(PrismContainerValue.class), FIELD_CONTAINER_VALUE_LOCAL_VAR_NAME,
                     JOp.cond(param.ne(JExpr._null()), JExpr.invoke(param, METHOD_AS_PRISM_CONTAINER_VALUE), JExpr._null()));
@@ -1741,109 +1726,109 @@ public class SchemaProcessor implements Processor {
     }
      */
 
-	private JMethod createFluentBegin(JFieldVar field, ClassOutline targetClass, ClassOutline fieldsFromClass,
-			JMethod fluentSetter) {
+    private JMethod createFluentBegin(JFieldVar field, ClassOutline targetClass, ClassOutline fieldsFromClass,
+            JMethod fluentSetter) {
 
-		JType valueClass = getContentType(field);
+        JType valueClass = getContentType(field);
 
-		// e.g. public AssignmentType beginAssignment() {
-		String methodName = getMethodName(fieldsFromClass, field, "begin");
-		JMethod beginMethod = targetClass.implClass.method(JMod.PUBLIC, valueClass, methodName);
-		JBlock body = beginMethod.body();
+        // e.g. public AssignmentType beginAssignment() {
+        String methodName = getMethodName(fieldsFromClass, field, "begin");
+        JMethod beginMethod = targetClass.implClass.method(JMod.PUBLIC, valueClass, methodName);
+        JBlock body = beginMethod.body();
 
-		// AssignmentType value = new AssignmentType();
-		JVar value = body.decl(valueClass, "value", JExpr._new(valueClass));
+        // AssignmentType value = new AssignmentType();
+        JVar value = body.decl(valueClass, "value", JExpr._new(valueClass));
 
-		// addAssignment(value);
-		body.invoke(fluentSetter).arg(value);
+        // addAssignment(value);
+        body.invoke(fluentSetter).arg(value);
 
-		// return value;
-		body._return(value);
+        // return value;
+        body._return(value);
 
-		return beginMethod;
-	}
+        return beginMethod;
+    }
 
-	/*
+    /*
 
     public <X> X endFocus() {
         return (X) ((PrismContainerValue) ((PrismContainer) asPrismContainerValue().getParent()).getParent()).asContainerable();
     }
-	 */
+     */
 
-	private JMethod createContainerFluentEnd(ClassOutline classOutline) {
-		String methodName = "end";
-		JMethod method = classOutline.implClass.method(JMod.PUBLIC, (JType) null, methodName);
-		method.type(method.generify("X"));
-		JBlock body = method.body();
+    private JMethod createContainerFluentEnd(ClassOutline classOutline) {
+        String methodName = "end";
+        JMethod method = classOutline.implClass.method(JMod.PUBLIC, (JType) null, methodName);
+        method.type(method.generify("X"));
+        JBlock body = method.body();
 
-		body._return(JExpr.cast(method.type(),
-				JExpr.invoke(JExpr.cast(CLASS_MAP.get(PrismContainerValue.class),
-								JExpr.invoke(JExpr.cast(CLASS_MAP.get(PrismContainer.class),
-										JExpr.invoke(JExpr.invoke("asPrismContainerValue"),"getParent")), "getParent")),
-				"asContainerable")));
+        body._return(JExpr.cast(method.type(),
+                JExpr.invoke(JExpr.cast(CLASS_MAP.get(PrismContainerValue.class),
+                                JExpr.invoke(JExpr.cast(CLASS_MAP.get(PrismContainer.class),
+                                        JExpr.invoke(JExpr.invoke("asPrismContainerValue"),"getParent")), "getParent")),
+                "asContainerable")));
 
-		return method;
-	}
+        return method;
+    }
 
-	private JMethod createReferenceFluentEnd(ClassOutline classOutline) {
-		String methodName = "end";
-		JMethod method = classOutline.implClass.method(JMod.PUBLIC, (JType) null, methodName);
-		method.type(method.generify("X"));
-		JBlock body = method.body();
+    private JMethod createReferenceFluentEnd(ClassOutline classOutline) {
+        String methodName = "end";
+        JMethod method = classOutline.implClass.method(JMod.PUBLIC, (JType) null, methodName);
+        method.type(method.generify("X"));
+        JBlock body = method.body();
 
-		body._return(JExpr.cast(method.type(),
-				JExpr.invoke(JExpr.cast(CLASS_MAP.get(PrismContainerValue.class),
-								JExpr.invoke(JExpr.cast(CLASS_MAP.get(PrismReference.class),
-										JExpr.invoke(JExpr.invoke("asReferenceValue"),"getParent")), "getParent")),
-				"asContainerable")));
+        body._return(JExpr.cast(method.type(),
+                JExpr.invoke(JExpr.cast(CLASS_MAP.get(PrismContainerValue.class),
+                                JExpr.invoke(JExpr.cast(CLASS_MAP.get(PrismReference.class),
+                                        JExpr.invoke(JExpr.invoke("asReferenceValue"),"getParent")), "getParent")),
+                "asContainerable")));
 
-		return method;
-	}
+        return method;
+    }
 
-	private JType getContentType(JFieldVar field) {
-		boolean multi = isList(field.type());
-		JType valueClass;
-		if (multi) {
-			valueClass = ((JClass) field.type()).getTypeParameters().get(0);
-		} else {
-			valueClass = field.type();
-		}
-		return valueClass;
-	}
+    private JType getContentType(JFieldVar field) {
+        boolean multi = isList(field.type());
+        JType valueClass;
+        if (multi) {
+            valueClass = ((JClass) field.type()).getTypeParameters().get(0);
+        } else {
+            valueClass = field.type();
+        }
+        return valueClass;
+    }
 
-	private JMethod createFluentSetter(JFieldVar field, ClassOutline targetClass, ClassOutline fieldsFromClass) {
-		// e.g. UserType name(String value)
-		String methodName = getFluentSetterMethodName(fieldsFromClass, field);
-		JMethod fluentSetter = targetClass.implClass.method(JMod.PUBLIC, targetClass.implClass, methodName);
-		JType contentType = getContentType(field);
-		JVar value = fluentSetter.param(contentType, "value");
-		JBlock body = fluentSetter.body();
+    private JMethod createFluentSetter(JFieldVar field, ClassOutline targetClass, ClassOutline fieldsFromClass) {
+        // e.g. UserType name(String value)
+        String methodName = getFluentSetterMethodName(fieldsFromClass, field);
+        JMethod fluentSetter = targetClass.implClass.method(JMod.PUBLIC, targetClass.implClass, methodName);
+        JType contentType = getContentType(field);
+        JVar value = fluentSetter.param(contentType, "value");
+        JBlock body = fluentSetter.body();
 
-		if (isList(field.type())) {
-			// getAssignment().add(value)
-			JMethod getterMethod = findGetterMethod(field, fieldsFromClass);
-			body.invoke(JExpr.invoke(getterMethod), "add").arg(value);
-		} else {
-			// setName(value);
-			JMethod setterMethod = findSetterMethod(field, fieldsFromClass);
-			body.invoke(setterMethod).arg(value);
-		}
+        if (isList(field.type())) {
+            // getAssignment().add(value)
+            JMethod getterMethod = findGetterMethod(field, fieldsFromClass);
+            body.invoke(JExpr.invoke(getterMethod), "add").arg(value);
+        } else {
+            // setName(value);
+            JMethod setterMethod = findSetterMethod(field, fieldsFromClass);
+            body.invoke(setterMethod).arg(value);
+        }
 
-		// return this;
-		body._return(JExpr._this());
+        // return this;
+        body._return(JExpr._this());
 
-		return fluentSetter;
-	}
+        return fluentSetter;
+    }
 
-	private JMethod createFluentAdder(JFieldVar field, ClassOutline targetClass, ClassOutline fieldsFromClass) {
-		JType valueType = getContentType(field);
+    private JMethod createFluentAdder(JFieldVar field, ClassOutline targetClass, ClassOutline fieldsFromClass) {
+        JType valueType = getContentType(field);
 
-		// e.g. FocusType assignment(AssignmentType value)
-		//String methodName = getMethodName(fieldsFromClass, field, "add");
-		String methodName = getFluentSetterMethodName(fieldsFromClass, field);
-		JMethod fluentSetter = targetClass.implClass.method(JMod.PUBLIC, targetClass.implClass, methodName);
-		JVar value = fluentSetter.param(valueType, "value");
-		JBlock body = fluentSetter.body();
+        // e.g. FocusType assignment(AssignmentType value)
+        //String methodName = getMethodName(fieldsFromClass, field, "add");
+        String methodName = getFluentSetterMethodName(fieldsFromClass, field);
+        JMethod fluentSetter = targetClass.implClass.method(JMod.PUBLIC, targetClass.implClass, methodName);
+        JVar value = fluentSetter.param(valueType, "value");
+        JBlock body = fluentSetter.body();
 
 
         // return this;
@@ -1852,18 +1837,18 @@ public class SchemaProcessor implements Processor {
         return fluentSetter;
     }
 
-	private JMethod createFieldListCreator(JFieldVar field, ClassOutline classOutline, JMethod getterMethod, String itemCreationMethodName) {
-		JFieldRef qnameRef = JExpr.ref(fieldFPrefixUnderscoredUpperCase(field.name()));		// F_ASSIGNMENT
+    private JMethod createFieldListCreator(JFieldVar field, ClassOutline classOutline, JMethod getterMethod, String itemCreationMethodName) {
+        JFieldRef qnameRef = JExpr.ref(fieldFPrefixUnderscoredUpperCase(field.name()));        // F_ASSIGNMENT
 
-		// e.g. List<AssignmentType> createAssignmentList()
-		String methodName = getMethodName(classOutline, field, "create") + "List";
-		JMethod method = classOutline.implClass.method(JMod.PUBLIC, field.type(), methodName);
-		JBlock body = method.body();
+        // e.g. List<AssignmentType> createAssignmentList()
+        String methodName = getMethodName(classOutline, field, "create") + "List";
+        JMethod method = classOutline.implClass.method(JMod.PUBLIC, field.type(), methodName);
+        JBlock body = method.body();
 
-		// PrismForJAXBUtil.createContainer(asPrismContainerValue(), F_ASSIGNMENT)
-		body.staticInvoke(CLASS_MAP.get(PrismForJAXBUtil.class), itemCreationMethodName)
-				.arg(JExpr.invoke(METHOD_AS_PRISM_CONTAINER_VALUE))
-				.arg(qnameRef);
+        // PrismForJAXBUtil.createContainer(asPrismContainerValue(), F_ASSIGNMENT)
+        body.staticInvoke(CLASS_MAP.get(PrismForJAXBUtil.class), itemCreationMethodName)
+                .arg(JExpr.invoke(METHOD_AS_PRISM_CONTAINER_VALUE))
+                .arg(qnameRef);
 
         // return getAssignment();
         body._return(JExpr.invoke(getterMethod));
@@ -1933,11 +1918,11 @@ public class SchemaProcessor implements Processor {
                 Field mfield = getField(JAnnotationUse.class, "memberValues");
                 mfield.setAccessible(true);
                 Map<String, Object> map;
-				try {
-					map = (Map<String, Object>) mfield.get(annotation);
-				} catch (IllegalArgumentException | IllegalAccessException e) {
-					throw new RuntimeException(e.getMessage(), e);
-				}
+                try {
+                    map = (Map<String, Object>) mfield.get(annotation);
+                } catch (IllegalArgumentException | IllegalAccessException e) {
+                    throw new RuntimeException(e.getMessage(), e);
+                }
                 mfield.setAccessible(false);
                 map.remove("name");
                 annotation.param("name", normalizeFieldName(field.name()));
@@ -2037,13 +2022,13 @@ public class SchemaProcessor implements Processor {
 
         //update setter
         if (!isList) {
-			JMethod setterMethod = recreateSetter(field, classOutline);
-			createFieldSetterBody(setterMethod, field);
-		} else {
-        	if (!hasAnnotationClass(field, XmlAnyElement.class)) {
-				createFieldListCreator(field, classOutline, getterMethod, "createProperty");
-			}
-		}
+            JMethod setterMethod = recreateSetter(field, classOutline);
+            createFieldSetterBody(setterMethod, field);
+        } else {
+            if (!hasAnnotationClass(field, XmlAnyElement.class)) {
+                createFieldListCreator(field, classOutline, getterMethod, "createProperty");
+            }
+        }
         return true;
     }
 
@@ -2107,13 +2092,45 @@ public class SchemaProcessor implements Processor {
     }
 
     public static void print(String s) {
-		if (PRINT_DEBUG_INFO) {
-			System.out.println(s);
-		}
-	}
+        if (PRINT_DEBUG_INFO) {
+            System.out.println(s);
+        }
+    }
 
-	public static void printWarning(String s) {
-		System.out.println(s);
-	}
+    public static void printWarning(String s) {
+        System.out.println(s);
+    }
+
+
+    private void createAcceptMethods(Outline outline) {
+        Set<Map.Entry<NClass, CClassInfo>> set = outline.getModel().beans().entrySet();
+        for (Map.Entry<NClass, CClassInfo> entry : set) {
+            ClassOutline classOutline = outline.getClazz(entry.getValue());
+            if (!hasParentAnnotation(classOutline, A_PRISM_OBJECT) && !hasParentAnnotation(classOutline, A_PRISM_CONTAINER)) {
+                createAcceptMethod(classOutline);
+            }
+        }
+    }
+
+    private void createAcceptMethod(ClassOutline classOutline) {
+        JDefinedClass impl = classOutline.implClass;
+        impl._implements(JaxbVisitable.class);
+
+        JMethod acceptMethod = impl.method(JMod.PUBLIC, classOutline.parent().getCodeModel().VOID, METHOD_ACCEPT);
+        acceptMethod.annotate(Override.class);
+        JVar visitor = acceptMethod.param(JaxbVisitor.class, "visitor");
+        JBlock body = acceptMethod.body();
+        JInvocation visitInvocation = body.invoke(visitor, METHOD_VISIT);
+        visitInvocation.arg(JExpr._this());
+
+        for (JFieldVar fieldVar : impl.fields().values()) {
+            if ((fieldVar.mods().getValue() & (JMod.STATIC|JMod.FINAL)) != 0) {
+                continue;
+            }
+            JInvocation invocation = body.staticInvoke(CLASS_MAP.get(PrismForJAXBUtil.class), METHOD_PRISM_UTIL_ACCEPT);
+            invocation.arg(fieldVar);
+            invocation.arg(visitor);
+        }
+    }
 
 }

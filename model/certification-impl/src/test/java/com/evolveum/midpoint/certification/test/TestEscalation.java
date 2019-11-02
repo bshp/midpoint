@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.certification.test;
@@ -30,14 +21,15 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 
-import static com.evolveum.midpoint.test.IntegrationTestTools.display;
 import static com.evolveum.midpoint.xml.ns._public.common.common_3.AccessCertificationResponseType.ACCEPT;
 import static com.evolveum.midpoint.xml.ns._public.common.common_3.AccessCertificationResponseType.NO_RESPONSE;
 import static com.evolveum.midpoint.xml.ns._public.common.common_3.ActivationStatusType.ENABLED;
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertNotNull;
+import static org.testng.AssertJUnit.assertTrue;
 
 /**
  * Very simple certification test.
@@ -49,10 +41,10 @@ import static org.testng.AssertJUnit.assertNotNull;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class TestEscalation extends AbstractCertificationTest {
 
-    protected static final File CERT_DEF_FILE = new File(COMMON_DIR, "certification-of-eroot-user-assignments-escalations.xml");
-    protected static final String CERT_DEF_OID = "399e117a-baaa-4e59-b845-21bb838cb7bc";
+    private static final File CERT_DEF_FILE = new File(COMMON_DIR, "certification-of-eroot-user-assignments-escalations.xml");
+    //protected static final String CERT_DEF_OID = "399e117a-baaa-4e59-b845-21bb838cb7bc";
 
-    protected AccessCertificationDefinitionType certificationDefinition;
+    private AccessCertificationDefinitionType certificationDefinition;
 
     private String campaignOid;
 
@@ -91,9 +83,9 @@ public class TestEscalation extends AbstractCertificationTest {
 
         campaign = getObject(AccessCertificationCampaignType.class, campaignOid).asObjectable();
         display("campaign", campaign);
-        assertAfterCampaignCreate(campaign, certificationDefinition);
-        assertPercentComplete(campaign, 100, 100, 100);      // no cases, no problems
-	}
+        assertSanityAfterCampaignCreate(campaign, certificationDefinition);
+        assertPercentCompleteAll(campaign, 100, 100, 100);      // no cases, no problems
+    }
 
     @Test
     public void test013SearchAllCases() throws Exception {
@@ -103,7 +95,8 @@ public class TestEscalation extends AbstractCertificationTest {
         searchWithNoCasesExpected(TEST_NAME);
     }
 
-    protected void searchWithNoCasesExpected(String TEST_NAME) throws Exception {
+    @SuppressWarnings("SameParameterValue")
+    private void searchWithNoCasesExpected(String TEST_NAME) throws Exception {
         // GIVEN
         Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
         OperationResult result = task.getResult();
@@ -135,7 +128,7 @@ public class TestEscalation extends AbstractCertificationTest {
 
         // WHEN
         TestUtil.displayWhen(TEST_NAME);
-        certificationService.openNextStage(campaignOid, 1, task, result);
+        certificationService.openNextStage(campaignOid, task, result);
 
         // THEN
         TestUtil.displayThen(TEST_NAME);
@@ -145,8 +138,8 @@ public class TestEscalation extends AbstractCertificationTest {
         AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
         display("campaign in stage 1", campaign);
 
-        assertAfterCampaignStart(campaign, certificationDefinition, 7);
-        checkAllCases(campaign.getCase(), campaignOid);
+        assertSanityAfterCampaignStart(campaign, certificationDefinition, 7);
+        checkAllCasesSanity(campaign.getCase());
         List<AccessCertificationCaseType> caseList = campaign.getCase();
         // no responses -> NO_RESPONSE in all cases
         assertCaseOutcome(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID, NO_RESPONSE, NO_RESPONSE, null);
@@ -156,10 +149,10 @@ public class TestEscalation extends AbstractCertificationTest {
         assertCaseOutcome(caseList, USER_JACK_OID, ROLE_CEO_OID, NO_RESPONSE, NO_RESPONSE, null);
         assertCaseOutcome(caseList, USER_JACK_OID, ORG_EROOT_OID, NO_RESPONSE, NO_RESPONSE, null);
 
-        assertPercentComplete(campaign, 0, 0, 0);
+        assertPercentCompleteAll(campaign, 0, 0, 0);
 
         assertEquals("Wrong # of triggers", 2, campaign.getTrigger().size());           // completion + timed-action
-		display("dummy transport", dummyTransport);
+        display("dummy transport", dummyTransport);
     }
 
     @Test
@@ -182,7 +175,7 @@ public class TestEscalation extends AbstractCertificationTest {
         TestUtil.assertSuccess(result);
 
         display("caseList", caseList);
-        checkAllCases(caseList, campaignOid);
+        checkAllCasesSanity(caseList);
     }
 
     @Test
@@ -208,46 +201,46 @@ public class TestEscalation extends AbstractCertificationTest {
 
         display("workItems", workItems);
         assertEquals("Wrong number of certification work items", 7, workItems.size());
-        checkAllWorkItems(workItems, campaignOid);
+        checkAllWorkItemsSanity(workItems);
     }
 
-	@Test
-	public void test100RecordDecision() throws Exception {
-		final String TEST_NAME = "test100RecordDecision";
-		TestUtil.displayTestTitle(this, TEST_NAME);
+    @Test
+    public void test100RecordDecision() throws Exception {
+        final String TEST_NAME = "test100RecordDecision";
+        TestUtil.displayTestTitle(this, TEST_NAME);
 
-		// GIVEN
-		Task task = taskManager.createTaskInstance(TestCertificationBasic.class.getName() + "." + TEST_NAME);
-		OperationResult result = task.getResult();
+        // GIVEN
+        Task task = taskManager.createTaskInstance(TestCertificationBasic.class.getName() + "." + TEST_NAME);
+        OperationResult result = task.getResult();
 
-		List<AccessCertificationCaseType> caseList = queryHelper.searchCases(campaignOid, null, null, result);
-		AccessCertificationCaseType superuserCase = findCase(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID);
+        List<AccessCertificationCaseType> caseList = queryHelper.searchCases(campaignOid, null, null, result);
+        AccessCertificationCaseType superuserCase = findCase(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID);
 
-		// WHEN
-		TestUtil.displayWhen(TEST_NAME);
-		AccessCertificationWorkItemType workItem = CertCampaignTypeUtil.findWorkItem(superuserCase, 1, USER_ADMINISTRATOR_OID);
-		long id = superuserCase.asPrismContainerValue().getId();
-		certificationService.recordDecision(campaignOid, id, workItem.getId(), ACCEPT, "no comment", task, result);
+        // WHEN
+        TestUtil.displayWhen(TEST_NAME);
+        AccessCertificationWorkItemType workItem = CertCampaignTypeUtil.findWorkItem(superuserCase, 1, 1, USER_ADMINISTRATOR_OID);
+        long id = superuserCase.asPrismContainerValue().getId();
+        certificationService.recordDecision(campaignOid, id, workItem.getId(), ACCEPT, "no comment", task, result);
 
-		// THEN
-		TestUtil.displayThen(TEST_NAME);
-		result.computeStatus();
-		TestUtil.assertSuccess(result);
+        // THEN
+        TestUtil.displayThen(TEST_NAME);
+        result.computeStatus();
+        TestUtil.assertSuccess(result);
 
-		caseList = queryHelper.searchCases(campaignOid, null, null, result);
-		display("caseList", caseList);
-		checkAllCases(caseList, campaignOid);
+        caseList = queryHelper.searchCases(campaignOid, null, null, result);
+        display("caseList", caseList);
+        checkAllCasesSanity(caseList);
 
-		superuserCase = findCase(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID);
-		assertEquals("changed case ID", Long.valueOf(id), superuserCase.asPrismContainerValue().getId());
-		assertSingleDecision(superuserCase, ACCEPT, "no comment", 1, USER_ADMINISTRATOR_OID, ACCEPT, false);
+        superuserCase = findCase(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID);
+        assertEquals("changed case ID", Long.valueOf(id), superuserCase.asPrismContainerValue().getId());
+        assertSingleDecision(superuserCase, ACCEPT, "no comment", 1, 1, USER_ADMINISTRATOR_OID, ACCEPT, false);
 
-		AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
-		assertPercentComplete(campaign, Math.round(100.0f/7.0f), Math.round(100.0f/7.0f), Math.round(100.0f/7.0f));      // 1 reviewer per case (always administrator)
-	}
+        AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
+        assertPercentCompleteAll(campaign, Math.round(100.0f/7.0f), Math.round(100.0f/7.0f), Math.round(100.0f/7.0f));      // 1 reviewer per case (always administrator)
+    }
 
 
-	@Test
+    @Test
     public void test110Escalate() throws Exception {
         final String TEST_NAME = "test110Escalate";
         TestUtil.displayTestTitle(this, TEST_NAME);
@@ -257,7 +250,7 @@ public class TestEscalation extends AbstractCertificationTest {
         Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
         OperationResult result = task.getResult();
 
-		dummyTransport.clearMessages();
+        dummyTransport.clearMessages();
 
         // WHEN
         TestUtil.displayWhen(TEST_NAME);
@@ -271,160 +264,446 @@ public class TestEscalation extends AbstractCertificationTest {
         result.computeStatus();
         TestUtil.assertSuccess(result);
 
-		List<AccessCertificationCaseType> caseList = queryHelper.searchCases(campaignOid, null, null, result);
+        List<AccessCertificationCaseType> caseList = queryHelper.searchCases(campaignOid, null, null, result);
         display("caseList", caseList);
-        checkAllCases(caseList, campaignOid);
+        checkAllCasesSanity(caseList);
 
-		AccessCertificationCaseType ceoCase = findCase(caseList, USER_JACK_OID, ROLE_CEO_OID);
+        AccessCertificationCaseType ceoCase = findCase(caseList, USER_JACK_OID, ROLE_CEO_OID);
         display("CEO case after escalation", ceoCase);
 
-		AccessCertificationWorkItemType workItem = CertCampaignTypeUtil.findWorkItem(ceoCase, 1, USER_ADMINISTRATOR_OID);
-		assertObjectRefs("assignees", false, workItem.getAssigneeRef(), USER_JACK_OID, USER_ADMINISTRATOR_OID);
-		assertEquals("Wrong originalAssignee OID", USER_ADMINISTRATOR_OID, workItem.getOriginalAssigneeRef().getOid());
-		final WorkItemEscalationLevelType NEW_ESCALATION_LEVEL = new WorkItemEscalationLevelType().number(1).name("jack-level");
-		assertEquals("Wrong escalation info", NEW_ESCALATION_LEVEL, workItem.getEscalationLevel());
-		assertEquals("Wrong # of events", 1, ceoCase.getEvent().size());
-		WorkItemEscalationEventType event = (WorkItemEscalationEventType) ceoCase.getEvent().get(0);
-		assertNotNull("No timestamp in event", event.getTimestamp());
-		assertEquals("Wrong initiatorRef OID", USER_ADMINISTRATOR_OID, event.getInitiatorRef().getOid());
-		assertEquals("Wrong workItemId", workItem.getId(), event.getWorkItemId());
-		assertObjectRefs("assigneeBefore", false, event.getAssigneeBefore(), USER_ADMINISTRATOR_OID);
-		assertObjectRefs("delegatedTo", false, event.getDelegatedTo(), USER_JACK_OID);
-		assertEquals("Wrong delegationMethod", WorkItemDelegationMethodType.ADD_ASSIGNEES, event.getDelegationMethod());
-		assertEquals("Wrong new escalation level", NEW_ESCALATION_LEVEL, event.getNewEscalationLevel());
+        AccessCertificationWorkItemType workItem = CertCampaignTypeUtil.findWorkItem(ceoCase, 1, 1, USER_ADMINISTRATOR_OID);
+        assertObjectRefs("assignees", false, workItem.getAssigneeRef(), USER_JACK_OID, USER_ADMINISTRATOR_OID);
+        assertEquals("Wrong originalAssignee OID", USER_ADMINISTRATOR_OID, workItem.getOriginalAssigneeRef().getOid());
+        final WorkItemEscalationLevelType NEW_ESCALATION_LEVEL = new WorkItemEscalationLevelType().number(1).name("jack-level");
+        assertEquals("Wrong escalation info", NEW_ESCALATION_LEVEL, workItem.getEscalationLevel());
+        assertEquals("Wrong # of events", 1, ceoCase.getEvent().size());
+        WorkItemEscalationEventType event = (WorkItemEscalationEventType) ceoCase.getEvent().get(0);
+        assertNotNull("No timestamp in event", event.getTimestamp());
+        assertEquals("Wrong initiatorRef OID", USER_ADMINISTRATOR_OID, event.getInitiatorRef().getOid());
+        assertEquals("Wrong workItemId", workItem.getId(), event.getWorkItemId());
+        assertObjectRefs("assigneeBefore", false, event.getAssigneeBefore(), USER_ADMINISTRATOR_OID);
+        assertObjectRefs("delegatedTo", false, event.getDelegatedTo(), USER_JACK_OID);
+        assertEquals("Wrong delegationMethod", WorkItemDelegationMethodType.ADD_ASSIGNEES, event.getDelegationMethod());
+        assertEquals("Wrong new escalation level", NEW_ESCALATION_LEVEL, event.getNewEscalationLevel());
 
-		AccessCertificationCaseType superuserCase = findCase(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID);
-		AccessCertificationWorkItemType superuserWorkItem = CertCampaignTypeUtil.findWorkItem(superuserCase, 1, USER_ADMINISTRATOR_OID);
-		assertEquals("Escalation info present even if it shouldn't be", null, superuserWorkItem.getEscalationLevel());
+        AccessCertificationCaseType superuserCase = findCase(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID);
+        AccessCertificationWorkItemType superuserWorkItem = CertCampaignTypeUtil.findWorkItem(superuserCase, 1, 1,
+                USER_ADMINISTRATOR_OID);
+        //noinspection SimplifiedTestNGAssertion
+        assertEquals("Escalation info present even if it shouldn't be", null, superuserWorkItem.getEscalationLevel());
 
-		AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
-		assertPercentComplete(campaign, Math.round(100.0f/7.0f), Math.round(100.0f/7.0f), Math.round(100.0f/7.0f));      // 1 reviewer per case (always administrator)
+        AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
+        assertPercentCompleteAll(campaign, Math.round(100.0f/7.0f), Math.round(100.0f/7.0f), Math.round(100.0f/7.0f));      // 1 reviewer per case (always administrator)
 
-		AccessCertificationStageType currentStage = CertCampaignTypeUtil.getCurrentStage(campaign);
-		assertEquals("Wrong new stage escalation level", NEW_ESCALATION_LEVEL, currentStage.getEscalationLevel());
+        AccessCertificationStageType currentStage = CertCampaignTypeUtil.getCurrentStage(campaign);
+        assertNotNull(currentStage);
+        assertEquals("Wrong new stage escalation level", NEW_ESCALATION_LEVEL, currentStage.getEscalationLevel());
 
-		display("campaign after escalation", campaign);
+        display("campaign after escalation", campaign);
         assertEquals("Wrong # of triggers", 2, campaign.getTrigger().size());           // completion + timed-action (P3D)
 
-		display("dummy transport", dummyTransport);
-		List<Message> messages = dummyTransport.getMessages("dummy:simpleReviewerNotifier");
-		assertEquals("Wrong # of dummy notifications", 3, messages.size());			// original + new approver + deputy of administrator
-	}
+        display("dummy transport", dummyTransport);
+        List<Message> messages = dummyTransport.getMessages("dummy:simpleReviewerNotifier");
+        assertEquals("Wrong # of dummy notifications", 3, messages.size());            // original + new approver + deputy of administrator
+    }
 
-	@Test
-	public void test120EscalateAgain() throws Exception {
-		final String TEST_NAME = "test120EscalateAgain";
-		TestUtil.displayTestTitle(this, TEST_NAME);
-		login(getUserFromRepo(USER_ADMINISTRATOR_OID));
+    @Test
+    public void test120EscalateAgain() throws Exception {
+        final String TEST_NAME = "test120EscalateAgain";
+        TestUtil.displayTestTitle(this, TEST_NAME);
+        login(getUserFromRepo(USER_ADMINISTRATOR_OID));
 
-		// GIVEN
-		Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
-		OperationResult result = task.getResult();
+        // GIVEN
+        Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
+        OperationResult result = task.getResult();
 
-		dummyTransport.clearMessages();
+        dummyTransport.clearMessages();
 
-		// WHEN
-		TestUtil.displayWhen(TEST_NAME);
+        // WHEN
+        TestUtil.displayWhen(TEST_NAME);
 
         clock.resetOverride();
         clock.overrideDuration("P4D");          // second escalation is at P3D
         waitForTaskNextRun(TASK_TRIGGER_SCANNER_OID, true, 20000, true);
 
-		// THEN
-		TestUtil.displayThen(TEST_NAME);
-		result.computeStatus();
-		TestUtil.assertSuccess(result);
+        // THEN
+        TestUtil.displayThen(TEST_NAME);
+        result.computeStatus();
+        TestUtil.assertSuccess(result);
 
-		List<AccessCertificationCaseType> caseList = queryHelper.searchCases(campaignOid, null, null, result);
-		display("caseList", caseList);
-		checkAllCases(caseList, campaignOid);
+        List<AccessCertificationCaseType> caseList = queryHelper.searchCases(campaignOid, null, null, result);
+        display("caseList", caseList);
+        checkAllCasesSanity(caseList);
 
-		AccessCertificationCaseType ceoCase = findCase(caseList, USER_JACK_OID, ROLE_CEO_OID);
-		display("CEO case after escalation", ceoCase);
-		AccessCertificationWorkItemType workItem = CertCampaignTypeUtil.findWorkItem(ceoCase, 1, USER_ELAINE_OID);
-		assertNotNull("No work item found", workItem);
-		assertObjectRefs("assignees", false, workItem.getAssigneeRef(), USER_ELAINE_OID);
-		assertEquals("Wrong originalAssignee OID", USER_ADMINISTRATOR_OID, workItem.getOriginalAssigneeRef().getOid());
-		final WorkItemEscalationLevelType OLD_ESCALATION_LEVEL = new WorkItemEscalationLevelType().number(1).name("jack-level");
-		final WorkItemEscalationLevelType NEW_ESCALATION_LEVEL = new WorkItemEscalationLevelType().number(2).name("elaine-level");
-		assertEquals("Wrong escalation info", NEW_ESCALATION_LEVEL, workItem.getEscalationLevel());
-		assertEquals("Wrong # of events", 2, ceoCase.getEvent().size());
-		WorkItemEscalationEventType event = (WorkItemEscalationEventType) ceoCase.getEvent().get(1);
-		assertNotNull("No timestamp in event", event.getTimestamp());
-		assertEquals("Wrong initiatorRef OID", USER_ADMINISTRATOR_OID, event.getInitiatorRef().getOid());
-		assertEquals("Wrong workItemId", workItem.getId(), event.getWorkItemId());
-		assertObjectRefs("assigneeBefore", false, event.getAssigneeBefore(), USER_ADMINISTRATOR_OID, USER_JACK_OID);
-		assertObjectRefs("delegatedTo", false, event.getDelegatedTo(), USER_ELAINE_OID);
-		assertEquals("Wrong delegationMethod", WorkItemDelegationMethodType.REPLACE_ASSIGNEES, event.getDelegationMethod());
-		assertEquals("Wrong old escalation level", OLD_ESCALATION_LEVEL, event.getEscalationLevel());
-		assertEquals("Wrong new escalation level", NEW_ESCALATION_LEVEL, event.getNewEscalationLevel());
+        AccessCertificationCaseType ceoCase = findCase(caseList, USER_JACK_OID, ROLE_CEO_OID);
+        display("CEO case after escalation", ceoCase);
+        AccessCertificationWorkItemType workItem = CertCampaignTypeUtil.findWorkItem(ceoCase, 1, 1, USER_ELAINE_OID);
+        assertNotNull("No work item found", workItem);
+        assertObjectRefs("assignees", false, workItem.getAssigneeRef(), USER_ELAINE_OID);
+        assertEquals("Wrong originalAssignee OID", USER_ADMINISTRATOR_OID, workItem.getOriginalAssigneeRef().getOid());
+        final WorkItemEscalationLevelType OLD_ESCALATION_LEVEL = new WorkItemEscalationLevelType().number(1).name("jack-level");
+        final WorkItemEscalationLevelType NEW_ESCALATION_LEVEL = new WorkItemEscalationLevelType().number(2).name("elaine-level");
+        assertEquals("Wrong escalation info", NEW_ESCALATION_LEVEL, workItem.getEscalationLevel());
+        assertEquals("Wrong # of events", 2, ceoCase.getEvent().size());
+        WorkItemEscalationEventType event = (WorkItemEscalationEventType) ceoCase.getEvent().get(1);
+        assertNotNull("No timestamp in event", event.getTimestamp());
+        assertEquals("Wrong initiatorRef OID", USER_ADMINISTRATOR_OID, event.getInitiatorRef().getOid());
+        assertEquals("Wrong workItemId", workItem.getId(), event.getWorkItemId());
+        assertObjectRefs("assigneeBefore", false, event.getAssigneeBefore(), USER_ADMINISTRATOR_OID, USER_JACK_OID);
+        assertObjectRefs("delegatedTo", false, event.getDelegatedTo(), USER_ELAINE_OID);
+        assertEquals("Wrong delegationMethod", WorkItemDelegationMethodType.REPLACE_ASSIGNEES, event.getDelegationMethod());
+        assertEquals("Wrong old escalation level", OLD_ESCALATION_LEVEL, event.getEscalationLevel());
+        assertEquals("Wrong new escalation level", NEW_ESCALATION_LEVEL, event.getNewEscalationLevel());
 
-		AccessCertificationCaseType superuserCase = findCase(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID);
-		AccessCertificationWorkItemType superuserWorkItem = CertCampaignTypeUtil.findWorkItem(superuserCase, 1, USER_ADMINISTRATOR_OID);
-		assertEquals("Escalation info present even if it shouldn't be", null, superuserWorkItem.getEscalationLevel());
+        AccessCertificationCaseType superuserCase = findCase(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID);
+        AccessCertificationWorkItemType superuserWorkItem = CertCampaignTypeUtil.findWorkItem(superuserCase, 1, 1,
+                USER_ADMINISTRATOR_OID);
+        //noinspection SimplifiedTestNGAssertion
+        assertEquals("Escalation info present even if it shouldn't be", null, superuserWorkItem.getEscalationLevel());
 
-		AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
-		assertPercentComplete(campaign, Math.round(100.0f/7.0f), Math.round(100.0f/7.0f), Math.round(100.0f/7.0f));      // 1 reviewer per case (always administrator)
+        AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
+        assertPercentCompleteAll(campaign, Math.round(100.0f/7.0f), Math.round(100.0f/7.0f), Math.round(100.0f/7.0f));      // 1 reviewer per case (always administrator)
 
-		AccessCertificationStageType currentStage = CertCampaignTypeUtil.getCurrentStage(campaign);
-		assertEquals("Wrong new stage escalation level", NEW_ESCALATION_LEVEL, currentStage.getEscalationLevel());
+        AccessCertificationStageType currentStage = CertCampaignTypeUtil.getCurrentStage(campaign);
+        assertNotNull(currentStage);
+        assertEquals("Wrong new stage escalation level", NEW_ESCALATION_LEVEL, currentStage.getEscalationLevel());
 
-		display("campaign after escalation", campaign);
+        display("campaign after escalation", campaign);
         assertEquals("Wrong # of triggers", 1, campaign.getTrigger().size());           // completion
 
-		display("dummy transport", dummyTransport);
-		List<Message> messages = dummyTransport.getMessages("dummy:simpleReviewerNotifier");
-		assertEquals("Wrong # of dummy notifications", 1, messages.size());			// new approver
+        display("dummy transport", dummyTransport);
+        List<Message> messages = dummyTransport.getMessages("dummy:simpleReviewerNotifier");
+        assertEquals("Wrong # of dummy notifications", 1, messages.size());            // new approver
     }
 
-	@Test
-	public void test130Remediation() throws Exception {
-		final String TEST_NAME = "test130Remediation";
-		TestUtil.displayTestTitle(this, TEST_NAME);
-		login(getUserFromRepo(USER_ADMINISTRATOR_OID));
+    @Test
+    public void test130Remediation() throws Exception {
+        final String TEST_NAME = "test130Remediation";
+        TestUtil.displayTestTitle(this, TEST_NAME);
+        login(getUserFromRepo(USER_ADMINISTRATOR_OID));
 
-		// GIVEN
-		Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
-		OperationResult result = task.getResult();
+        // GIVEN
+        Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
+        OperationResult result = task.getResult();
 
-		dummyTransport.clearMessages();
+        dummyTransport.clearMessages();
 
-		// WHEN
-		TestUtil.displayWhen(TEST_NAME);
+        // WHEN
+        TestUtil.displayWhen(TEST_NAME);
 
         clock.resetOverride();
         clock.overrideDuration("P15D");          // stage ends at P14D
         waitForTaskNextRun(TASK_TRIGGER_SCANNER_OID, true, 20000, true);
 
-		// THEN
-		TestUtil.displayThen(TEST_NAME);
-		result.computeStatus();
-		TestUtil.assertSuccess(result);
+        // THEN
+        TestUtil.displayThen(TEST_NAME);
+        result.computeStatus();
+        TestUtil.assertSuccess(result);
 
-		AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
-		display("campaign after escalation", campaign);
-		assertStateAndStage(campaign, AccessCertificationCampaignStateType.IN_REMEDIATION, 2);
+        AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
+        display("campaign after remediation", campaign);
+        assertStateAndStage(campaign, AccessCertificationCampaignStateType.IN_REMEDIATION, 2);
     }
 
-	protected void checkAllCases(Collection<AccessCertificationCaseType> caseList, String campaignOid) {
+    @Test
+    public void test140Close() throws Exception {
+        final String TEST_NAME = "test140Close";
+        TestUtil.displayTestTitle(this, TEST_NAME);
+        login(getUserFromRepo(USER_ADMINISTRATOR_OID));
+
+        // GIVEN
+        Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
+        task.setOwner(userAdministrator.asPrismObject());
+        OperationResult result = task.getResult();
+
+        dummyTransport.clearMessages();
+
+        // WHEN
+        TestUtil.displayWhen(TEST_NAME);
+
+        clock.resetOverride();
+        clock.overrideDuration("P16D");
+        certificationManager.closeCampaign(campaignOid, true, task, result);
+
+        // THEN
+        TestUtil.displayThen(TEST_NAME);
+        result.computeStatus();
+        TestUtil.assertSuccess(result);
+
+        AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
+        display("campaign after close", campaign);
+        assertStateAndStage(campaign, AccessCertificationCampaignStateType.CLOSED, 2);
+        assertEquals("Wrong # of triggers", 1, campaign.getTrigger().size());           // reiterate
+    }
+
+    @Test
+    public void test200AutomaticReiteration() throws Exception {
+        final String TEST_NAME = "test200AutomaticReiteration";
+        TestUtil.displayTestTitle(this, TEST_NAME);
+        login(getUserFromRepo(USER_ADMINISTRATOR_OID));
+
+        // GIVEN
+        Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
+        task.setOwner(userAdministrator.asPrismObject());
+        OperationResult result = task.getResult();
+
+        dummyTransport.clearMessages();
+
+        // WHEN
+        TestUtil.displayWhen(TEST_NAME);
+
+        clock.resetOverride();
+        clock.overrideDuration("P18D");          // campaign ends at P16D, reiteration scheduled to P17D
+        waitForTaskNextRun(TASK_TRIGGER_SCANNER_OID, true, 20000, true);
+
+        // THEN
+        TestUtil.displayThen(TEST_NAME);
+        result.computeStatus();
+        TestUtil.assertSuccess(result);
+
+        AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
+        display("campaign in stage 1", campaign);
+
+        assertSanityAfterCampaignStart(campaign, certificationDefinition, 7, 2, 2, new Date(clock.currentTimeMillis()));
+        List<AccessCertificationCaseType> caseList = campaign.getCase();
+        assertCaseOutcome(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID, ACCEPT, ACCEPT, null);  // from iteration 1
+        assertCaseOutcome(caseList, USER_ADMINISTRATOR_OID, ROLE_COO_OID, NO_RESPONSE, NO_RESPONSE, null);
+        assertCaseOutcome(caseList, USER_ADMINISTRATOR_OID, ROLE_CEO_OID, NO_RESPONSE, NO_RESPONSE, null);
+        assertCaseOutcome(caseList, USER_ADMINISTRATOR_OID, ORG_EROOT_OID, NO_RESPONSE, NO_RESPONSE, null);
+        assertCaseOutcome(caseList, USER_JACK_OID, ROLE_CEO_OID, NO_RESPONSE, NO_RESPONSE, null);
+        assertCaseOutcome(caseList, USER_JACK_OID, ORG_EROOT_OID, NO_RESPONSE, NO_RESPONSE, null);
+
+        // current iteration/stage:
+        // - 6 cases (all except admin->super), 6 work items, no decisions
+        assertPercentCompleteCurrent(campaign, 0, 0, 0);
+
+        // current stage (all iterations):
+        // - 7 cases, 7 work items; one case is complete/decided, one work item is done
+        assertPercentCompleteCurrentStage(campaign, 14, 14, 14);
+
+        // current iteration (all stages)
+        // - 6 cases, 6 work items, no decisions
+        assertPercentCompleteCurrentIteration(campaign, 0, 0, 0);
+
+        // all stages, all iterations
+        // - 7 cases, 1 complete, 1 decided
+        // - 1 of 7 work items done
+        assertPercentCompleteAll(campaign, 14, 14, 14);
+
+        assertEquals("Wrong # of triggers", 2, campaign.getTrigger().size());           // completion + timed-action
+        display("dummy transport", dummyTransport);
+    }
+
+    @Test
+    public void test300Close() throws Exception {
+        final String TEST_NAME = "test300Close";
+        TestUtil.displayTestTitle(this, TEST_NAME);
+        login(getUserFromRepo(USER_ADMINISTRATOR_OID));
+
+        // GIVEN
+        Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
+        task.setOwner(userAdministrator.asPrismObject());
+        OperationResult result = task.getResult();
+
+        dummyTransport.clearMessages();
+
+        // WHEN
+        TestUtil.displayWhen(TEST_NAME);
+
+        clock.resetOverride();
+        clock.overrideDuration("P19D");         // +1 day relative to previous test
+        certificationManager.closeCampaign(campaignOid, true, task, result);
+
+        // THEN
+        TestUtil.displayThen(TEST_NAME);
+        result.computeStatus();
+        TestUtil.assertSuccess(result);
+
+        AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
+        display("campaign after close", campaign);
+        assertStateAndStage(campaign, AccessCertificationCampaignStateType.CLOSED, 2);
+        assertEquals("Wrong # of triggers", 0, campaign.getTrigger().size());           // no more automated reiterations
+    }
+
+    @Test
+    public void test310ManualReiteration() throws Exception {
+        final String TEST_NAME = "test310ManualReiteration";
+        TestUtil.displayTestTitle(this, TEST_NAME);
+        login(getUserFromRepo(USER_ADMINISTRATOR_OID));
+
+        // GIVEN
+        Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
+        task.setOwner(userAdministrator.asPrismObject());
+        OperationResult result = task.getResult();
+
+        dummyTransport.clearMessages();
+
+        // WHEN
+        TestUtil.displayWhen(TEST_NAME);
+
+        clock.resetOverride();
+        clock.overrideDuration("P20D");          // +1 day relative to previous test
+        certificationManager.reiterateCampaign(campaignOid, task, result);
+
+        // THEN
+        TestUtil.displayThen(TEST_NAME);
+        result.computeStatus();
+        TestUtil.assertSuccess(result);
+
+        AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
+        display("campaign after reiteration", campaign);
+        assertStateStageIteration(campaign, AccessCertificationCampaignStateType.CREATED, 0, 3);
+
+        // current iteration/stage:
+        // - 6 cases (all except admin->super), 0 work items
+        // - so, these cases are all complete but none is decided
+        // - no work items so they are all OK
+        assertPercentCompleteCurrent(campaign, 100, 0, 100);
+
+        // current stage (all iterations):
+        // - 6 cases, 0 work items => the same numbers
+        assertPercentCompleteCurrentStage(campaign, 100, 0, 100);
+
+        // current iteration (all stages) -> the same
+        assertPercentCompleteCurrentIteration(campaign, 100, 0, 100);
+
+        // all stages, all iterations
+        // - 7 cases, 1 complete, 1 decided
+        // - 1 of 7 work items done
+        assertPercentCompleteAll(campaign, 14, 14, 14);
+    }
+
+    @Test
+    public void test320OpenFirstStage() throws Exception {
+        final String TEST_NAME = "test320OpenFirstStage";
+        TestUtil.displayTestTitle(this, TEST_NAME);
+
+        // GIVEN
+        Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
+        task.setOwner(userAdministrator.asPrismObject());
+        OperationResult result = task.getResult();
+
+        // WHEN
+        TestUtil.displayWhen(TEST_NAME);
+        certificationService.openNextStage(campaignOid, task, result);
+
+        // THEN
+        TestUtil.displayThen(TEST_NAME);
+        result.computeStatus();
+        TestUtil.assertSuccess(result);
+
+        AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
+        display("campaign in stage 1", campaign);
+
+        assertSanityAfterCampaignStart(campaign, certificationDefinition, 7, 3, 3, new Date(clock.currentTimeMillis()));
+        List<AccessCertificationCaseType> caseList = campaign.getCase();
+        assertCaseOutcome(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID, ACCEPT, ACCEPT, null);  // from iteration 1
+        assertCaseOutcome(caseList, USER_ADMINISTRATOR_OID, ROLE_COO_OID, NO_RESPONSE, NO_RESPONSE, null);
+        assertCaseOutcome(caseList, USER_ADMINISTRATOR_OID, ROLE_CEO_OID, NO_RESPONSE, NO_RESPONSE, null);
+        assertCaseOutcome(caseList, USER_ADMINISTRATOR_OID, ORG_EROOT_OID, NO_RESPONSE, NO_RESPONSE, null);
+        assertCaseOutcome(caseList, USER_JACK_OID, ROLE_CEO_OID, NO_RESPONSE, NO_RESPONSE, null);
+        assertCaseOutcome(caseList, USER_JACK_OID, ORG_EROOT_OID, NO_RESPONSE, NO_RESPONSE, null);
+
+        // current iteration/stage:
+        // - 6 cases (all except admin->super), 6 work items, no decisions
+        assertPercentCompleteCurrent(campaign, 0, 0, 0);
+
+        // current stage (all iterations):
+        // - 7 cases, 7 work items; one case is complete/decided, one work item is done
+        assertPercentCompleteCurrentStage(campaign, 14, 14, 14);
+
+        // current iteration (all stages)
+        // - 6 cases, 6 work items, no decisions
+        assertPercentCompleteCurrentIteration(campaign, 0, 0, 0);
+
+        // all stages, all iterations
+        // - 7 cases, 1 complete, 1 decided
+        // - 1 of 7 work items done
+        assertPercentCompleteAll(campaign, 14, 14, 14);
+
+        assertEquals("Wrong # of triggers", 2, campaign.getTrigger().size());           // completion + timed-action
+        display("dummy transport", dummyTransport);
+    }
+
+    @Test
+    public void test400Close() throws Exception {
+        final String TEST_NAME = "test300Close";
+        TestUtil.displayTestTitle(this, TEST_NAME);
+        login(getUserFromRepo(USER_ADMINISTRATOR_OID));
+
+        // GIVEN
+        Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
+        task.setOwner(userAdministrator.asPrismObject());
+        OperationResult result = task.getResult();
+
+        dummyTransport.clearMessages();
+
+        // WHEN
+        TestUtil.displayWhen(TEST_NAME);
+
+        clock.resetOverride();
+        clock.overrideDuration("P21D");         // +1 day relative to previous test
+        certificationManager.closeCampaign(campaignOid, true, task, result);
+
+        // THEN
+        TestUtil.displayThen(TEST_NAME);
+        result.computeStatus();
+        TestUtil.assertSuccess(result);
+
+        AccessCertificationCampaignType campaign = getCampaignWithCases(campaignOid);
+        display("campaign after close", campaign);
+        assertStateAndStage(campaign, AccessCertificationCampaignStateType.CLOSED, 2);
+        assertEquals("Wrong # of triggers", 0, campaign.getTrigger().size());           // no more automated reiterations
+    }
+
+    @Test
+    public void test410ManualReiterationUnavailable() throws Exception {
+        final String TEST_NAME = "test410ManualReiterationUnavailable";
+        TestUtil.displayTestTitle(this, TEST_NAME);
+        login(getUserFromRepo(USER_ADMINISTRATOR_OID));
+
+        // GIVEN
+        Task task = taskManager.createTaskInstance(TestEscalation.class.getName() + "." + TEST_NAME);
+        task.setOwner(userAdministrator.asPrismObject());
+        OperationResult result = task.getResult();
+
+        dummyTransport.clearMessages();
+
+        // WHEN
+        TestUtil.displayWhen(TEST_NAME);
+
+        clock.resetOverride();
+        clock.overrideDuration("P22D");          // +1 day relative to previous test
+        try {
+            certificationManager.reiterateCampaign(campaignOid, task, result);
+            fail("unexpected success");
+        } catch (IllegalStateException e) {
+            // THEN
+            System.err.println("got expected exception: " + e.getMessage());
+            e.printStackTrace();
+            assertTrue("wrong exception message", e.getMessage().contains("maximum number of iterations (3) was reached"));
+        }
+    }
+
+    @SuppressWarnings("Duplicates")
+    private void checkAllCasesSanity(Collection<AccessCertificationCaseType> caseList) {
         assertEquals("Wrong number of certification cases", 7, caseList.size());
-        checkCase(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID, userAdministrator, campaignOid);
-        checkCase(caseList, USER_ADMINISTRATOR_OID, ROLE_COO_OID, userAdministrator, campaignOid);
-        checkCase(caseList, USER_ADMINISTRATOR_OID, ROLE_CEO_OID, userAdministrator, campaignOid);
-        checkCase(caseList, USER_ADMINISTRATOR_OID, ORG_EROOT_OID, userAdministrator, campaignOid);
-        checkCase(caseList, USER_JACK_OID, ROLE_CEO_OID, userJack, campaignOid, ORG_GOVERNOR_OFFICE_OID, ORG_SCUMM_BAR_OID, ENABLED);
-        checkCase(caseList, USER_JACK_OID, ORG_EROOT_OID, userJack, campaignOid);
+        checkCaseSanity(caseList, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID, userAdministrator);
+        checkCaseSanity(caseList, USER_ADMINISTRATOR_OID, ROLE_COO_OID, userAdministrator);
+        checkCaseSanity(caseList, USER_ADMINISTRATOR_OID, ROLE_CEO_OID, userAdministrator);
+        checkCaseSanity(caseList, USER_ADMINISTRATOR_OID, ORG_EROOT_OID, userAdministrator);
+        checkCaseSanity(caseList, USER_JACK_OID, ROLE_CEO_OID, userJack, ORG_GOVERNOR_OFFICE_OID, ORG_SCUMM_BAR_OID, ENABLED);
+        checkCaseSanity(caseList, USER_JACK_OID, ORG_EROOT_OID, userJack);
     }
 
-    protected void checkAllWorkItems(Collection<AccessCertificationWorkItemType> workItems, String campaignOid) {
+    @SuppressWarnings("Duplicates")
+    private void checkAllWorkItemsSanity(Collection<AccessCertificationWorkItemType> workItems) {
         assertEquals("Wrong number of certification work items", 7, workItems.size());
-        checkWorkItem(workItems, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID, userAdministrator, campaignOid);
-        checkWorkItem(workItems, USER_ADMINISTRATOR_OID, ROLE_COO_OID, userAdministrator, campaignOid);
-        checkWorkItem(workItems, USER_ADMINISTRATOR_OID, ROLE_CEO_OID, userAdministrator, campaignOid);
-        checkWorkItem(workItems, USER_ADMINISTRATOR_OID, ORG_EROOT_OID, userAdministrator, campaignOid);
-        checkWorkItem(workItems, USER_JACK_OID, ROLE_CEO_OID, userJack, campaignOid, ORG_GOVERNOR_OFFICE_OID, ORG_SCUMM_BAR_OID, ENABLED);
-        checkWorkItem(workItems, USER_JACK_OID, ORG_EROOT_OID, userJack, campaignOid);
+        checkWorkItemSanity(workItems, USER_ADMINISTRATOR_OID, ROLE_SUPERUSER_OID, userAdministrator);
+        checkWorkItemSanity(workItems, USER_ADMINISTRATOR_OID, ROLE_COO_OID, userAdministrator);
+        checkWorkItemSanity(workItems, USER_ADMINISTRATOR_OID, ROLE_CEO_OID, userAdministrator);
+        checkWorkItemSanity(workItems, USER_ADMINISTRATOR_OID, ORG_EROOT_OID, userAdministrator);
+        checkWorkItemSanity(workItems, USER_JACK_OID, ROLE_CEO_OID, userJack, ORG_GOVERNOR_OFFICE_OID, ORG_SCUMM_BAR_OID, ENABLED);
+        checkWorkItemSanity(workItems, USER_JACK_OID, ORG_EROOT_OID, userJack);
     }
-
-
 }

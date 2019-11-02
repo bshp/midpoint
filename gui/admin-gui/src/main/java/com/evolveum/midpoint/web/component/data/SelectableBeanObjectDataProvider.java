@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.data;
@@ -25,11 +16,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.evolveum.midpoint.prism.path.ItemPath;
+import com.evolveum.midpoint.schema.GetOperationOptionsBuilder;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ShadowType;
 import org.apache.commons.lang.Validate;
 import org.apache.wicket.Component;
-import org.apache.wicket.RestartResponseException;
 
 import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.prism.PrismObject;
@@ -45,21 +35,22 @@ import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.component.util.SelectableBean;
-import com.evolveum.midpoint.web.page.error.PageError;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ResourceType;
+import org.jetbrains.annotations.NotNull;
 
 import static com.evolveum.midpoint.schema.DefinitionProcessingOption.FULL;
 import static com.evolveum.midpoint.schema.DefinitionProcessingOption.ONLY_IF_EXISTS;
+import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
 /**
  * @author lazyman
  * @author semancik
  */
 public class SelectableBeanObjectDataProvider<O extends ObjectType> extends BaseSortableDataProvider<SelectableBean<O>> {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private static final Trace LOGGER = TraceManager.getTrace(SelectableBeanObjectDataProvider.class);
+    private static final Trace LOGGER = TraceManager.getTrace(SelectableBeanObjectDataProvider.class);
     private static final String DOT_CLASS = SelectableBeanObjectDataProvider.class.getName() + ".";
     private static final String OPERATION_SEARCH_OBJECTS = DOT_CLASS + "searchObjects";
     private static final String OPERATION_COUNT_OBJECTS = DOT_CLASS + "countObjects";
@@ -72,6 +63,11 @@ public class SelectableBeanObjectDataProvider<O extends ObjectType> extends Base
     // we use special options when exporting to CSV (due to bulk nature of the operation)
     private boolean export;
 
+    // it seems that if connector doesn't support counting, provisioning return null. the default before was 0
+    // which resulted to the empty list of object. Therefore we need to set this the default count to  "undefined"
+    // at least for the shadows.
+    private int defaultCountIfNull = 0;
+
     /**
      *  The number of all objects that the query can return. Defaults to a really big number
      *  if we cannot count the number of objects.
@@ -82,60 +78,65 @@ public class SelectableBeanObjectDataProvider<O extends ObjectType> extends Base
     private Class<? extends O> type;
     private Collection<SelectorOptions<GetOperationOptions>> options;
 
-   public SelectableBeanObjectDataProvider(Component component, Class<? extends O> type, Set<? extends O> selected ) {
+    public SelectableBeanObjectDataProvider(Component component, Class<? extends O> type, Set<? extends O> selected ) {
         super(component, true, true);
 
         Validate.notNull(type);
-       if (selected != null) {
-           this.selected = selected;
-       }
+        if (selected != null) {
+            this.selected = selected;
+        }
         this.type = type;
     }
 
     public void clearSelectedObjects(){
-    	selected.clear();
+        selected.clear();
     }
 
+    @NotNull
     public List<O> getSelectedData() {
-    	preprocessSelectedDataInternal();
-    	for (SelectableBean<O> selectable : super.getAvailableData()) {
-			if (selectable.isSelected() && selectable.getValue() != null) {
-				((Set)selected).add(selectable.getValue());
-			}
-    	}
-    	List<O> allSelected = new ArrayList<>();
-    	allSelected.addAll(selected);
-    	return allSelected;
+        preprocessSelectedDataInternal();
+        for (SelectableBean<O> selectable : super.getAvailableData()) {
+            if (selectable.isSelected() && selectable.getValue() != null) {
+                ((Set)selected).add(selectable.getValue());
+            }
+        }
+        List<O> allSelected = new ArrayList<>();
+        allSelected.addAll(selected);
+        return allSelected;
     }
 
     private void preprocessSelectedData() {
-    	 preprocessSelectedDataInternal();
+         preprocessSelectedDataInternal();
          getAvailableData().clear();
     }
 
     private void preprocessSelectedDataInternal() {
-    	for (SelectableBean<O> available : getAvailableData()) {
-			if (available.isSelected() && available.getValue() != null) {
-     			((Set)selected).add(available.getValue());
-     		}
+        for (SelectableBean<O> available : getAvailableData()) {
+            if (available.isSelected() && available.getValue() != null) {
+                 ((Set)selected).add(available.getValue());
+             }
          }
 
          for (SelectableBean<O> available : getAvailableData()) {
-			 if (!available.isSelected()) {
-     			if (selected.contains(available.getValue())) {
-     				selected.remove(available.getValue());
-     			}
-     		}
+             if (!available.isSelected()) {
+                 if (selected.contains(available.getValue())) {
+                     selected.remove(available.getValue());
+                 }
+             }
          }
     }
 
+    @Override
+    protected boolean checkOrderingSettings() {
+        return true;
+    }
 
     @Override
     public Iterator<SelectableBean<O>> internalIterator(long offset, long pageSize) {
         LOGGER.trace("begin::iterator() offset {} pageSize {}.", new Object[]{offset, pageSize});
 //        if (pageSize > 1000000) {
-//        	// Failsafe. Do not even try this. This can have huge impact on the resource. (MID-3336)
-//        	throw new IllegalArgumentException("Requested huge page size: "+pageSize);
+//            // Failsafe. Do not even try this. This can have huge impact on the resource. (MID-3336)
+//            throw new IllegalArgumentException("Requested huge page size: "+pageSize);
 //        }
 
         preprocessSelectedData();
@@ -147,38 +148,35 @@ public class SelectableBeanObjectDataProvider<O extends ObjectType> extends Base
 
             ObjectQuery query = getQuery();
             if (query == null){
-            	if (emptyListOnNullQuery) {
-            		return new ArrayList<SelectableBean<O>>().iterator();
-            	}
-            	query = new ObjectQuery();
+                if (emptyListOnNullQuery) {
+                    return new ArrayList<SelectableBean<O>>().iterator();
+                }
+                query = getPrismContext().queryFactory().createQuery();
             }
             query.setPaging(paging);
 
             if (LOGGER.isTraceEnabled()) {
-            	LOGGER.trace("Query {} with {}", type.getSimpleName(), query.debugDump());
+                LOGGER.trace("Query {} with {}", type.getSimpleName(), query.debugDump());
             }
 
-            if (ResourceType.class.equals(type) && (options == null || options.isEmpty())){
-            	options = SelectorOptions.createCollection(GetOperationOptions.createNoFetch());
+            if (ResourceType.class.equals(type) && (options == null || options.isEmpty())) {
+                options = SelectorOptions.createCollection(GetOperationOptions.createNoFetch());
             }
-			Collection<SelectorOptions<GetOperationOptions>> currentOptions = options;
-			if (export) {
-				// TODO also for other classes
-				if (ShadowType.class.equals(type)) {
-					currentOptions = SelectorOptions.set(currentOptions, ItemPath.EMPTY_PATH, () -> new GetOperationOptions(),
-							(o) -> o.setDefinitionProcessing(ONLY_IF_EXISTS));
-					currentOptions = SelectorOptions
-							.set(currentOptions, new ItemPath(ShadowType.F_FETCH_RESULT), GetOperationOptions::new,
-									(o) -> o.setDefinitionProcessing(FULL));
-					currentOptions = SelectorOptions
-							.set(currentOptions, new ItemPath(ShadowType.F_AUXILIARY_OBJECT_CLASS), GetOperationOptions::new,
-									(o) -> o.setDefinitionProcessing(FULL));
-				}
-			}
-            List<PrismObject<? extends O>> list = (List)getModel().searchObjects(type, query, currentOptions, task, result);
+            GetOperationOptionsBuilder optionsBuilder = getOperationOptionsBuilder(options);
+            if (export) {
+                // TODO also for other classes
+                if (ShadowType.class.equals(type)) {
+                    optionsBuilder = optionsBuilder
+                            .definitionProcessing(ONLY_IF_EXISTS)
+                            .item(ShadowType.F_FETCH_RESULT).definitionProcessing(FULL)
+                            .item(ShadowType.F_AUXILIARY_OBJECT_CLASS).definitionProcessing(FULL);
+                }
+            }
+            optionsBuilder.mergeFrom(getDistinctRelatedOptions());
+            List<PrismObject<? extends O>> list = (List)getModel().searchObjects(type, query, optionsBuilder.build(), task, result);
 
             if (LOGGER.isTraceEnabled()) {
-            	LOGGER.trace("Query {} resulted in {} objects", type.getSimpleName(), list.size());
+                LOGGER.trace("Query {} resulted in {} objects", type.getSimpleName(), list.size());
             }
 
             for (PrismObject<? extends O> object : list) {
@@ -186,7 +184,7 @@ public class SelectableBeanObjectDataProvider<O extends ObjectType> extends Base
             }
 //            result.recordSuccess();
         } catch (Exception ex) {
-            result.recordFatalError("Couldn't list objects.", ex);
+            result.recordFatalError(getPage().createStringResource("ObjectDataProvider.message.listObjects.fatalError").getString(), ex);
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't list objects", ex);
             return handleNotSuccessOrHandledErrorInIterator(result);
         } finally {
@@ -198,31 +196,31 @@ public class SelectableBeanObjectDataProvider<O extends ObjectType> extends Base
     }
 
     protected Iterator<SelectableBean<O>> handleNotSuccessOrHandledErrorInIterator(OperationResult result) {
-    	LOGGER.trace("handling non-success result {}", result);
+        LOGGER.trace("handling non-success result {}", result);
         // page.showResult() will not work here. We are too deep in the rendering now.
         // Also do NOT re-throw not redirect to to error page. That will break the page.
-    	// Just return a SelectableBean that indicates the error.
+        // Just return a SelectableBean that indicates the error.
         List<SelectableBean<O>> errorList = new ArrayList<>(1);
         SelectableBean<O> bean = new SelectableBean<>();
-		bean.setResult(result);
+        bean.setResult(result);
         errorList.add(bean);
         return errorList.iterator();
     }
 
     public SelectableBean<O> createDataObjectWrapper(O obj) {
-    	SelectableBean<O> selectable = new SelectableBean<O>(obj);
-    	if (!WebComponentUtil.isSuccessOrHandledError(obj.getFetchResult())) {
-    		try {
-				selectable.setResult(obj.getFetchResult());
-			} catch (SchemaException e) {
-				throw new SystemException(e.getMessage(), e);
-			}
-    	}
-    	for (O s : selected){
-    		if (s.getOid().equals(obj.getOid())) {
-    			selectable.setSelected(true);
-    		}
-    	}
+        SelectableBean<O> selectable = new SelectableBean<>(obj);
+        if (!WebComponentUtil.isSuccessOrHandledError(obj.getFetchResult())) {
+            try {
+                selectable.setResult(obj.getFetchResult());
+            } catch (SchemaException e) {
+                throw new SystemException(e.getMessage(), e);
+            }
+        }
+        for (O s : selected){
+            if (s.getOid().equals(obj.getOid())) {
+                selectable.setSelected(true);
+            }
+        }
 
         return selectable;
     }
@@ -231,29 +229,33 @@ public class SelectableBeanObjectDataProvider<O extends ObjectType> extends Base
     protected int internalSize() {
         LOGGER.trace("begin::internalSize()");
         if (!isUseObjectCounting()) {
-        	return Integer.MAX_VALUE;
+            return Integer.MAX_VALUE;
         }
         int count = 0;
-        OperationResult result = new OperationResult(OPERATION_COUNT_OBJECTS);
+        Task task = getPage().createSimpleTask(OPERATION_COUNT_OBJECTS);
+        OperationResult result = task.getResult();
         try {
-            Task task = getPage().createSimpleTask(OPERATION_COUNT_OBJECTS);
-            Integer counted = getModel().countObjects(type, getQuery(), options, task, result);
-            count = counted == null ? 0 : counted.intValue();
+            Collection<SelectorOptions<GetOperationOptions>> currentOptions = GetOperationOptions.merge(getPrismContext(), options, getDistinctRelatedOptions());
+            Integer counted = getModel().countObjects(type, getQuery(), currentOptions, task, result);
+            count = defaultIfNull(counted, defaultCountIfNull);
         } catch (Exception ex) {
-            result.recordFatalError("Couldn't count objects.", ex);
+            result.recordFatalError(getPage().createStringResource("ObjectDataProvider.message.countObjects.fatalError").getString(), ex);
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't count objects", ex);
         } finally {
             result.computeStatusIfUnknown();
         }
 
-        if (!WebComponentUtil.isSuccessOrHandledError(result)) {
+        if (!WebComponentUtil.isSuccessOrHandledError(result) && !result.isNotApplicable()) {
             getPage().showResult(result);
-            throw new RestartResponseException(PageError.class);
+            // Let us do nothing. The error will be shown on the page and a count of 0 will be used.
+            // Redirecting to the error page does more harm than good (see also MID-4306).
         }
 
         LOGGER.trace("end::internalSize(): {}", count);
         return count;
     }
+
+
 
     @Override
     protected CachedSize getCachedSize(Map<Serializable, CachedSize> cache) {
@@ -272,12 +274,12 @@ public class SelectableBeanObjectDataProvider<O extends ObjectType> extends Base
         clearCache();
     }
 
-    public boolean isUseObjectCounting(){
-    	return useObjectCounting;
+    protected boolean isUseObjectCounting(){
+        return useObjectCounting;
     }
 
     public void setUseObjectCounting(boolean useCounting) {
-    	this.useObjectCounting = useCounting;
+        this.useObjectCounting = useCounting;
     }
 
     public Collection<SelectorOptions<GetOperationOptions>> getOptions() {
@@ -289,22 +291,26 @@ public class SelectableBeanObjectDataProvider<O extends ObjectType> extends Base
     }
 
     public boolean isEmptyListOnNullQuery() {
-		return emptyListOnNullQuery;
-	}
+        return emptyListOnNullQuery;
+    }
 
     public void setEmptyListOnNullQuery(boolean emptyListOnNullQuery) {
-		this.emptyListOnNullQuery = emptyListOnNullQuery;
-	}
+        this.emptyListOnNullQuery = emptyListOnNullQuery;
+    }
 
-	public boolean isExport() {
-		return export;
-	}
+    public boolean isExport() {
+        return export;
+    }
 
-	public void setExport(boolean export) {
-		this.export = export;
-	}
+    public void setExport(boolean export) {
+        this.export = export;
+    }
 
-	//    public int getSize() {
+    public void setDefaultCountIfNull(int defaultCountIfNull) {
+        this.defaultCountIfNull = defaultCountIfNull;
+    }
+
+    //    public int getSize() {
 //        return size;
 //    }
 //

@@ -1,87 +1,73 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.data;
 
-import com.evolveum.midpoint.web.component.menu.cog.InlineMenu;
-import com.evolveum.midpoint.web.component.menu.cog.InlineMenuItem;
-import com.evolveum.midpoint.web.component.menu.cog.MenuDividerPanel;
-import com.evolveum.midpoint.web.component.menu.cog.MenuLinkPanel;
-import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
-import org.apache.wicket.AttributeModifier;
-import org.apache.wicket.markup.html.WebMarkupContainer;
-import org.apache.wicket.markup.html.list.ListItem;
-import org.apache.wicket.markup.html.list.ListView;
-import org.apache.wicket.model.AbstractReadOnlyModel;
-import org.apache.wicket.model.IModel;
-import org.apache.wicket.model.Model;
-
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.wicket.model.IModel;
+
+import com.evolveum.midpoint.gui.api.component.button.DropdownButtonDto;
+import com.evolveum.midpoint.gui.api.component.button.DropdownButtonPanel;
+import com.evolveum.midpoint.web.component.data.column.InlineMenuable;
+import com.evolveum.midpoint.web.component.menu.cog.ButtonInlineMenuItem;
+import com.evolveum.midpoint.web.component.menu.cog.InlineMenuItem;
+import com.evolveum.midpoint.web.component.util.VisibleBehaviour;
+
 /**
- * Created by honchar
+ * @author honchar
+ * @author Viliam Repan (lazyman)
  */
 public class MenuMultiButtonPanel<T extends Serializable> extends MultiButtonPanel<T> {
-    private static final String ID_INLINE_MENU_PANEL = "inlineMenuPanel";
-    private static final String ID_MENU_ITEM_BODY = "menuItemBody";
-    private static final String ID_MENU_BUTTON_CONTAINER = "menuButtonContainer";
 
-    public MenuMultiButtonPanel(String id, int buttonsCount, IModel<T> model, IModel<List<InlineMenuItem>> menuItemsModel) {
-        super(id, buttonsCount, model, menuItemsModel);
+    private static final long serialVersionUID = 1L;
+
+    private static final String ID_INLINE_MENU_PANEL = "inlineMenuPanel";
+
+    private IModel<List<InlineMenuItem>> menuItemsModel;
+
+    public MenuMultiButtonPanel(String id, IModel<T> model, int numberOfButtons, IModel<List<InlineMenuItem>> menuItemsModel) {
+        super(id, model, numberOfButtons);
+
+        this.menuItemsModel = menuItemsModel;
     }
 
     @Override
-    protected void initLayout() {
-        super.initLayout();
+    protected void onInitialize() {
+        super.onInitialize();
 
-        InlineMenu inlineMenu = new InlineMenu(ID_INLINE_MENU_PANEL, menuItemsModel){
+        initLayout();
+    }
+
+    private void initLayout() {
+        DropdownButtonPanel inlineMenu = new DropdownButtonPanel(ID_INLINE_MENU_PANEL,
+                new DropdownButtonDto(null, null, null, menuItemsModel.getObject())) {
+
+            private static final long serialVersionUID = 1L;
+
             @Override
-            protected String getIconClass(){
-                return "fa fa-ellipsis-h";
-            }
-           @Override
-            protected String getAdditionalButtonClass(){
-                return "btn btn-default btn-xs";
-            }
-
-           @Override
-           protected String getMenuItemContainerClass(){
-               return "none";
-            }
-
-           @Override
-           protected String getMenuItemButtonStyle(){
-               return "";
-            }
-
-           @Override
-           protected String getMenuItemContainerStyle(){
-               return "margin-left: -37px; margin-bottom: -3px; list-style: none;";
+            protected String getSpecialButtonClass() {
+                return "btn-xs btn-default";
             }
 
         };
-        inlineMenu.add(new VisibleEnableBehaviour(){
-           @Override
-            public boolean isVisible(){
-               return !(numberOfButtons < 2);
-           }
-        });
         add(inlineMenu);
 
+        inlineMenu.add(new VisibleBehaviour(() -> {
+            List<InlineMenuItem> menuItems = getModelObject() == null || !(getModelObject() instanceof InlineMenuable) ?
+                    menuItemsModel.getObject() : ((InlineMenuable)getModelObject()).getMenuItems();
+            for (InlineMenuItem menuItem : menuItems) {
+                if (!(menuItem instanceof ButtonInlineMenuItem)){
+                    return true;
+                }
+            }
+            return false;
+        }));
     }
+
 }

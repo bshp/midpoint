@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.query2.resolution;
@@ -21,6 +12,8 @@ import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.repo.sql.data.common.RObject;
 import com.evolveum.midpoint.repo.sql.data.common.any.RAnyValue;
+import com.evolveum.midpoint.repo.sql.data.common.any.RExtItem;
+import com.evolveum.midpoint.repo.sql.data.common.dictionary.ExtItemDictionary;
 import com.evolveum.midpoint.repo.sql.query.QueryException;
 import com.evolveum.midpoint.repo.sql.query.definition.VirtualQueryParam;
 import com.evolveum.midpoint.repo.sql.query2.InterpretationContext;
@@ -34,7 +27,6 @@ import com.evolveum.midpoint.repo.sql.query2.hqm.JoinSpecification;
 import com.evolveum.midpoint.repo.sql.query2.hqm.RootHibernateQuery;
 import com.evolveum.midpoint.repo.sql.query2.hqm.condition.AndCondition;
 import com.evolveum.midpoint.repo.sql.query2.hqm.condition.Condition;
-import com.evolveum.midpoint.repo.sql.util.RUtil;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import org.apache.commons.lang.ObjectUtils;
@@ -81,11 +73,13 @@ public class ItemPathResolver {
         LOGGER.trace("Starting resolution and context update for item path '{}', singletonOnly='{}'", relativePath, singletonOnly);
 
         while (!currentState.isFinal()) {
-            LOGGER.trace("Current resolution state:\n{}", currentState.debugDumpNoParent());
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace("Current resolution state:\n{}", currentState.debugDumpNoParent());
+            }
             currentState = currentState.nextState(itemDefinition, singletonOnly, context.getPrismContext());
         }
 
-        LOGGER.trace("resolveItemPath({}) ending in resolution state of:\n{}", relativePath, currentState.debugDump());
+        LOGGER.trace("resolveItemPath({}) ending in resolution state of:\n{}", relativePath, currentState.debugDumpLazily());
         return currentState.getHqlDataInstance();
     }
 
@@ -147,8 +141,15 @@ public class ItemPathResolver {
             if (anyLinkDef.getOwnerType() != null) {        // null for assignment extensions
                 conjunction.add(hibernateQuery.createEq(joinedItemAlias + ".ownerType", anyLinkDef.getOwnerType()));
             }
-            conjunction.add(hibernateQuery.createEq(joinedItemAlias + "." + RAnyValue.F_NAME,
-                    RUtil.qnameToString(anyLinkDef.getItemName())));
+            ExtItemDictionary dictionary = context.getExtItemDictionary();
+            RExtItem extItemDefinition = dictionary.findItemByDefinition(anyLinkDef.getItemDefinition());
+            if (extItemDefinition != null) {
+                conjunction.add(hibernateQuery.createEq(joinedItemAlias + "." + RAnyValue.F_ITEM_ID,
+                        extItemDefinition.getId()));
+            } else {
+                // there are no rows referencing this item, because it does not exist in RExtItem (yet)
+                conjunction.add(hibernateQuery.createFalse());
+            }
             condition = conjunction;
         }
         else if (joinedItemDefinition.getCollectionSpecification() instanceof VirtualCollectionSpecification) {

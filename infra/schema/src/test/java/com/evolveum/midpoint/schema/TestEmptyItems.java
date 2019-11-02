@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.schema;
 
@@ -39,91 +30,91 @@ import static org.testng.AssertJUnit.assertEquals;
  */
 public class TestEmptyItems {
 
-	@BeforeSuite
-	public void setup() throws SchemaException, SAXException, IOException {
-		PrettyPrinter.setDefaultNamespacePrefix(MidPointConstants.NS_MIDPOINT_PUBLIC_PREFIX);
-		PrismTestUtil.resetPrismContext(MidPointPrismContextFactory.FACTORY);
-	}
+    @BeforeSuite
+    public void setup() throws SchemaException, SAXException, IOException {
+        PrettyPrinter.setDefaultNamespacePrefix(MidPointConstants.NS_MIDPOINT_PUBLIC_PREFIX);
+        PrismTestUtil.resetPrismContext(MidPointPrismContextFactory.FACTORY);
+    }
 
-	@Test
-	public void testEmptyItemsOnGet() throws Exception {
-		System.out.println("===[ testEmptyItemsOnGet ]===");
+    @Test
+    public void testEmptyItemsOnGet() throws Exception {
+        System.out.println("===[ testEmptyItemsOnGet ]===");
 
-		// GIVEN
-		UserType user = new UserType(getPrismContext());
-		System.out.println("User before:\n" + user.asPrismObject().debugDump());
-		assertEquals("Wrong # of user sub-items before 'get' operations", 0, CollectionUtils.emptyIfNull(user.asPrismContainerValue().getItems()).size());
+        // GIVEN
+        UserType user = new UserType(getPrismContext());
+        System.out.println("User before:\n" + user.asPrismObject().debugDump());
+        assertEquals("Wrong # of user sub-items before 'get' operations", 0, user.asPrismContainerValue().size());
 
-		// WHEN
-		user.getAssignment();
-		user.getLinkRef();
-		user.getEmployeeType();
+        // WHEN
+        user.getAssignment();
+        user.getLinkRef();
+        user.getEmployeeType();
 
-		// THEN
-		System.out.println("User after:\n" + user.asPrismObject().debugDump());
-		assertEquals("Wrong # of user sub-items after 'get' operations", 0, CollectionUtils.emptyIfNull(user.asPrismContainerValue().getItems()).size());
-	}
+        // THEN
+        System.out.println("User after:\n" + user.asPrismObject().debugDump());
+        assertEquals("Wrong # of user sub-items after 'get' operations", 0, user.asPrismContainerValue().size());
+    }
 
-	@Test
-	public void testEmptyItemsOnParse() throws Exception {
-		System.out.println("===[ testEmptyItemsOnParse ]===");
+    @Test
+    public void testEmptyItemsOnParse() throws Exception {
+        System.out.println("===[ testEmptyItemsOnParse ]===");
 
-		// GIVEN
-		UserType user = new UserType(getPrismContext());
-		user.setName(PolyStringType.fromOrig("jack"));
-		System.out.println("User before:\n" + user.asPrismObject().debugDump());
-		assertEquals("Wrong # of user sub-items before serialization/reparsing", 1, CollectionUtils.emptyIfNull(user.asPrismContainerValue().getItems()).size());
+        // GIVEN
+        UserType user = new UserType(getPrismContext());
+        user.setName(PolyStringType.fromOrig("jack"));
+        System.out.println("User before:\n" + user.asPrismObject().debugDump());
+        assertEquals("Wrong # of user sub-items before serialization/reparsing", 1, user.asPrismContainerValue().size());
 
-		// WHEN
-		String xml = getPrismContext().xmlSerializer().serialize(user.asPrismObject());
-		user = (UserType) getPrismContext().parserFor(xml).parse().asObjectable();
+        // WHEN
+        String xml = getPrismContext().xmlSerializer().serialize(user.asPrismObject());
+        user = (UserType) getPrismContext().parserFor(xml).parse().asObjectable();
 
-		// THEN
-		System.out.println("User after:\n" + user.asPrismObject().debugDump());
-		assertEquals("Wrong # of user sub-items after serialization/reparsing", 1, CollectionUtils.emptyIfNull(user.asPrismContainerValue().getItems()).size());
-	}
+        // THEN
+        System.out.println("User after:\n" + user.asPrismObject().debugDump());
+        assertEquals("Wrong # of user sub-items after serialization/reparsing", 1, user.asPrismContainerValue().size());
+    }
 
-	@Test
-	public void testEmptyItemsOnConstructed() throws Exception {
-		System.out.println("===[ testEmptyItemsOnConstructed ]===");
-		UserType jack = new UserType(getPrismContext())
-				.oid("00000000-0000-0000-0000-000000000002").version("42")
-				.name("jack")
-				.givenName("Jack")
-				.familyName("Sparrow")
-				.honorificPrefix("Cpt.")
-				.honorificSuffix("PhD.")
-				.beginAssignment()
-					.beginActivation()
-						.administrativeStatus(ActivationStatusType.ENABLED)
-						.enableTimestamp("2016-12-31T23:59:59+01:00")
-					.<AssignmentType>end()
-					.beginConstruction()
-						.resourceRef("00000000-1233-4443-3123-943412324212", ResourceType.COMPLEX_TYPE)
-					.<AssignmentType>end()
-				.<UserType>end()
-				.beginAssignment()
-					.beginActivation()
-						.validFrom("2017-01-01T12:00:00+01:00")
-						.validTo("2017-03-31T00:00:00+01:00")
-					.<AssignmentType>end()
-					.targetRef("83138913-4329-4323-3432-432432143612", RoleType.COMPLEX_TYPE, SchemaConstants.ORG_APPROVER)
-				.<UserType>end()
-				.employeeType("pirate")
-				.employeeType("captain")
-				.organization("O123456");
-		System.out.println("User:\n" + jack.asPrismObject().debugDump());
+    @Test
+    public void testEmptyItemsOnConstructed() throws Exception {
+        System.out.println("===[ testEmptyItemsOnConstructed ]===");
+        UserType jack = new UserType(getPrismContext())
+                .oid("00000000-0000-0000-0000-000000000002").version("42")
+                .name("jack")
+                .givenName("Jack")
+                .familyName("Sparrow")
+                .honorificPrefix("Cpt.")
+                .honorificSuffix("PhD.")
+                .beginAssignment()
+                    .beginActivation()
+                        .administrativeStatus(ActivationStatusType.ENABLED)
+                        .enableTimestamp("2016-12-31T23:59:59+01:00")
+                    .<AssignmentType>end()
+                    .beginConstruction()
+                        .resourceRef("00000000-1233-4443-3123-943412324212", ResourceType.COMPLEX_TYPE)
+                    .<AssignmentType>end()
+                .<UserType>end()
+                .beginAssignment()
+                    .beginActivation()
+                        .validFrom("2017-01-01T12:00:00+01:00")
+                        .validTo("2017-03-31T00:00:00+01:00")
+                    .<AssignmentType>end()
+                    .targetRef("83138913-4329-4323-3432-432432143612", RoleType.COMPLEX_TYPE, SchemaConstants.ORG_APPROVER)
+                .<UserType>end()
+                .employeeType("pirate")
+                .employeeType("captain")
+                .organization("O123456");
+        System.out.println("User:\n" + jack.asPrismObject().debugDump());
 
-		assertEquals("Wrong # of user sub-items before 'get' operations", 8, CollectionUtils.emptyIfNull(jack.asPrismContainerValue().getItems()).size());
+        assertEquals("Wrong # of user sub-items before 'get' operations", 8, jack.asPrismContainerValue().size());
 
-		// WHEN
-		jack.getAssignment();
-		jack.getLinkRef();
-		jack.getEmployeeType();
+        // WHEN
+        jack.getAssignment();
+        jack.getLinkRef();
+        jack.getEmployeeType();
 
-		// THEN
-		System.out.println("User after:\n" + jack.asPrismObject().debugDump());
-		assertEquals("Wrong # of user sub-items after 'get' operations", 8, CollectionUtils.emptyIfNull(jack.asPrismContainerValue().getItems()).size());
-	}
+        // THEN
+        System.out.println("User after:\n" + jack.asPrismObject().debugDump());
+        assertEquals("Wrong # of user sub-items after 'get' operations", 8, jack.asPrismContainerValue().size());
+    }
 
 }

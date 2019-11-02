@@ -1,39 +1,28 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.certification.impl;
 
-import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.schema.util.ObjectTypeUtil;
-import com.evolveum.midpoint.task.api.Task;
-import com.evolveum.midpoint.task.api.TaskCategory;
-import com.evolveum.midpoint.task.api.TaskHandler;
-import com.evolveum.midpoint.task.api.TaskManager;
-import com.evolveum.midpoint.task.api.TaskRunResult;
+import com.evolveum.midpoint.task.api.*;
 import com.evolveum.midpoint.task.api.TaskRunResult.TaskRunResultStatus;
+import com.evolveum.midpoint.util.exception.CommonException;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AccessCertificationCampaignType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.TaskPartitionDefinitionType;
+
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
-import java.util.List;
 
 /**
  * The task handler for automatic campaign start.
@@ -43,35 +32,35 @@ import java.util.List;
 @Component
 public class AccessCertificationCampaignCreationTaskHandler implements TaskHandler {
 
-	public static final String HANDLER_URI = AccessCertificationConstants.NS_CERTIFICATION_TASK_PREFIX + "/campaign-creation/handler-3";
+    private static final String HANDLER_URI = AccessCertificationConstants.NS_CERTIFICATION_TASK_PREFIX + "/campaign-creation/handler-3";
+    private static final String CLASS_DOT = AccessCertificationCampaignCreationTaskHandler.class.getName() + ".";
 
-    public static final String CLASS_DOT = AccessCertificationCampaignCreationTaskHandler.class.getName() + ".";
+    @Autowired private TaskManager taskManager;
+    @Autowired private CertificationManagerImpl certificationManager;
 
-    @Autowired
-	private TaskManager taskManager;
+    private static final transient Trace LOGGER = TraceManager.getTrace(AccessCertificationCampaignCreationTaskHandler.class);
 
-	@Autowired
-    private PrismContext prismContext;
+    @PostConstruct
+    private void initialize() {
+        taskManager.registerHandler(HANDLER_URI, this);
+    }
 
-    @Autowired
-    private CertificationManagerImpl certificationManager;
+    @NotNull
+    @Override
+    public StatisticsCollectionStrategy getStatisticsCollectionStrategy() {
+        return new StatisticsCollectionStrategy()
+                .fromStoredValues()
+                .maintainIterationStatistics();
+    }
 
-	private static final transient Trace LOGGER = TraceManager.getTrace(AccessCertificationCampaignCreationTaskHandler.class);
+    @Override
+    public TaskRunResult run(RunningTask task, TaskPartitionDefinitionType partition) {
+        LOGGER.trace("Task run starting");
 
-	@PostConstruct
-	private void initialize() {
-		taskManager.registerHandler(HANDLER_URI, this);
-	}
-
-	@Override
-	public TaskRunResult run(Task task) {
-		LOGGER.trace("Task run starting");
-
-		long progress = task.getProgress();
-		OperationResult opResult = new OperationResult(CLASS_DOT+"run");
+        OperationResult opResult = new OperationResult(CLASS_DOT+"run");
         opResult.setSummarizeSuccesses(true);
-		TaskRunResult runResult = new TaskRunResult();
-		runResult.setOperationResult(opResult);
+        TaskRunResult runResult = new TaskRunResult();
+        runResult.setOperationResult(opResult);
 
         String definitionOid = task.getObjectOid();
         if (definitionOid == null) {
@@ -87,8 +76,6 @@ public class AccessCertificationCampaignCreationTaskHandler implements TaskHandl
         String campaignName = null;
         String campaignOid = null;
         try {
-            task.startCollectingOperationStatsFromStoredValues(true, false, false);
-
             LOGGER.info("Creating campaign with definition of {}", definitionOid);
             AccessCertificationCampaignType campaign = certificationManager.createCampaign(definitionOid, task, opResult);
             LOGGER.info("Campaign {} was created.", ObjectTypeUtil.toShortString(campaign));
@@ -99,47 +86,29 @@ public class AccessCertificationCampaignCreationTaskHandler implements TaskHandl
             campaignOid = campaign.getOid();
             task.recordIterativeOperationStart(campaignName, campaignName, AccessCertificationCampaignType.COMPLEX_TYPE, campaignOid);
 
-            certificationManager.openNextStage(campaign.getOid(), 1, task, opResult);
+            certificationManager.openNextStage(campaign.getOid(), task, opResult);
             LOGGER.info("Campaign {} was started.", ObjectTypeUtil.toShortString(campaign));
 
             task.recordIterativeOperationEnd(campaignName, campaignName, AccessCertificationCampaignType.COMPLEX_TYPE, campaignOid, started, null);
 
             opResult.computeStatus();
             runResult.setRunResultStatus(TaskRunResultStatus.FINISHED);
-            runResult.setProgress(progress+1);
+            runResult.setProgress(task.getProgress()+1);
             return runResult;
 
-        } catch (Exception e) {     // TODO better error handling
+        } catch (CommonException | RuntimeException e) {
             if (campaignOid != null) {
                 task.recordIterativeOperationEnd(campaignName, campaignName, AccessCertificationCampaignType.COMPLEX_TYPE, campaignOid, started, e);
             }
             LoggingUtils.logException(LOGGER, "Error while executing 'create campaign' task handler", e);
             opResult.recordFatalError("Error while executing 'create campaign' task handler: "+e.getMessage(), e);
             runResult.setRunResultStatus(TaskRunResultStatus.PERMANENT_ERROR);
-            runResult.setProgress(progress);
             return runResult;
-        } finally {
-            task.storeOperationStats();
         }
-	}
-
-	@Override
-	public Long heartbeat(Task task) {
-		return null;	// not to reset progress information
-	}
-
-	@Override
-	public void refreshStatus(Task task) {
-		// Do nothing. Everything is fresh already.
-	}
+    }
 
     @Override
     public String getCategoryName(Task task) {
         return TaskCategory.ACCESS_CERTIFICATION;
-    }
-
-    @Override
-    public List<String> getCategoryNames() {
-        return null;
     }
 }

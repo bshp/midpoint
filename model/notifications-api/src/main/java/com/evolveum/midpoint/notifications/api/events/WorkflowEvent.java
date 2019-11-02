@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.notifications.api.events;
@@ -20,39 +11,48 @@ import com.evolveum.midpoint.notifications.api.OperationStatus;
 import com.evolveum.midpoint.prism.delta.ChangeType;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
+import com.evolveum.midpoint.schema.util.ObjectTypeUtil;
 import com.evolveum.midpoint.task.api.LightweightIdentifierGenerator;
 import com.evolveum.midpoint.util.DebugUtil;
 import com.evolveum.midpoint.util.QNameUtil;
 import com.evolveum.midpoint.wf.util.ApprovalUtils;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * @author mederly
  */
 abstract public class WorkflowEvent extends BaseEvent {
 
-    @NotNull protected final WfContextType workflowContext;
+    @Nullable protected final ApprovalContextType approvalContext;
     @NotNull private final ChangeType changeType;
+    @NotNull protected final CaseType aCase;
 
-    public WorkflowEvent(@NotNull LightweightIdentifierGenerator lightweightIdentifierGenerator, @NotNull ChangeType changeType,
-            @NotNull WfContextType workflowContext, EventHandlerType handler) {
+    WorkflowEvent(@NotNull LightweightIdentifierGenerator lightweightIdentifierGenerator, @NotNull ChangeType changeType,
+            @Nullable ApprovalContextType approvalContext, @NotNull CaseType aCase, EventHandlerType handler) {
         super(lightweightIdentifierGenerator, handler);
         this.changeType = changeType;
-		this.workflowContext = workflowContext;
+        this.approvalContext = approvalContext;
+        this.aCase = aCase;
+    }
+
+    @NotNull
+    public CaseType getCase() {
+        return aCase;
     }
 
     public String getProcessInstanceName() {
-        return workflowContext.getProcessInstanceName();
+        return aCase.getName().getOrig();
     }
 
     public OperationStatus getOperationStatus() {
         return outcomeToStatus(changeType, getOutcome());
     }
 
-	protected abstract String getOutcome();
+    protected abstract String getOutcome();
 
-	@Override
+    @Override
     public boolean isStatusType(EventStatusType eventStatusType) {
         return getOperationStatus().matchesEventStatusType(eventStatusType);
     }
@@ -64,6 +64,14 @@ abstract public class WorkflowEvent extends BaseEvent {
     @Override
     public boolean isOperationType(EventOperationType eventOperationType) {
         return changeTypeMatchesOperationType(changeType, eventOperationType);
+    }
+
+    public boolean isApprovalCase() {
+        return ObjectTypeUtil.hasArchetype(aCase, SystemObjectsType.ARCHETYPE_APPROVAL_CASE.value());
+    }
+
+    public boolean isManualResourceCase() {
+        return ObjectTypeUtil.hasArchetype(aCase, SystemObjectsType.ARCHETYPE_MANUAL_CASE.value());
     }
 
     public boolean isResultKnown() {
@@ -99,36 +107,14 @@ abstract public class WorkflowEvent extends BaseEvent {
         return false;
     }
 
-    public WfProcessorSpecificStateType getProcessorSpecificState() {
-        return workflowContext.getProcessorSpecificState();
+    @NotNull
+    public ApprovalContextType getApprovalContext() {
+        return approvalContext;
     }
 
-    public WfProcessSpecificStateType getProcessSpecificState() {
-		return workflowContext.getProcessSpecificState();
-    }
-
-	@NotNull
-	public WfContextType getWorkflowContext() {
-		return workflowContext;
-	}
-
-	public WfPrimaryChangeProcessorStateType getPrimaryChangeProcessorState() {
-        WfProcessorSpecificStateType state = getProcessorSpecificState();
-        if (state instanceof WfPrimaryChangeProcessorStateType) {
-            return (WfPrimaryChangeProcessorStateType) state;
-        } else {
-            return null;
-        }
-    }
-
-    // the following three methods are specific to ItemApproval process
-    public ItemApprovalProcessStateType getItemApprovalProcessState() {
-        WfProcessSpecificStateType state = getProcessSpecificState();
-        if (state instanceof ItemApprovalProcessStateType) {
-            return (ItemApprovalProcessStateType) state;
-        } else {
-            return null;
-        }
+    @NotNull
+    public CaseType getWorkflowTask() {
+        return aCase;
     }
 
     @Override
@@ -144,16 +130,16 @@ abstract public class WorkflowEvent extends BaseEvent {
     // This method is not used. It is here just for maven dependency plugin to detect the
     // dependency on workflow-api
     @SuppressWarnings("unused")
-	private void notUsed() {
-    	ApprovalUtils.approvalBooleanValueFromUri("");
+    private void notUsed() {
+        ApprovalUtils.approvalBooleanValueFromUri("");
     }
 
-	@Override
-	protected void debugDumpCommon(StringBuilder sb, int indent) {
-		super.debugDumpCommon(sb, indent);
-		DebugUtil.debugDumpWithLabelLn(sb, "processInstanceName", getProcessInstanceName(), indent + 1);
-		DebugUtil.debugDumpWithLabelToStringLn(sb, "changeType", changeType, indent + 1);
-		DebugUtil.debugDumpWithLabelLn(sb, "outcome", getOutcome(), indent + 1);
-	}
+    @Override
+    protected void debugDumpCommon(StringBuilder sb, int indent) {
+        super.debugDumpCommon(sb, indent);
+        DebugUtil.debugDumpWithLabelLn(sb, "processInstanceName", getProcessInstanceName(), indent + 1);
+        DebugUtil.debugDumpWithLabelToStringLn(sb, "changeType", changeType, indent + 1);
+        DebugUtil.debugDumpWithLabelLn(sb, "outcome", getOutcome(), indent + 1);
+    }
 
 }

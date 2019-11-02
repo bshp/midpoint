@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.report.impl;
 
@@ -19,19 +10,16 @@ import com.evolveum.midpoint.audit.api.AuditEventRecord;
 import com.evolveum.midpoint.audit.api.AuditEventStage;
 import com.evolveum.midpoint.audit.api.AuditEventType;
 import com.evolveum.midpoint.audit.api.AuditService;
+import com.evolveum.midpoint.common.Clock;
 import com.evolveum.midpoint.model.api.ModelService;
 import com.evolveum.midpoint.prism.*;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.query.ObjectFilter;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
-import com.evolveum.midpoint.prism.query.builder.QueryBuilder;
-import com.evolveum.midpoint.schema.GetOperationOptions;
-import com.evolveum.midpoint.schema.ResultHandler;
-import com.evolveum.midpoint.schema.RetrieveOption;
-import com.evolveum.midpoint.schema.SelectorOptions;
+import com.evolveum.midpoint.schema.*;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
+import com.evolveum.midpoint.schema.expression.TypedValue;
 import com.evolveum.midpoint.schema.result.OperationResult;
-import com.evolveum.midpoint.schema.util.ObjectTypeUtil;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.task.api.TaskManager;
 import com.evolveum.midpoint.util.exception.*;
@@ -52,23 +40,28 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import static com.evolveum.midpoint.schema.util.CertCampaignTypeUtil.norm;
 import static com.evolveum.midpoint.xml.ns._public.common.common_3.AccessCertificationCampaignStateType.CLOSED;
 import static com.evolveum.midpoint.xml.ns._public.common.common_3.AccessCertificationCampaignType.F_STATE;
 import static com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType.F_NAME;
+import javax.xml.datatype.DatatypeConfigurationException;
+import javax.xml.datatype.DatatypeFactory;
+import javax.xml.datatype.XMLGregorianCalendar;
 
 public class ReportFunctions {
 
     private static final Trace LOGGER = TraceManager.getTrace(ReportFunctions.class);
 
-    private PrismContext prismContext;
-    private ModelService model;
+    private final PrismContext prismContext;
+    private final SchemaHelper schemaHelper;
+    private final ModelService model;
+    private final TaskManager taskManager;
+    private final AuditService auditService;
 
-    private TaskManager taskManager;
-
-    private AuditService auditService;
-
-    public ReportFunctions(PrismContext prismContext, ModelService modelService, TaskManager taskManager, AuditService auditService) {
+    public ReportFunctions(PrismContext prismContext, SchemaHelper schemaHelper,
+            ModelService modelService, TaskManager taskManager, AuditService auditService) {
         this.prismContext = prismContext;
+        this.schemaHelper = schemaHelper;
         this.model = modelService;
         this.taskManager = taskManager;
         this.auditService = auditService;
@@ -147,7 +140,7 @@ public class ReportFunctions {
                     .filter(as -> as.getTargetRef() != null && as.getTargetRef().getOid() != null
                             && filterOids.contains(as.getTargetRef().getOid()))
                     // filter to default relation only - ignores approvers etc
-                    .filter(as -> ObjectTypeUtil.isDefaultRelation(as.getTargetRef().getRelation()))
+                    .filter(as -> prismContext.isDefaultRelation(as.getTargetRef().getRelation()))
                     .collect(Collectors.toList());
         }
 
@@ -183,8 +176,6 @@ public class ReportFunctions {
             if (assignment.getTargetRef() != null) {
                 clazz = getClassForType(assignment.getTargetRef().getType());
                 oid = assignment.getTargetRef().getOid();
-            } else if (assignment.getTarget() != null) {
-                clazz = assignment.getTarget().getClass();
             } else if (assignment.getTenantRef() != null) {
                 clazz = getClassForType(assignment.getTenantRef().getType());
                 oid = assignment.getTenantRef().getOid();
@@ -196,12 +187,12 @@ public class ReportFunctions {
                 LOGGER.debug("Could not resolve assignment for type {}. No target type defined.", type);
             }
 
-            if (!clazz.equals(type)) {
+            if (clazz == null || !clazz.equals(type)) {
                 continue;
             }
 
-            if (assignment.getTarget() != null) {
-                resolvedAssignments.add((PrismObject<O>) assignment.getTarget().asPrismObject());
+            if (assignment.getTargetRef() != null && assignment.getTargetRef().asReferenceValue().getObject() != null) {
+                resolvedAssignments.add((PrismObject<O>) assignment.getTargetRef().asReferenceValue().getObject());
                 continue;
             }
 
@@ -219,24 +210,16 @@ public class ReportFunctions {
         return resolvedAssignments;
     }
 
-    public List<AuditEventRecord> searchAuditRecords(String query, Map<String, Object> params) {
+    public List<AuditEventRecord> searchAuditRecords(String query, Map<String, Object> jasperParams) {
 
         if (StringUtils.isBlank(query)) {
             return new ArrayList<>();
         }
+        OperationResult result = new OperationResult("searchAuditRecords");
 
-        Map<String, Object> resultSet = new HashMap<String, Object>();
-        Set<Entry<String, Object>> paramSet = params.entrySet();
-        for (Entry<String, Object> p : paramSet) {
-            if (p.getValue() instanceof AuditEventTypeType) {
-                resultSet.put(p.getKey(), AuditEventType.toAuditEventType((AuditEventTypeType) p.getValue()));
-            } else if (p.getValue() instanceof AuditEventStageType) {
-                resultSet.put(p.getKey(), AuditEventStage.toAuditEventStage((AuditEventStageType) p.getValue()));
-            } else {
-                resultSet.put(p.getKey(), p.getValue());
-            }
-        }
-        return auditService.listRecords(query, resultSet);
+        List<AuditEventRecord> records = auditService.listRecords(query, ReportUtils.jasperParamsToAuditParams(jasperParams), result);
+        result.computeStatus();
+        return records;
     }
 
     public List<AuditEventRecord> searchAuditRecordsAsWorkflows(String query, Map<String, Object> params) {
@@ -312,13 +295,13 @@ public class ReportFunctions {
     }
 
     <C extends Containerable, T> ObjectFilter createEqualFilter(QName propertyName, Class<C> type, T realValue) throws SchemaException {
-        return QueryBuilder.queryFor(type, prismContext)
+        return prismContext.queryFor(type)
                 .item(propertyName).eq(realValue)
                 .buildFilter();
     }
 
     <C extends Containerable, T> ObjectFilter createEqualFilter(ItemPath propertyPath, Class<C> type, T realValue) throws SchemaException {
-        return QueryBuilder.queryFor(type, prismContext)
+        return prismContext.queryFor(type)
                 .item(propertyPath).eq(realValue)
                 .buildFilter();
     }
@@ -335,6 +318,45 @@ public class ReportFunctions {
 //    Object parseObjectFromXML (String xml) throws SchemaException {
 //        return prismContext.parserFor(xml).xml().parseAnyData();
 //    }
+    public List<PrismContainerValue<CaseWorkItemType>> searchApprovalWorkItems()
+            throws CommunicationException, ObjectNotFoundException, SchemaException, SecurityViolationException,
+            ConfigurationException, ExpressionEvaluationException, DatatypeConfigurationException {
+        return searchApprovalWorkItems(0, null);
+    }
+
+    /*
+     * @param days - return only workitems with createTimestamp older than (now-days), 0 to return all
+     * @sortColumn - optionally AbstractWorkItemType QName to asc sort results (e.g. AbstractWorkItemType.F_CREATE_TIMESTAMP)
+    */
+    public List<PrismContainerValue<CaseWorkItemType>> searchApprovalWorkItems(int days, QName sortColumn)
+            throws CommunicationException, ObjectNotFoundException, SchemaException, SecurityViolationException,
+            ConfigurationException, ExpressionEvaluationException, DatatypeConfigurationException {
+        Task task = taskManager.createTaskInstance();
+        OperationResult result = task.getResult();
+        ObjectQuery query = prismContext.queryFor(AbstractWorkItemType.class).build();
+
+        if (days > 0) {
+            XMLGregorianCalendar since = (new Clock()).currentTimeXMLGregorianCalendar();
+            DatatypeFactory df = DatatypeFactory.newInstance();
+            since.add (df.newDuration(false, 0, 0, days, 0, 0, 0));
+
+            query.addFilter(prismContext.queryFor(AbstractWorkItemType.class)
+                         .item(AbstractWorkItemType.F_CREATE_TIMESTAMP).lt(since).buildFilter());
+        }
+
+        if (sortColumn != null) {
+            query.addFilter(prismContext.queryFor(AbstractWorkItemType.class)
+                        .asc(sortColumn)
+                        .buildFilter());
+        }
+        Object[] itemsToResolve = { CaseWorkItemType.F_ASSIGNEE_REF,
+                ItemPath.create(PrismConstants.T_PARENT, CaseType.F_OBJECT_REF),
+                ItemPath.create(PrismConstants.T_PARENT, CaseType.F_TARGET_REF),
+                ItemPath.create(PrismConstants.T_PARENT, CaseType.F_REQUESTOR_REF) };
+        SearchResultList<CaseWorkItemType> workItems = model.searchContainers(CaseWorkItemType.class, query,
+                schemaHelper.getOperationOptionsBuilder().items(itemsToResolve).resolve().build(), task, result);
+        return PrismContainerValue.toPcvList(workItems);
+    }
 
     /**
      * Retrieves all definitions.
@@ -361,34 +383,34 @@ public class ReportFunctions {
         }
 
         ResultHandler<AccessCertificationCampaignType> handler = (campaignObject, parentResult) -> {
-			AccessCertificationCampaignType campaign = campaignObject.asObjectable();
-			if (campaign.getDefinitionRef() != null) {
-				String definitionOid = campaign.getDefinitionRef().getOid();
-				PrismObject<AccessCertificationDefinitionForReportType> definitionObject = definitionsForReportMap.get(definitionOid);
-				if (definitionObject != null) {
-					AccessCertificationDefinitionForReportType definition = definitionObject.asObjectable();
-					int campaigns = definition.getCampaigns() != null ? definition.getCampaigns() : 0;
-					definition.setCampaigns(campaigns+1);
-					AccessCertificationCampaignStateType state = campaign.getState();
-					if (state != AccessCertificationCampaignStateType.CREATED && state != CLOSED) {
-						int openCampaigns = definition.getOpenCampaigns() != null ? definition.getOpenCampaigns() : 0;
-						definition.setOpenCampaigns(openCampaigns+1);
-					}
-				}
-			}
-			return true;
-		};
+            AccessCertificationCampaignType campaign = campaignObject.asObjectable();
+            if (campaign.getDefinitionRef() != null) {
+                String definitionOid = campaign.getDefinitionRef().getOid();
+                PrismObject<AccessCertificationDefinitionForReportType> definitionObject = definitionsForReportMap.get(definitionOid);
+                if (definitionObject != null) {
+                    AccessCertificationDefinitionForReportType definition = definitionObject.asObjectable();
+                    int campaigns = definition.getCampaigns() != null ? definition.getCampaigns() : 0;
+                    definition.setCampaigns(campaigns+1);
+                    AccessCertificationCampaignStateType state = campaign.getState();
+                    if (state != AccessCertificationCampaignStateType.CREATED && state != CLOSED) {
+                        int openCampaigns = definition.getOpenCampaigns() != null ? definition.getOpenCampaigns() : 0;
+                        definition.setOpenCampaigns(openCampaigns+1);
+                    }
+                }
+            }
+            return true;
+        };
         model.searchObjectsIterative(AccessCertificationCampaignType.class, null, handler, null, task, result);
 
         List<PrismObject<AccessCertificationDefinitionForReportType>> rv = new ArrayList<>(definitionsForReportMap.values());
         Collections.sort(rv, (o1, o2) -> {
-			String n1 = o1.asObjectable().getName().getOrig();
-			String n2 = o2.asObjectable().getName().getOrig();
-			if (n1 == null) {
-				n1 = "";
-			}
-			return n1.compareTo(n2);
-		});
+            String n1 = o1.asObjectable().getName().getOrig();
+            String n2 = o2.asObjectable().getName().getOrig();
+            if (n1 == null) {
+                n1 = "";
+            }
+            return n1.compareTo(n2);
+        });
         for (PrismObject<AccessCertificationDefinitionForReportType> defObject : rv) {
             AccessCertificationDefinitionForReportType def = defObject.asObjectable();
             if (def.getCampaigns() == null) {
@@ -413,7 +435,7 @@ public class ReportFunctions {
             //query = null;
             return new ArrayList<>();
         } else {
-            query = QueryBuilder.queryFor(AccessCertificationCaseType.class, prismContext)
+            query = prismContext.queryFor(AccessCertificationCaseType.class)
                     .item(PrismConstants.T_PARENT, F_NAME).eqPoly(campaignName, "").matchingOrig()
                     // TODO first by object/target type then by name (not supported by the repository as of now)
                     .asc(AccessCertificationCaseType.F_OBJECT_REF, PrismConstants.T_OBJECT_REFERENCE, ObjectType.F_NAME)
@@ -432,7 +454,7 @@ public class ReportFunctions {
             //query = null;
             return new ArrayList<>();
         } else {
-            query = QueryBuilder.queryFor(AccessCertificationCaseType.class, prismContext)
+            query = prismContext.queryFor(AccessCertificationCaseType.class)
                     .item(PrismConstants.T_PARENT, F_NAME).eqPoly(campaignName, "").matchingOrig()
                     .and().item(AccessCertificationCaseType.F_CURRENT_STAGE_OUTCOME).eq(SchemaConstants.MODEL_CERTIFICATION_OUTCOME_NO_RESPONSE)
                     // TODO first by object/target type then by name (not supported by the repository as of now)
@@ -446,30 +468,68 @@ public class ReportFunctions {
     }
 
     public List<PrismContainerValue<AccessCertificationWorkItemType>> getCertificationCampaignDecisions(String campaignName, Integer stageNumber)
+            throws CommunicationException, ObjectNotFoundException, SchemaException, SecurityViolationException,
+            ConfigurationException, ExpressionEvaluationException {
+        return getCertificationCampaignDecisions(campaignName, stageNumber, null);
+    }
+
+    public List<PrismContainerValue<AccessCertificationWorkItemType>> getCertificationCampaignDecisions(String campaignName, Integer stageNumber, Integer iteration)
             throws SchemaException, SecurityViolationException, ConfigurationException, ObjectNotFoundException, ExpressionEvaluationException, CommunicationException {
         List<AccessCertificationCaseType> cases = getCertificationCampaignCasesAsBeans(campaignName);
         List<AccessCertificationWorkItemType> workItems = new ArrayList<>();
         for (AccessCertificationCaseType aCase : cases) {
             for (AccessCertificationWorkItemType workItem : aCase.getWorkItem()) {
-                if (stageNumber == null || java.util.Objects.equals(workItem.getStageNumber(), stageNumber)) {
-                    workItems.add(workItem);
+                if (stageNumber != null && !Objects.equals(workItem.getStageNumber(), stageNumber)) {
+                    continue;
                 }
+                if (iteration != null && norm(workItem.getIteration()) != iteration) {
+                    continue;
+                }
+                workItems.add(workItem);
             }
         }
         return PrismContainerValue.toPcvList(workItems);
     }
 
+    private AccessCertificationCampaignType getCampaignByName(String campaignName)
+            throws CommunicationException, ObjectNotFoundException, SchemaException, SecurityViolationException,
+            ConfigurationException, ExpressionEvaluationException {
+        Task task = taskManager.createTaskInstance();
+        if (StringUtils.isEmpty(campaignName)) {
+            return null;
+        }
+        ObjectQuery query = prismContext.queryFor(AccessCertificationCampaignType.class)
+                .item(AccessCertificationCampaignType.F_NAME).eqPoly(campaignName).matchingOrig()
+                .build();
+        List<PrismObject<AccessCertificationCampaignType>> objects = model
+                .searchObjects(AccessCertificationCampaignType.class, query, null, task, task.getResult());
+        if (objects.isEmpty()) {
+            return null;
+        } else if (objects.size() == 1) {
+            return objects.get(0).asObjectable();
+        } else {
+            throw new IllegalStateException("More than one certification campaign found by name '" + campaignName + "': " + objects);
+        }
+    }
+
+    @SuppressWarnings("unused")
     public List<PrismContainerValue<AccessCertificationWorkItemType>> getCertificationCampaignNonResponders(String campaignName, Integer stageNumber)
             throws SchemaException, SecurityViolationException, ConfigurationException, ObjectNotFoundException, ExpressionEvaluationException, CommunicationException {
-        List<AccessCertificationCaseType> cases = getCertificationCampaignNotRespondedCasesAsBeans(campaignName);
         List<AccessCertificationWorkItemType> workItems = new ArrayList<>();
-        for (AccessCertificationCaseType aCase : cases) {
-            for (AccessCertificationWorkItemType workItem : aCase.getWorkItem()) {
-                if ((workItem.getOutput() == null || workItem.getOutput().getOutcome() == null)
-                    && (stageNumber == null || java.util.Objects.equals(workItem.getStageNumber(), stageNumber))) {
-                    workItems.add(workItem);
+        AccessCertificationCampaignType campaign = getCampaignByName(campaignName);
+        if (campaign != null) {
+            List<AccessCertificationCaseType> cases = getCertificationCampaignNotRespondedCasesAsBeans(campaignName);
+            for (AccessCertificationCaseType aCase : cases) {
+                for (AccessCertificationWorkItemType workItem : aCase.getWorkItem()) {
+                    if (norm(workItem.getIteration()) == norm(campaign.getIteration())
+                            && (workItem.getOutput() == null || workItem.getOutput().getOutcome() == null)
+                            && (stageNumber == null || Objects.equals(workItem.getStageNumber(), stageNumber))) {
+                        workItems.add(workItem);
+                    }
                 }
             }
+        } else {
+            LOGGER.debug("No campaign named '{}' was found", campaignName);
         }
         return PrismContainerValue.toPcvList(workItems);
     }
@@ -477,21 +537,21 @@ public class ReportFunctions {
     public List<PrismObject<AccessCertificationCampaignType>> getCertificationCampaigns(Boolean alsoClosedCampaigns) throws SchemaException, ConfigurationException, ObjectNotFoundException, CommunicationException, SecurityViolationException, ExpressionEvaluationException {
         Task task = taskManager.createTaskInstance();
 
-        ObjectQuery query = QueryBuilder.queryFor(AccessCertificationCampaignType.class, prismContext)
+        ObjectQuery query = prismContext.queryFor(AccessCertificationCampaignType.class)
                                 .asc(F_NAME)
                                 .build();
         if (!Boolean.TRUE.equals(alsoClosedCampaigns)) {
             query.addFilter(
-                    QueryBuilder.queryFor(AccessCertificationCampaignType.class, prismContext)
+                    prismContext.queryFor(AccessCertificationCampaignType.class)
                         .not().item(F_STATE).eq(CLOSED)
                         .buildFilter()
             );
         }
 
-        Collection<SelectorOptions<GetOperationOptions>> options = SelectorOptions.createCollection(GetOperationOptions.createResolveNames());
-        options.add(SelectorOptions.create(AccessCertificationCampaignType.F_CASE,
-                GetOperationOptions.createRetrieve(RetrieveOption.INCLUDE)));
-
+        Collection<SelectorOptions<GetOperationOptions>> options = schemaHelper.getOperationOptionsBuilder()
+                .root().resolveNames()
+                .item(AccessCertificationCampaignType.F_CASE).retrieve()
+                .build();
         return model.searchObjects(AccessCertificationCampaignType.class, query, options, task, task.getResult());
     }
 

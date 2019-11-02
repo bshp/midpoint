@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.model.impl.scripting.helpers;
@@ -19,16 +10,18 @@ package com.evolveum.midpoint.model.impl.scripting.helpers;
 import com.evolveum.midpoint.model.api.*;
 import com.evolveum.midpoint.model.impl.scripting.ActionExecutor;
 import com.evolveum.midpoint.model.impl.scripting.ExecutionContext;
-import com.evolveum.midpoint.model.api.PipelineItem;
 import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.delta.ObjectDelta;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.schema.GetOperationOptions;
+import com.evolveum.midpoint.schema.ObjectDeltaOperation;
 import com.evolveum.midpoint.schema.SelectorOptions;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.schema.statistics.StatisticsUtil;
 import com.evolveum.midpoint.schema.util.MiscSchemaUtil;
+import com.evolveum.midpoint.task.api.RunningTask;
+import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.util.exception.CommunicationException;
 import com.evolveum.midpoint.util.exception.ConfigurationException;
 import com.evolveum.midpoint.util.exception.ExpressionEvaluationException;
@@ -56,33 +49,29 @@ public class OperationsHelper {
 
     private static final Trace LOGGER = TraceManager.getTrace(OperationsHelper.class);
 
-    @Autowired
-    private ModelService modelService;
+    @Autowired private ModelService modelService;
+    @Autowired private ModelInteractionService modelInteractionService;
+    @Autowired private PrismContext prismContext;
 
-    @Autowired
-    private ModelInteractionService modelInteractionService;
-
-    @Autowired
-    private PrismContext prismContext;
-
-    public void applyDelta(ObjectDelta delta, ExecutionContext context, OperationResult result) throws ScriptExecutionException {
-        applyDelta(delta, null, context, result);
+    public Collection<ObjectDeltaOperation<? extends ObjectType>> applyDelta(ObjectDelta delta, ExecutionContext context, OperationResult result) throws ScriptExecutionException {
+        return applyDelta(delta, null, context, result);
     }
 
-    public void applyDelta(ObjectDelta delta, ModelExecuteOptions options, ExecutionContext context, OperationResult result) throws ScriptExecutionException {
+    public Collection<ObjectDeltaOperation<? extends ObjectType>> applyDelta(ObjectDelta delta, ModelExecuteOptions options, ExecutionContext context, OperationResult result) throws ScriptExecutionException {
         try {
-            modelService.executeChanges(Collections.singleton(delta), options, context.getTask(), result);
+            return modelService.executeChanges(Collections.singleton(delta), options, context.getTask(), result);
         } catch (ObjectAlreadyExistsException|ObjectNotFoundException|SchemaException|ExpressionEvaluationException|CommunicationException|ConfigurationException|PolicyViolationException|SecurityViolationException e) {
             throw new ScriptExecutionException("Couldn't modify object: " + e.getMessage(), e);
         }
     }
 
-    public void applyDelta(ObjectDelta<? extends ObjectType> delta, ModelExecuteOptions options, boolean dryRun, ExecutionContext context, OperationResult result) throws ScriptExecutionException {
+    public Collection<ObjectDeltaOperation<? extends ObjectType>> applyDelta(ObjectDelta<? extends ObjectType> delta, ModelExecuteOptions options, boolean dryRun, ExecutionContext context, OperationResult result) throws ScriptExecutionException {
         try {
             if (dryRun) {
                 modelInteractionService.previewChanges(Collections.singleton(delta), options, context.getTask(), result);
+                return null;
             } else {
-                modelService.executeChanges(Collections.singleton(delta), options, context.getTask(), result);
+                return modelService.executeChanges(Collections.singleton(delta), options, context.getTask(), result);
             }
         } catch (ObjectAlreadyExistsException|ObjectNotFoundException|SchemaException|ExpressionEvaluationException|CommunicationException|ConfigurationException|PolicyViolationException|SecurityViolationException e) {
             throw new ScriptExecutionException("Couldn't modify object: " + e.getMessage(), e);
@@ -91,7 +80,7 @@ public class OperationsHelper {
 
     public Collection<SelectorOptions<GetOperationOptions>> createGetOptions(SelectorQualifiedGetOptionsType optionsBean, boolean noFetch) {
         LOGGER.trace("optionsBean = {}, noFetch = {}", optionsBean, noFetch);
-        Collection<SelectorOptions<GetOperationOptions>> rv = MiscSchemaUtil.optionsTypeToOptions(optionsBean);
+        Collection<SelectorOptions<GetOperationOptions>> rv = MiscSchemaUtil.optionsTypeToOptions(optionsBean, prismContext);
         if (noFetch) {
             if (rv == null) {
                 return SelectorOptions.createCollection(GetOperationOptions.createNoFetch());
@@ -122,32 +111,41 @@ public class OperationsHelper {
 
     public long recordStart(ExecutionContext context, ObjectType objectType) {
         long started = System.currentTimeMillis();
-        if (context.getTask() != null && objectType != null) {
-            context.getTask().recordIterativeOperationStart(PolyString.getOrig(objectType.getName()),
-                    StatisticsUtil.getDisplayName(objectType.asPrismObject()),
-                    StatisticsUtil.getObjectType(objectType, prismContext),
-                    objectType.getOid());
-        } else {
-            LOGGER.warn("Couldn't record operation start in script execution; task = {}, objectType = {}",
-                    context.getTask(), objectType);
+        if (context.isRecordProgressAndIterationStatistics()) {
+            if (context.getTask() != null && objectType != null) {
+                context.getTask().recordIterativeOperationStart(PolyString.getOrig(objectType.getName()),
+                        StatisticsUtil.getDisplayName(objectType.asPrismObject()),
+                        StatisticsUtil.getObjectType(objectType, prismContext),
+                        objectType.getOid());
+            } else {
+                LOGGER.warn("Couldn't record operation start in script execution; task = {}, objectType = {}",
+                        context.getTask(), objectType);
+            }
         }
         return started;
     }
 
     public void recordEnd(ExecutionContext context, ObjectType objectType, long started, Throwable ex) {
-        if (context.getTask() != null && objectType != null) {
-            context.getTask().recordIterativeOperationEnd(
-                    PolyString.getOrig(objectType.getName()),
-                    StatisticsUtil.getDisplayName(objectType.asPrismObject()),
-                    StatisticsUtil.getObjectType(objectType, prismContext),
-                    objectType.getOid(),
-                    started, ex);
-        } else {
-            LOGGER.warn("Couldn't record operation end in script execution; task = {}, objectType = {}",
-                    context.getTask(), objectType);
-        }
-        if (context.getTask() != null) {
-            context.getTask().setProgress(context.getTask().getProgress() + 1);
+        if (context.isRecordProgressAndIterationStatistics()) {
+            Task task = context.getTask();
+            if (task != null && objectType != null) {
+                task.recordIterativeOperationEnd(
+                        PolyString.getOrig(objectType.getName()),
+                        StatisticsUtil.getDisplayName(objectType.asPrismObject()),
+                        StatisticsUtil.getObjectType(objectType, prismContext),
+                        objectType.getOid(),
+                        started, ex);
+            } else {
+                LOGGER.warn("Couldn't record operation end in script execution; task = {}, objectType = {}",
+                        task, objectType);
+            }
+            if (task != null) {
+                if (task instanceof RunningTask) {
+                    ((RunningTask) task).incrementProgressAndStoreStatsIfNeeded();
+                } else {
+                    task.setProgress(task.getProgress() + 1);
+                }
+            }
         }
     }
 
@@ -165,7 +163,7 @@ public class OperationsHelper {
             ExecutionContext context) {
         result.computeStatusIfUnknown();
         // TODO make this configurable
-        result.getSubresults().forEach(s -> s.setMinor(true));
+        result.getSubresults().forEach(s -> s.setMinor());
         result.cleanupResult();
         globalResult.addSubresult(result.clone());
     }

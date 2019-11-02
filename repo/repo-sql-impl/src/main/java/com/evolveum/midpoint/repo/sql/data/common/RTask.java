@@ -1,38 +1,23 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.data.common;
 
-import com.evolveum.midpoint.prism.PrismContext;
-import com.evolveum.midpoint.prism.PrismObjectDefinition;
 import com.evolveum.midpoint.repo.sql.data.RepositoryContext;
 import com.evolveum.midpoint.repo.sql.data.common.embedded.REmbeddedReference;
 import com.evolveum.midpoint.repo.sql.data.common.embedded.RPolyString;
 import com.evolveum.midpoint.repo.sql.data.common.enums.*;
 import com.evolveum.midpoint.repo.sql.query.definition.JaxbName;
-import com.evolveum.midpoint.repo.sql.query.definition.JaxbPath;
+import com.evolveum.midpoint.repo.sql.query2.definition.NotQueryable;
 import com.evolveum.midpoint.repo.sql.util.DtoTranslationException;
 import com.evolveum.midpoint.repo.sql.util.IdGeneratorResult;
 import com.evolveum.midpoint.repo.sql.util.MidPointJoinedPersister;
 import com.evolveum.midpoint.repo.sql.util.RUtil;
-import com.evolveum.midpoint.schema.GetOperationOptions;
-import com.evolveum.midpoint.schema.SelectorOptions;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.TaskType;
-
-import com.evolveum.midpoint.xml.ns._public.common.common_3.WfContextType;
 import org.hibernate.annotations.Cascade;
 import org.hibernate.annotations.ForeignKey;
 import org.hibernate.annotations.Index;
@@ -40,8 +25,7 @@ import org.hibernate.annotations.Persister;
 
 import javax.persistence.*;
 import javax.xml.datatype.XMLGregorianCalendar;
-
-import java.util.Collection;
+import java.util.Arrays;
 import java.util.Set;
 
 /**
@@ -49,23 +33,21 @@ import java.util.Set;
  */
 @Entity
 @Table(name = "m_task", indexes = {
-		@javax.persistence.Index(name = "iTaskWfProcessInstanceId", columnList = "wfProcessInstanceId"),
-		@javax.persistence.Index(name = "iTaskWfStartTimestamp", columnList = "wfStartTimestamp"),
-		@javax.persistence.Index(name = "iTaskWfEndTimestamp", columnList = "wfEndTimestamp"),
-		@javax.persistence.Index(name = "iTaskWfRequesterOid", columnList = "wfRequesterRef_targetOid"),
-		@javax.persistence.Index(name = "iTaskWfObjectOid", columnList = "wfObjectRef_targetOid"),
-		@javax.persistence.Index(name = "iTaskWfTargetOid", columnList = "wfTargetRef_targetOid") })
+        @javax.persistence.Index(name = "iTaskObjectOid", columnList = "objectRef_targetOid"),
+        @javax.persistence.Index(name = "iTaskNameOrig", columnList = "name_orig")},
+        uniqueConstraints = @UniqueConstraint(name = "uc_task_identifier", columnNames = {"taskIdentifier"}))
 @ForeignKey(name = "fk_task")
 @Persister(impl = MidPointJoinedPersister.class)
-public class RTask extends RObject<TaskType> implements OperationResult {
+public class RTask extends RObject<TaskType> implements OperationResultFull {
 
-    private RPolyString name;
+    private RPolyString nameCopy;
     private String taskIdentifier;
     private RTaskExecutionStatus executionStatus;
     private String node;
     private String category;
     private String handlerUri;
     //operation result
+    private byte[] fullResult;
     private ROperationResultStatus status;
     //end of operation result
     private XMLGregorianCalendar lastRunStartTimestamp;
@@ -78,18 +60,9 @@ public class RTask extends RObject<TaskType> implements OperationResult {
     private REmbeddedReference ownerRefTask;
     private String parent;
 
-    private String canRunOnNode;
     private RThreadStopAction threadStopAction;
     private Set<String> dependent;
     private RTaskWaitingReason waitingReason;
-
-    // workflow-related information (note: objectRef is already present in task information)
-    private String wfProcessInstanceId;
-    private REmbeddedReference wfRequesterRef;
-    private REmbeddedReference wfObjectRef;
-    private REmbeddedReference wfTargetRef;
-    private XMLGregorianCalendar wfStartTimestamp;
-    private XMLGregorianCalendar wfEndTimestamp;
 
     @ElementCollection
     @ForeignKey(name = "fk_task_dependent")
@@ -104,11 +77,6 @@ public class RTask extends RObject<TaskType> implements OperationResult {
     @Enumerated(EnumType.ORDINAL)
     public RTaskWaitingReason getWaitingReason() {
         return waitingReason;
-    }
-
-    @Column(nullable = true)
-    public String getCanRunOnNode() {
-        return canRunOnNode;
     }
 
     public String getCategory() {
@@ -159,50 +127,30 @@ public class RTask extends RObject<TaskType> implements OperationResult {
         return recurrence;
     }
 
+    @JaxbName(localPart = "name")
+    @AttributeOverrides({
+            @AttributeOverride(name = "orig", column = @Column(name = "name_orig")),
+            @AttributeOverride(name = "norm", column = @Column(name = "name_norm"))
+    })
     @Embedded
-    public RPolyString getName() {
-        return name;
+    public RPolyString getNameCopy() {
+        return nameCopy;
     }
 
-    @JaxbPath(itemPath = { @JaxbName(localPart = "workflowContext"), @JaxbName(localPart = "processInstanceId") })
-    public String getWfProcessInstanceId() {
-        return wfProcessInstanceId;
+    public void setNameCopy(RPolyString nameCopy) {
+        this.nameCopy = nameCopy;
     }
 
-    @JaxbPath(itemPath = { @JaxbName(localPart = "workflowContext"), @JaxbName(localPart = "requesterRef") })
-    @Embedded
-    public REmbeddedReference getWfRequesterRef() {
-        return wfRequesterRef;
+    @Lob
+    @NotQueryable
+    @Override
+    public byte[] getFullResult() {
+        return fullResult;
     }
 
-    @JaxbPath(itemPath = { @JaxbName(localPart = "workflowContext"), @JaxbName(localPart = "objectRef") })
-    @Embedded
-    public REmbeddedReference getWfObjectRef() {
-        return wfObjectRef;
-    }
-
-    @JaxbPath(itemPath = { @JaxbName(localPart = "workflowContext"), @JaxbName(localPart = "targetRef") })
-    @Embedded
-    public REmbeddedReference getWfTargetRef() {
-        return wfTargetRef;
-    }
-
-    @JaxbPath(itemPath = { @JaxbName(localPart = "workflowContext"), @JaxbName(localPart = "startTimestamp") })
-    public XMLGregorianCalendar getWfStartTimestamp() {
-        return wfStartTimestamp;
-    }
-
-    @JaxbPath(itemPath = { @JaxbName(localPart = "workflowContext"), @JaxbName(localPart = "endTimestamp") })
-    public XMLGregorianCalendar getWfEndTimestamp() {
-        return wfEndTimestamp;
-    }
-
-    public void setName(RPolyString name) {
-        this.name = name;
-    }
-
-    public void setCanRunOnNode(String canRunOnNode) {
-        this.canRunOnNode = canRunOnNode;
+    @Override
+    public void setFullResult(byte[] fullResult) {
+        this.fullResult = fullResult;
     }
 
     public void setThreadStopAction(RThreadStopAction threadStopAction) {
@@ -223,30 +171,6 @@ public class RTask extends RObject<TaskType> implements OperationResult {
 
     public void setCategory(String category) {
         this.category = category;
-    }
-
-    public void setWfProcessInstanceId(String wfProcessInstanceId) {
-        this.wfProcessInstanceId = wfProcessInstanceId;
-    }
-
-    public void setWfRequesterRef(REmbeddedReference wfRequesterRef) {
-        this.wfRequesterRef = wfRequesterRef;
-    }
-
-    public void setWfObjectRef(REmbeddedReference wfObjectRef) {
-        this.wfObjectRef = wfObjectRef;
-    }
-
-    public void setWfTargetRef(REmbeddedReference wfTargetRef) {
-        this.wfTargetRef = wfTargetRef;
-    }
-
-    public void setWfStartTimestamp(XMLGregorianCalendar wfStartTimestamp) {
-        this.wfStartTimestamp = wfStartTimestamp;
-    }
-
-    public void setWfEndTimestamp(XMLGregorianCalendar wfEndTimestamp) {
-        this.wfEndTimestamp = wfEndTimestamp;
     }
 
     public String getHandlerUri() {
@@ -331,6 +255,7 @@ public class RTask extends RObject<TaskType> implements OperationResult {
         this.waitingReason = waitingReason;
     }
 
+    @SuppressWarnings("RedundantIfStatement")
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -339,7 +264,7 @@ public class RTask extends RObject<TaskType> implements OperationResult {
 
         RTask rTask = (RTask) o;
 
-        if (name != null ? !name.equals(rTask.name) : rTask.name != null) return false;
+        if (nameCopy != null ? !nameCopy.equals(rTask.nameCopy) : rTask.nameCopy != null) return false;
         if (binding != rTask.binding) return false;
         if (executionStatus != rTask.executionStatus) return false;
         if (handlerUri != null ? !handlerUri.equals(rTask.handlerUri) : rTask.handlerUri != null) return false;
@@ -355,7 +280,6 @@ public class RTask extends RObject<TaskType> implements OperationResult {
         if (recurrence != rTask.recurrence) return false;
         if (taskIdentifier != null ? !taskIdentifier.equals(rTask.taskIdentifier) : rTask.taskIdentifier != null)
             return false;
-        if (canRunOnNode != null ? !canRunOnNode.equals(rTask.canRunOnNode) : rTask.canRunOnNode != null) return false;
         if (threadStopAction != null ? !threadStopAction.equals(rTask.threadStopAction) :
                 rTask.threadStopAction != null) return false;
         if (category != null ? !category.equals(rTask.category) : rTask.category != null) return false;
@@ -364,12 +288,7 @@ public class RTask extends RObject<TaskType> implements OperationResult {
         if (waitingReason != null ? !waitingReason.equals(rTask.waitingReason) : rTask.waitingReason != null)
             return false;
         if (status != rTask.status) return false;
-        if (wfRequesterRef != null ? !wfRequesterRef.equals(rTask.wfRequesterRef) : rTask.wfRequesterRef != null) return false;
-        if (wfObjectRef != null ? !wfObjectRef.equals(rTask.wfObjectRef) : rTask.wfObjectRef != null) return false;
-        if (wfTargetRef != null ? !wfTargetRef.equals(rTask.wfTargetRef) : rTask.wfTargetRef != null) return false;
-        if (wfProcessInstanceId != null ? !wfProcessInstanceId.equals(rTask.wfProcessInstanceId) : rTask.wfProcessInstanceId != null) return false;
-        if (wfStartTimestamp != null ? !wfStartTimestamp.equals(rTask.wfStartTimestamp) : rTask.wfStartTimestamp != null) return false;
-        if (wfEndTimestamp != null ? !wfEndTimestamp.equals(rTask.wfEndTimestamp) : rTask.wfEndTimestamp != null) return false;
+        if (fullResult != null ? !Arrays.equals(fullResult, rTask.fullResult) : rTask.fullResult != null) return false;
 
         return true;
     }
@@ -377,7 +296,7 @@ public class RTask extends RObject<TaskType> implements OperationResult {
     @Override
     public int hashCode() {
         int result1 = super.hashCode();
-        result1 = 31 * result1 + (name != null ? name.hashCode() : 0);
+        result1 = 31 * result1 + (nameCopy != null ? nameCopy.hashCode() : 0);
         result1 = 31 * result1 + (taskIdentifier != null ? taskIdentifier.hashCode() : 0);
         result1 = 31 * result1 + (executionStatus != null ? executionStatus.hashCode() : 0);
         result1 = 31 * result1 + (node != null ? node.hashCode() : 0);
@@ -387,23 +306,22 @@ public class RTask extends RObject<TaskType> implements OperationResult {
         result1 = 31 * result1 + (lastRunFinishTimestamp != null ? lastRunFinishTimestamp.hashCode() : 0);
         result1 = 31 * result1 + (recurrence != null ? recurrence.hashCode() : 0);
         result1 = 31 * result1 + (binding != null ? binding.hashCode() : 0);
-        result1 = 31 * result1 + (canRunOnNode != null ? canRunOnNode.hashCode() : 0);
         result1 = 31 * result1 + (threadStopAction != null ? threadStopAction.hashCode() : 0);
         result1 = 31 * result1 + (category != null ? category.hashCode() : 0);
         result1 = 31 * result1 + (parent != null ? parent.hashCode() : 0);
         result1 = 31 * result1 + (waitingReason != null ? waitingReason.hashCode() : 0);
         result1 = 31 * result1 + (status != null ? status.hashCode() : 0);
+        result1 = 31 * result1 + (fullResult != null ? Arrays.hashCode(fullResult) : 0);
 
         return result1;
     }
 
+    // dynamically called
     public static void copyFromJAXB(TaskType jaxb, RTask repo, RepositoryContext repositoryContext,
-                                    IdGeneratorResult generatorResult) throws DtoTranslationException {
-        RObject.copyFromJAXB(jaxb, repo, repositoryContext, generatorResult);
+            IdGeneratorResult generatorResult) throws DtoTranslationException {
+        copyAssignmentHolderInformationFromJAXB(jaxb, repo, repositoryContext, generatorResult);
 
-        PrismObjectDefinition<TaskType> taskDefinition = jaxb.asPrismObject().getDefinition();
-
-        repo.setName(RPolyString.copyFromJAXB(jaxb.getName()));
+        repo.setNameCopy(RPolyString.copyFromJAXB(jaxb.getName()));
         repo.setTaskIdentifier(jaxb.getTaskIdentifier());
         repo.setExecutionStatus(RUtil.getRepoEnumValue(jaxb.getExecutionStatus(), RTaskExecutionStatus.class));
         repo.setHandlerUri(jaxb.getHandlerUri());
@@ -413,36 +331,24 @@ public class RTask extends RObject<TaskType> implements OperationResult {
         repo.setNode(jaxb.getNode());
         repo.setBinding(RUtil.getRepoEnumValue(jaxb.getBinding(), RTaskBinding.class));
         repo.setRecurrence(RUtil.getRepoEnumValue(jaxb.getRecurrence(), RTaskRecurrence.class));
-        repo.setCanRunOnNode(jaxb.getExecutionConstraints() != null ? jaxb.getExecutionConstraints().getGroup() : null);
         repo.setThreadStopAction(RUtil.getRepoEnumValue(jaxb.getThreadStopAction(), RThreadStopAction.class));
         repo.setCategory(jaxb.getCategory());
         repo.setParent(jaxb.getParent());
 
-        repo.setObjectRef(RUtil.jaxbRefToEmbeddedRepoRef(jaxb.getObjectRef(), repositoryContext.prismContext));
-        repo.setOwnerRefTask(RUtil.jaxbRefToEmbeddedRepoRef(jaxb.getOwnerRef(), repositoryContext.prismContext));
+        repo.setObjectRef(RUtil.jaxbRefToEmbeddedRepoRef(jaxb.getObjectRef(), repositoryContext.relationRegistry));
+        repo.setOwnerRefTask(RUtil.jaxbRefToEmbeddedRepoRef(jaxb.getOwnerRef(), repositoryContext.relationRegistry));
         repo.setWaitingReason(RUtil.getRepoEnumValue(jaxb.getWaitingReason(), RTaskWaitingReason.class));
         repo.setDependent(RUtil.listToSet(jaxb.getDependent()));
 
-        WfContextType wfc = jaxb.getWorkflowContext();
-        if (wfc != null) {
-            repo.setWfProcessInstanceId(wfc.getProcessInstanceId());
-            repo.setWfRequesterRef(RUtil.jaxbRefToEmbeddedRepoRef(wfc.getRequesterRef(), repositoryContext.prismContext));
-            repo.setWfObjectRef(RUtil.jaxbRefToEmbeddedRepoRef(wfc.getObjectRef(), repositoryContext.prismContext));
-            repo.setWfTargetRef(RUtil.jaxbRefToEmbeddedRepoRef(wfc.getTargetRef(), repositoryContext.prismContext));
-            repo.setWfStartTimestamp(wfc.getStartTimestamp());
-            repo.setWfEndTimestamp(wfc.getEndTimestamp());
-        }
+//        WfContextType wfc = jaxb.getApprovalContext();
+//        if (wfc != null) {
+//            repo.setWfRequesterRef(RUtil.jaxbRefToEmbeddedRepoRef(wfc.getRequesterRef(), repositoryContext.relationRegistry));
+//            repo.setWfObjectRef(RUtil.jaxbRefToEmbeddedRepoRef(wfc.getObjectRefOrClone(), repositoryContext.relationRegistry));
+//            repo.setWfTargetRef(RUtil.jaxbRefToEmbeddedRepoRef(wfc.getTargetRef(), repositoryContext.relationRegistry));
+//            repo.setWfStartTimestamp(wfc.getStartTimestamp());
+//            repo.setWfEndTimestamp(wfc.getEndTimestamp());
+//        }
 
-        RUtil.copyResultFromJAXB(taskDefinition, jaxb.F_RESULT, jaxb.getResult(), repo, repositoryContext.prismContext);
-    }
-
-    @Override
-    public TaskType toJAXB(PrismContext prismContext, Collection<SelectorOptions<GetOperationOptions>> options)
-            throws DtoTranslationException {
-        TaskType object = new TaskType();
-        RUtil.revive(object, prismContext);
-        RTask.copyToJAXB(this, object, prismContext, options);
-
-        return object;
+        RUtil.copyResultFromJAXB(TaskType.F_RESULT, jaxb.getResult(), repo, repositoryContext.prismContext);
     }
 }

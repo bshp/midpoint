@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.model.impl.scripting;
@@ -20,6 +11,9 @@ import com.evolveum.midpoint.model.api.ModelService;
 import com.evolveum.midpoint.model.api.PipelineItem;
 import com.evolveum.midpoint.model.api.ScriptExecutionResult;
 import com.evolveum.midpoint.prism.PrismContext;
+import com.evolveum.midpoint.prism.query.QueryConverter;
+import com.evolveum.midpoint.schema.expression.VariablesMap;
+import com.evolveum.midpoint.task.api.RunningTask;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.util.exception.SystemException;
 import com.evolveum.midpoint.util.logging.Trace;
@@ -44,36 +38,38 @@ public class ExecutionContext {
     private final ScriptingExpressionEvaluator scriptingExpressionEvaluator;
     private final StringBuilder consoleOutput = new StringBuilder();
     private final Map<String, PipelineData> globalVariables = new HashMap<>();      // will probably remain unused
-    private final Map<String, Object> initialVariables;                             // used e.g. when there are no data in a pipeline; these are frozen - i.e. made immutable if possible; to be cloned-on-use
+    private final VariablesMap initialVariables;                             // used e.g. when there are no data in a pipeline; these are frozen - i.e. made immutable if possible; to be cloned-on-use
     private PipelineData finalOutput;                                        // used only when passing result to external clients (TODO do this more cleanly)
+    private final boolean recordProgressAndIterationStatistics;
 
     public ExecutionContext(ScriptingExpressionEvaluationOptionsType options, Task task,
             ScriptingExpressionEvaluator scriptingExpressionEvaluator,
-            boolean privileged, Map<String, Object> initialVariables) {
+            boolean privileged, boolean recordProgressAndIterationStatistics, VariablesMap initialVariables) {
         this.options = options;
         this.task = task;
         this.scriptingExpressionEvaluator = scriptingExpressionEvaluator;
         this.privileged = privileged;
         this.initialVariables = initialVariables;
+        this.recordProgressAndIterationStatistics = recordProgressAndIterationStatistics;
     }
 
-	public Task getTask() {
+    public Task getTask() {
         return task;
     }
 
-	public ScriptingExpressionEvaluationOptionsType getOptions() {
-		return options;
-	}
+    public ScriptingExpressionEvaluationOptionsType getOptions() {
+        return options;
+    }
 
-	public boolean isContinueOnAnyError() {
-    	return options != null && Boolean.TRUE.equals(options.isContinueOnAnyError());
-	}
+    public boolean isContinueOnAnyError() {
+        return options != null && Boolean.TRUE.equals(options.isContinueOnAnyError());
+    }
 
-	public boolean isHideOperationResults() {
+    public boolean isHideOperationResults() {
         return options != null && Boolean.TRUE.equals(options.isHideOperationResults());
     }
 
-	public PipelineData getGlobalVariable(String name) {
+    public PipelineData getGlobalVariable(String name) {
         return globalVariables.get(name);
     }
 
@@ -81,7 +77,7 @@ public class ExecutionContext {
         globalVariables.put(name, value);
     }
 
-    public Map<String, Object> getInitialVariables() {
+    public VariablesMap getInitialVariables() {
         return initialVariables;
     }
 
@@ -104,6 +100,10 @@ public class ExecutionContext {
         this.finalOutput = finalOutput;
     }
 
+    public boolean isRecordProgressAndIterationStatistics() {
+        return recordProgressAndIterationStatistics;
+    }
+
     public ScriptExecutionResult toExecutionResult() {
         List<PipelineItem> items = null;
         if (getFinalOutput() != null) {
@@ -117,7 +117,7 @@ public class ExecutionContext {
     }
 
     public boolean canRun() {
-        return task == null || task.canRun();
+        return !(task instanceof RunningTask) || ((RunningTask) task).canRun();
     }
 
     public void checkTaskStop() {
@@ -137,11 +137,15 @@ public class ExecutionContext {
         return scriptingExpressionEvaluator.getModelService();
     }
 
-	public PrismContext getPrismContext() {
-		return scriptingExpressionEvaluator.getPrismContext();
-	}
+    public PrismContext getPrismContext() {
+        return scriptingExpressionEvaluator.getPrismContext();
+    }
 
     public boolean isPrivileged() {
         return privileged;
+    }
+
+    public QueryConverter getQueryConverter() {
+        return getPrismContext().getQueryConverter();
     }
 }

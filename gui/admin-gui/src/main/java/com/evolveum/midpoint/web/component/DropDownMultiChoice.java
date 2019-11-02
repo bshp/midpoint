@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component;
@@ -71,11 +62,11 @@ public class DropDownMultiChoice<T> extends ListMultipleChoice<T> {
         }
 
         sb.append('{');
-        Iterator<String> keys = map.keySet().iterator();
+       Iterator<Map.Entry<String, String>> keys = map.entrySet().iterator();
         while (keys.hasNext()) {
-            String key = keys.next();
-            sb.append(key).append(":");
-            sb.append('\'').append(map.get(key)).append('\'');
+            final Map.Entry<String, String> key = keys.next();
+            sb.append(key.getKey()).append(":");
+            sb.append('\'').append(key.getValue()).append('\'');
             if (keys.hasNext()) {
                 sb.append(",\n");
             }
@@ -84,7 +75,7 @@ public class DropDownMultiChoice<T> extends ListMultipleChoice<T> {
     }
 
     private Map<String, String> createDefaultOptions() {
-        Map<String, String> map = new HashMap<String, String>();
+        Map<String, String> map = new HashMap<>();
         map.put(PROP_BUTTON_CLASS, "btn btn-default btn-sm");
 
         return map;

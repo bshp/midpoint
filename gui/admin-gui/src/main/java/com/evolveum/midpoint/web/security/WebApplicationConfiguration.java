@@ -1,21 +1,13 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.security;
 
+import com.evolveum.midpoint.common.configuration.api.MidpointConfiguration;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import org.apache.commons.configuration.Configuration;
@@ -30,8 +22,6 @@ public class WebApplicationConfiguration implements Serializable {
 
     private static final Trace LOGGER = TraceManager.getTrace(WebApplicationConfiguration.class);
 
-    public static final String MIDPOINT_HOME = "midpoint.home"; //todo move somewhere
-
     private String importFolder;
     private String exportFolder;
     private int progressRefreshInterval;            // how often to refresh 'progress table' (in milliseconds; 0 means this feature is disabled)
@@ -44,10 +34,10 @@ public class WebApplicationConfiguration implements Serializable {
         abortEnabled = config.getBoolean("abortEnabled", true);
 
         if (abortEnabled && !isProgressReportingEnabled()) {
-            LOGGER.warn("Abort functionality requires progress reporting to be enabled - set progressRefreshInterval in '"+MidPointApplication.WEB_APP_CONFIGURATION+"' section to a non-zero value");
+            LOGGER.warn("Abort functionality requires progress reporting to be enabled - set progressRefreshInterval in '"+ MidpointConfiguration.WEB_APP_CONFIGURATION+"' section to a non-zero value");
             abortEnabled = false;
         }
-        String midpointHome = System.getProperty(MIDPOINT_HOME);
+        String midpointHome = System.getProperty(MidpointConfiguration.MIDPOINT_HOME_PROPERTY);
 
         if (importFolder == null) {
             if (StringUtils.isNotEmpty(midpointHome)) {
@@ -59,9 +49,9 @@ public class WebApplicationConfiguration implements Serializable {
 
         if (exportFolder == null) {
             if (StringUtils.isNotEmpty(midpointHome)) {
-            	exportFolder = midpointHome + "/tmp";
+                exportFolder = midpointHome + "/tmp";
             } else {
-            	exportFolder = ".";
+                exportFolder = ".";
             }
         }
     }

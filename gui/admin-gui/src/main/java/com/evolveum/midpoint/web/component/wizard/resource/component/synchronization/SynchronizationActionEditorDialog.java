@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.wizard.resource.component.synchronization;
@@ -100,7 +91,7 @@ public class SynchronizationActionEditorDialog extends ModalWindow{
     }
 
     public StringResourceModel createStringResource(String resourceKey, Object... objects) {
-    	return PageBase.createStringResourceStatic(this, resourceKey, objects);
+        return PageBase.createStringResourceStatic(this, resourceKey, objects);
 //        return new StringResourceModel(resourceKey, this, null, resourceKey, objects);
     }
 
@@ -117,23 +108,25 @@ public class SynchronizationActionEditorDialog extends ModalWindow{
     }
 
     private void initLayout(WebMarkupContainer content){
-        Form form = new Form(ID_MAIN_FORM);
+        Form form = new com.evolveum.midpoint.web.component.form.Form(ID_MAIN_FORM);
         form.setOutputMarkupId(true);
         content.add(form);
 
-        TextFormGroup name = new TextFormGroup(ID_NAME, new PropertyModel<String>(model, SynchronizationActionTypeDto.F_ACTION_OBJECT + ".name"),
+        TextFormGroup name = new TextFormGroup(ID_NAME, new PropertyModel<>(model, SynchronizationActionTypeDto.F_ACTION_OBJECT + ".name"),
                 createStringResource("SynchronizationActionEditorDialog.label.name"), ID_LABEL_SIZE, ID_INPUT_SIZE, false);
         form.add(name);
 
-        TextAreaFormGroup description = new TextAreaFormGroup(ID_DESCRIPTION, new PropertyModel<String>(model, SynchronizationActionTypeDto.F_ACTION_OBJECT + ".description"),
+        TextAreaFormGroup description = new TextAreaFormGroup(ID_DESCRIPTION, new PropertyModel<>(model, SynchronizationActionTypeDto.F_ACTION_OBJECT + ".description"),
                 createStringResource("SynchronizationActionEditorDialog.label.description"), ID_LABEL_SIZE, ID_INPUT_SIZE, false);
         form.add(description);
 
         DropDownFormGroup<SynchronizationActionTypeDto.HandlerUriActions> handlerUri = new DropDownFormGroup<SynchronizationActionTypeDto.HandlerUriActions>(ID_HANDLER_URI,
-                new PropertyModel<SynchronizationActionTypeDto.HandlerUriActions>(model, SynchronizationActionTypeDto.F_HANDLER_URI),
+            new PropertyModel<>(model, SynchronizationActionTypeDto.F_HANDLER_URI),
                 WebComponentUtil.createReadonlyModelFromEnum(SynchronizationActionTypeDto.HandlerUriActions.class),
-                new EnumChoiceRenderer<SynchronizationActionTypeDto.HandlerUriActions>(this), createStringResource("SynchronizationActionEditorDialog.label.handlerUri"),
-                "SynchronizationStep.action.tooltip.handlerUri", true, ID_LABEL_SIZE, ID_INPUT_SIZE, false){
+            new EnumChoiceRenderer<>(this), createStringResource("SynchronizationActionEditorDialog.label.handlerUri"),
+                createStringResource("SynchronizationStep.action.tooltip.handlerUri",
+                        WebComponentUtil.getMidpointCustomSystemName((PageResourceWizard)getPage(), "midpoint.default.system.name")),
+                true, ID_LABEL_SIZE, ID_INPUT_SIZE, false, false){
 
             @Override
             protected DropDownChoice createDropDown(String id, IModel<List<SynchronizationActionTypeDto.HandlerUriActions>> choices,
@@ -146,9 +139,12 @@ public class SynchronizationActionEditorDialog extends ModalWindow{
         };
         form.add(handlerUri);
 
-        DropDownFormGroup<BeforeAfterType> order = new DropDownFormGroup<BeforeAfterType>(ID_ORDER, new PropertyModel<BeforeAfterType>(model, SynchronizationActionTypeDto.F_ACTION_OBJECT + ".order"),
-                WebComponentUtil.createReadonlyModelFromEnum(BeforeAfterType.class), new EnumChoiceRenderer<BeforeAfterType>(this),
-                createStringResource("SynchronizationActionEditorDialog.label.order"), "SynchronizationStep.action.tooltip.order", true, ID_LABEL_SIZE, ID_INPUT_SIZE, false){
+        DropDownFormGroup<BeforeAfterType> order = new DropDownFormGroup<BeforeAfterType>(ID_ORDER, new PropertyModel<>(model, SynchronizationActionTypeDto.F_ACTION_OBJECT + ".order"),
+                WebComponentUtil.createReadonlyModelFromEnum(BeforeAfterType.class), new EnumChoiceRenderer<>(this),
+                createStringResource("SynchronizationActionEditorDialog.label.order"),
+                createStringResource("SynchronizationStep.action.tooltip.order",
+                        WebComponentUtil.getMidpointCustomSystemName((PageResourceWizard)getPage(), "midpoint.default.system.name")),
+                true, ID_LABEL_SIZE, ID_INPUT_SIZE, false, false){
 
             @Override
             protected DropDownChoice createDropDown(String id, IModel<List<BeforeAfterType>> choices, IChoiceRenderer<BeforeAfterType> renderer, boolean required){
@@ -163,7 +159,9 @@ public class SynchronizationActionEditorDialog extends ModalWindow{
     }
 
     private void initButtons(Form form){
-        AjaxLink cancel = new AjaxLink(ID_BUTTON_CANCEL) {
+        AjaxLink<Void> cancel = new AjaxLink<Void>(ID_BUTTON_CANCEL) {
+
+            private static final long serialVersionUID = 1L;
 
             @Override
             public void onClick(AjaxRequestTarget target) {
@@ -173,9 +171,10 @@ public class SynchronizationActionEditorDialog extends ModalWindow{
         form.add(cancel);
 
         AjaxSubmitLink save = new AjaxSubmitLink(ID_BUTTON_SAVE) {
+            private static final long serialVersionUID = 1L;
 
             @Override
-            protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            protected void onSubmit(AjaxRequestTarget target) {
                 savePerformed(target);
             }
         };
@@ -194,8 +193,8 @@ public class SynchronizationActionEditorDialog extends ModalWindow{
             inputModel = new PropertyModel<>(model, SynchronizationActionTypeDto.F_ACTION_OBJECT);
         }
 
-		((PageResourceWizard) getPage()).refreshIssues(target);
-		updateComponents(target);
+        ((PageResourceWizard) getPage()).refreshIssues(target);
+        updateComponents(target);
         close(target);
     }
 

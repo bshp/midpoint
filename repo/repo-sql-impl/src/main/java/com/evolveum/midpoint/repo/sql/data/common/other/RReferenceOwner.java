@@ -1,20 +1,17 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.data.common.other;
+
+import com.evolveum.midpoint.util.QNameUtil;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
+import org.apache.commons.lang.Validate;
+
+import javax.xml.namespace.QName;
 
 /**
  * This is just helper enumeration for different types of reference entities
@@ -24,29 +21,61 @@ package com.evolveum.midpoint.repo.sql.data.common.other;
  */
 public enum RReferenceOwner {
 
-    OBJECT_PARENT_ORG,          // 0
+    OBJECT_PARENT_ORG(ObjectType.class, ObjectType.F_PARENT_ORG_REF),      // 0
 
-    USER_ACCOUNT,               // 1
+    USER_ACCOUNT(FocusType.class, FocusType.F_LINK_REF),                   // 1
 
-    RESOURCE_BUSINESS_CONFIGURATON_APPROVER,    // 2
+    RESOURCE_BUSINESS_CONFIGURATON_APPROVER(ResourceType.class, ResourceBusinessConfigurationType.F_APPROVER_REF),    // 2
 
-    ROLE_APPROVER,              // 3
+    @Deprecated // REMOVED from schema in 4.0
+    ROLE_APPROVER(AbstractRoleType.class, null /* was: AbstractRoleType.F_APPROVER_REF */),              // 3
 
     /**
      * @deprecated
      */
     @Deprecated
-    SYSTEM_CONFIGURATION_ORG_ROOT,  // 4
+    SYSTEM_CONFIGURATION_ORG_ROOT(SystemConfigurationType.class, null),                 // 4
 
-    CREATE_APPROVER,            // 5
+    CREATE_APPROVER(ObjectType.class, MetadataType.F_CREATE_APPROVER_REF), // 5
 
-    MODIFY_APPROVER,            // 6
+    MODIFY_APPROVER(ObjectType.class, MetadataType.F_MODIFY_APPROVER_REF), // 6
 
-    INCLUDE,                    // 7
+    INCLUDE(ObjectTemplateType.class, ObjectTemplateType.F_INCLUDE_REF),           // 7
 
-    ROLE_MEMBER,                // 8
+    ROLE_MEMBER(AssignmentHolderType.class, AssignmentHolderType.F_ROLE_MEMBERSHIP_REF),        // 8
 
-    DELEGATED,                // 9
+    DELEGATED(FocusType.class, FocusType.F_DELEGATED_REF),                // 9
 
-    PERSONA                     // 10
+    PERSONA(FocusType.class, FocusType.F_PERSONA_REF),                    // 10
+
+    ARCHETYPE(AssignmentHolderType.class, AssignmentHolderType.F_ARCHETYPE_REF);                    // 11
+
+    private Class<? extends ObjectType> typeClass;
+    private QName elementName;
+
+    RReferenceOwner(Class<? extends ObjectType> typeClass, QName elementName) {
+        this.typeClass = typeClass;
+        this.elementName = elementName;
+    }
+
+    public Class<? extends ObjectType> getTypeClass() {
+        return typeClass;
+    }
+
+    public QName getElementName() {
+        return elementName;
+    }
+
+    public static RReferenceOwner getOwnerByQName(Class<? extends ObjectType> typeClass, QName qname) {
+        Validate.notNull(typeClass, "Jaxb type class must not be null");
+        Validate.notNull(qname, "QName must not be null");
+
+        for (RReferenceOwner owner : values()) {
+            if (QNameUtil.match(qname, owner.getElementName()) && owner.getTypeClass().isAssignableFrom(typeClass)) {
+                return owner;
+            }
+        }
+
+        throw new IllegalArgumentException("Can't find owner for qname '" + qname + "'");
+    }
 }

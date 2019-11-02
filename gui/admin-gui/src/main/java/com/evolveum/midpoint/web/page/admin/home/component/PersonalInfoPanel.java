@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.home.component;
@@ -30,7 +21,6 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.wicket.markup.html.basic.Label;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 
 import java.util.Date;
@@ -47,14 +37,21 @@ public class PersonalInfoPanel extends BasePanel<PersonalInfoDto> {
     private static final String ID_PASSWORD_EXP = "passwordExp";
 
 
-    public PersonalInfoPanel(String id, PageBase parentPage) {
-        super(id);
-        initLayout(parentPage);
+    public PersonalInfoPanel(String id) {
+        super(id, (IModel<PersonalInfoDto>) null);
+    }
+
+    @Override
+    protected void onInitialize() {
+        super.onInitialize();
+        initLayout();
     }
 
     @Override
     public IModel<PersonalInfoDto> createModel() {
         return new LoadableModel<PersonalInfoDto>(false) {
+
+           private static final long serialVersionUID = 1L;
 
             @Override
             protected PersonalInfoDto load() {
@@ -88,22 +85,32 @@ public class PersonalInfoPanel extends BasePanel<PersonalInfoDto> {
         return dto;
     }
 
-    protected void initLayout(PageBase parentPage) {
-        DateLabelComponent lastLoginDate = new DateLabelComponent(ID_LAST_LOGIN_DATE, new AbstractReadOnlyModel<Date>() {
+    protected void initLayout() {
+        DateLabelComponent lastLoginDate = new DateLabelComponent(ID_LAST_LOGIN_DATE, new IModel<Date>() {
 
+            private static final long serialVersionUID = 1L;
             @Override
             public Date getObject() {
+
+                if(getModel() ==  null) {
+                    return null;
+                }
                 PersonalInfoDto dto = getModel().getObject();
                 return dto == null ? null : dto.getLastLoginDate();
             }
-        }, DateLabelComponent.LONG_MEDIUM_STYLE);
-        lastLoginDate.setBeforeTextOnDateNull(parentPage.getString("PersonalInfoPanel.never"));
+        }, WebComponentUtil.getLongDateTimeFormat(getPageBase()));
+        lastLoginDate.setBeforeTextOnDateNull(getPageBase().getString("PersonalInfoPanel.never"));
         add(lastLoginDate);
 
-        Label lastLoginFrom = new Label(ID_LAST_LOGIN_FROM, new AbstractReadOnlyModel<String>() {
+        Label lastLoginFrom = new Label(ID_LAST_LOGIN_FROM, new IModel<String>() {
+
+            private static final long serialVersionUID = 1L;
 
             @Override
             public String getObject() {
+                if(getModel() ==  null) {
+                    return PersonalInfoPanel.this.getString("PersonalInfoPanel.undefined");
+                }
                 PersonalInfoDto dto = getModel().getObject();
 
                 return StringUtils.isNotEmpty(dto.getLastLoginFrom()) ? dto.getLastLoginFrom() :
@@ -112,21 +119,31 @@ public class PersonalInfoPanel extends BasePanel<PersonalInfoDto> {
         });
         add(lastLoginFrom);
 
-        DateLabelComponent lastFailDate = new DateLabelComponent(ID_LAST_FAIL_DATE, new AbstractReadOnlyModel<Date>() {
+        DateLabelComponent lastFailDate = new DateLabelComponent(ID_LAST_FAIL_DATE, new IModel<Date>() {
+
+            private static final long serialVersionUID = 1L;
 
             @Override
             public Date getObject() {
+                if(getModel() ==  null) {
+                    return null;
+                }
                 PersonalInfoDto dto = getModel().getObject();
                 return dto == null ? null : dto.getLastFailDate();
             }
-        }, DateLabelComponent.LONG_MEDIUM_STYLE);
-        lastFailDate.setBeforeTextOnDateNull(parentPage.getString("PersonalInfoPanel.never"));
+        }, WebComponentUtil.getLongDateTimeFormat(getPageBase()));
+        lastFailDate.setBeforeTextOnDateNull(getPageBase().getString("PersonalInfoPanel.never"));
         add(lastFailDate);
 
-        Label lastFailFrom = new Label(ID_LAST_FAIL_FROM, new AbstractReadOnlyModel<String>() {
+        Label lastFailFrom = new Label(ID_LAST_FAIL_FROM, new IModel<String>() {
+
+            private static final long serialVersionUID = 1L;
 
             @Override
             public String getObject() {
+                if(getModel() ==  null) {
+                    return PersonalInfoPanel.this.getString("PersonalInfoPanel.undefined");
+                }
                 PersonalInfoDto dto = getModel().getObject();
 
                 return StringUtils.isNotEmpty(dto.getLastFailFrom()) ? dto.getLastFailFrom() :
@@ -135,10 +152,15 @@ public class PersonalInfoPanel extends BasePanel<PersonalInfoDto> {
         });
         add(lastFailFrom);
 
-        Label passwordExp = new Label(ID_PASSWORD_EXP, new AbstractReadOnlyModel<String>() {
+        Label passwordExp = new Label(ID_PASSWORD_EXP, new IModel<String>() {
+
+            private static final long serialVersionUID = 1L;
 
             @Override
             public String getObject() {
+                if(getModel() ==  null) {
+                    return PersonalInfoPanel.this.getString("PersonalInfoPanel.undefined");
+                }
                 PersonalInfoDto dto = getModel().getObject();
 
                 return dto.getPasswordExp() != null ? WebComponentUtil.formatDate(dto.getPasswordExp()) :

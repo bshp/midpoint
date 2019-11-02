@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2016-2017 Evolveum
+ * Copyright (c) 2016-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.component.assignment;
 
@@ -21,13 +12,13 @@ import com.evolveum.midpoint.gui.api.page.PageBase;
 import com.evolveum.midpoint.prism.query.ObjectFilter;
 import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
+import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.ajax.AjaxRequestTarget;
+import org.apache.wicket.ajax.attributes.AjaxRequestAttributes;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
 import org.apache.wicket.behavior.AttributeAppender;
 import org.apache.wicket.markup.html.basic.Label;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
-import org.apache.wicket.model.Model;
 import org.apache.wicket.model.StringResourceModel;
 
 import javax.xml.namespace.QName;
@@ -65,6 +56,13 @@ public abstract class UserSelectionButton extends BasePanel<List<UserType>> {
     private void initLayout(){
         AjaxLink<String> userSelectionButton = new AjaxLink<String>(ID_USER_SELECTION_BUTTON) {
             private static final long serialVersionUID = 1L;
+
+            @Override
+            protected void updateAjaxAttributes(AjaxRequestAttributes attributes) {
+                super.updateAjaxAttributes(attributes);
+                attributes.setEventPropagation(AjaxRequestAttributes.EventPropagation.BUBBLE);
+            }
+
             @Override
             public void onClick(AjaxRequestTarget target) {
                 if (showUserSelectionPopup) {
@@ -73,8 +71,9 @@ public abstract class UserSelectionButton extends BasePanel<List<UserType>> {
                 showUserSelectionPopup = true;
             }
         };
+        userSelectionButton.add(AttributeModifier.append("class", getTargetUserButtonClass()));
         userSelectionButton.setOutputMarkupId(true);
-        userSelectionButton.add(new AttributeAppender("title", new AbstractReadOnlyModel<String>() {
+        userSelectionButton.add(new AttributeAppender("title", new IModel<String>() {
             private static final long serialVersionUID = 1L;
 
             @Override
@@ -84,7 +83,7 @@ public abstract class UserSelectionButton extends BasePanel<List<UserType>> {
         }));
         add(userSelectionButton);
 
-        Label label = new Label(ID_USER_SELECTION_BUTTON_LABEL, new AbstractReadOnlyModel<String>() {
+        Label label = new Label(ID_USER_SELECTION_BUTTON_LABEL, new IModel<String>() {
             private static final long serialVersionUID = 1L;
 
             @Override
@@ -95,7 +94,7 @@ public abstract class UserSelectionButton extends BasePanel<List<UserType>> {
         label.setRenderBodyOnly(true);
         userSelectionButton.add(label);
 
-        AjaxLink deleteButton = new AjaxLink(ID_DELETE_SELECTED_USER_BUTTON) {
+        AjaxLink<Void> deleteButton = new AjaxLink<Void>(ID_DELETE_SELECTED_USER_BUTTON) {
             private static final long serialVersionUID = 1L;
             @Override
             public void onClick(AjaxRequestTarget target) {
@@ -106,7 +105,7 @@ public abstract class UserSelectionButton extends BasePanel<List<UserType>> {
             private static final long serialVersionUID = 1L;
             @Override
             public boolean isVisible(){
-                return getModelObject() != null && getModelObject().size() > 0;
+                return isDeleteButtonVisible();
             }
         });
         userSelectionButton.add(deleteButton);
@@ -114,8 +113,16 @@ public abstract class UserSelectionButton extends BasePanel<List<UserType>> {
 
     protected abstract String getUserButtonLabel();
 
+    protected boolean isDeleteButtonVisible(){
+        return getModelObject() != null && getModelObject().size() > 0;
+    }
+
     protected void onDeleteSelectedUsersPerformed(AjaxRequestTarget target){
         showUserSelectionPopup = false;
+    }
+
+    protected String getTargetUserButtonClass(){
+        return "";
     }
 
     private void initUserSelectionPopup(AjaxRequestTarget target) {

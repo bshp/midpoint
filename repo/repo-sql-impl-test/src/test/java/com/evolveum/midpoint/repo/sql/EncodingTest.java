@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql;
@@ -19,12 +10,9 @@ package com.evolveum.midpoint.repo.sql;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.PrismObjectDefinition;
 import com.evolveum.midpoint.prism.PrismProperty;
-import com.evolveum.midpoint.prism.match.PolyStringNormMatchingRule;
+import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.polystring.PolyString;
-import com.evolveum.midpoint.prism.query.EqualFilter;
-import com.evolveum.midpoint.prism.query.ObjectFilter;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
-import com.evolveum.midpoint.prism.query.builder.QueryBuilder;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.schema.result.OperationResultStatus;
 import com.evolveum.midpoint.util.DebugUtil;
@@ -490,7 +478,7 @@ public class EncodingTest extends BaseSQLRepoTest {
     private static final String USER_GIVEN_NAME = "P\u00f3lic\u00edja, p\u00f3lic\u00edja, S\u00e1la\u0161\u00e1ry, pr\u00e1va Jova. Z c\u00e9sty pr\u00edva, z c\u00e9sty pr\u00e1va, s\u00fdmpatika, korpora. Popul\u00e1ry, Karpatula. Juv\u00e1 svorno polic\u00e1na. Kerl\u00e9\u0161 na strach, polic\u00edja. Bumtar\u00e1ra, bumtar\u00e1ra, bum. ";//"Fëľïx";
     private static final String USER_FAMILY_NAME = "ŢæĺêkéčišćeľščťžýáíéäöåøřĺąćęłńóśźżrůāēīūŗļķņģšžčāäǟḑēīļņōȯȱõȭŗšțūžÇĞIİÖŞÜáàâéèêíìîóòôúùûáâãçéêíóôõúÁáĄąÄäÉéĘęĚěÍíÓóÔôÚúŮůÝýČčĎďŤťĽľĹĺŇňŔŕŘřŠšŽž";
     private static final String[] USER_ORGANIZATION = {"COMITATVS NOBILITVS HVNGARIÆ", "Salsa Verde ğomorula prïvatûła"};
-    private static final String[] USER_EMPLOYEE_TYPE = {"Ģŗąfųŀą", "CANTATOR"};
+    private static final String[] USER_SUBTYPE = {"Ģŗąfųŀą", "CANTATOR"};
     private static final String INSANE_NATIONAL_STRING = "Pørúga ném nå väšȍm apârátula";
 
     private RandomString randomString;
@@ -530,8 +518,8 @@ public class EncodingTest extends BaseSQLRepoTest {
         userType.setGivenName(toPolyStringType(USER_GIVEN_NAME));
         userType.setFamilyName(toPolyStringType(USER_FAMILY_NAME));
         userType.setTitle(toPolyStringType(INSANE_NATIONAL_STRING));
-        userType.getEmployeeType().add(USER_EMPLOYEE_TYPE[0]);
-        userType.getEmployeeType().add(USER_EMPLOYEE_TYPE[1]);
+        userType.getSubtype().add(USER_SUBTYPE[0]);
+        userType.getSubtype().add(USER_SUBTYPE[1]);
         userType.getOrganization().add(toPolyStringType(USER_ORGANIZATION[0]));
         userType.getOrganization().add(toPolyStringType(USER_ORGANIZATION[1]));
 
@@ -560,7 +548,7 @@ public class EncodingTest extends BaseSQLRepoTest {
 
             OperationResult subresult1 = result.createSubresult(result.getOperation() + ".searchObjects.fullName");
             try {
-                ObjectQuery query = QueryBuilder.queryFor(UserType.class, prismContext)
+                ObjectQuery query = prismContext.queryFor(UserType.class)
                         .item(UserType.F_FULL_NAME).eq(toPolyString(USER_FULL_NAME)).matchingNorm()
                         .build();
                 subresult1.addParam("query", query);
@@ -607,7 +595,7 @@ public class EncodingTest extends BaseSQLRepoTest {
         checkUserPropertyPolyString(userRetrieved, UserType.F_GIVEN_NAME, subresult, USER_GIVEN_NAME);
         checkUserPropertyPolyString(userRetrieved, UserType.F_FAMILY_NAME, subresult, USER_FAMILY_NAME);
         checkUserPropertyPolyString(userRetrieved, UserType.F_TITLE, subresult, INSANE_NATIONAL_STRING);
-        checkUserProperty(userRetrieved, UserType.F_EMPLOYEE_TYPE, subresult, USER_EMPLOYEE_TYPE);
+        checkUserProperty(userRetrieved, UserType.F_SUBTYPE, subresult, USER_SUBTYPE);
         checkUserPropertyPolyString(userRetrieved, UserType.F_ORGANIZATION, subresult, USER_ORGANIZATION);
         checkUserProperty(userRetrieved, UserType.F_DESCRIPTION, subresult, POLICIJA);
     }
@@ -615,7 +603,7 @@ public class EncodingTest extends BaseSQLRepoTest {
     private <O extends ObjectType, T> void checkUserProperty(PrismObject<O> object, QName propQName, OperationResult parentResult, T... expectedValues) {
         String propName = propQName.getLocalPart();
         OperationResult result = parentResult.createSubresult(parentResult.getOperation() + "." + propName);
-        PrismProperty<T> prop = object.findProperty(propQName);
+        PrismProperty<T> prop = object.findProperty(ItemName.fromQName(propQName));
         Collection<T> actualValues = prop.getRealValues();
         result.addArbitraryObjectCollectionAsParam("actualValues", actualValues);
         assertMultivalue("User, property '" + propName + "'", expectedValues, actualValues, result);
@@ -690,7 +678,7 @@ public class EncodingTest extends BaseSQLRepoTest {
     private <O extends ObjectType> void checkUserPropertyPolyString(PrismObject<O> object, QName propQName, OperationResult parentResult, String... expectedValues) {
         String propName = propQName.getLocalPart();
         OperationResult result = parentResult.createSubresult(parentResult.getOperation() + "." + propName);
-        PrismProperty<PolyString> prop = object.findProperty(propQName);
+        PrismProperty<PolyString> prop = object.findProperty(ItemName.fromQName(propQName));
         Collection<PolyString> actualValues = prop.getRealValues();
         result.addArbitraryObjectCollectionAsParam("actualValues", actualValues);
         assertMultivaluePolyString("User, property '" + propName + "'", expectedValues, actualValues, result);

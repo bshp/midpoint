@@ -1,26 +1,17 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.data.common;
 
 import com.evolveum.midpoint.repo.sql.data.common.id.ROrgClosureId;
+import com.evolveum.midpoint.repo.sql.helpers.modify.Ignore;
 import com.evolveum.midpoint.repo.sql.query2.definition.NotQueryable;
 import com.evolveum.midpoint.repo.sql.util.RUtil;
 import org.hibernate.annotations.ForeignKey;
-import org.hibernate.annotations.Index;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -28,12 +19,15 @@ import java.io.Serializable;
 /**
  * @author lazyman
  */
+@Ignore
 @IdClass(ROrgClosureId.class)
 @Entity
-@Table(name = "m_org_closure")
-@org.hibernate.annotations.Table(appliesTo = "m_org_closure",
-        indexes = {@Index(name = "iDescendant", columnNames = {"descendant_oid"}),
-                   @Index(name = "iDescendantAncestor", columnNames = {"descendant_oid", "ancestor_oid"})})
+@Table(name = "m_org_closure",
+        indexes = {
+                @javax.persistence.Index(name = "iAncestor", columnList = "ancestor_oid"),
+                @javax.persistence.Index(name = "iDescendant", columnList = "descendant_oid"),
+                @javax.persistence.Index(name = "iDescendantAncestor", columnList = "descendant_oid, ancestor_oid")
+        })
 @NotQueryable
 public class ROrgClosure implements Serializable {
 
@@ -65,7 +59,7 @@ public class ROrgClosure implements Serializable {
     }
 
     @MapsId("ancestorOid")
-    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({@JoinColumn(name = "ancestor_oid", referencedColumnName = "oid")})
     @ForeignKey(name = "fk_ancestor")
     @NotQueryable
@@ -74,7 +68,6 @@ public class ROrgClosure implements Serializable {
     }
 
     @Id
-    @Index(name = "iAncestor")
     @Column(name = "ancestor_oid", length = RUtil.COLUMN_LENGTH_OID, insertable = false, updatable = false)
     @NotQueryable
     public String getAncestorOid() {
@@ -89,7 +82,7 @@ public class ROrgClosure implements Serializable {
     }
 
     @MapsId("descendantOid")
-    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({@JoinColumn(name = "descendant_oid", referencedColumnName = "oid")})
     @ForeignKey(name = "fk_descendant")
     @NotQueryable
@@ -98,7 +91,6 @@ public class ROrgClosure implements Serializable {
     }
 
     @Id
-    @Index(name = "iDescendant")
     @Column(name = "descendant_oid", length = RUtil.COLUMN_LENGTH_OID, insertable = false, updatable = false)
     @NotQueryable
     public String getDescendantOid() {

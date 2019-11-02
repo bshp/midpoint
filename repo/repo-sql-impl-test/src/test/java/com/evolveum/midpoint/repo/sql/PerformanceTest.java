@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2010-2019 Evolveum and contributors
+ *
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
+ */
 package com.evolveum.midpoint.repo.sql;
 
 import com.evolveum.midpoint.prism.*;
@@ -10,6 +16,7 @@ import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
@@ -48,13 +55,24 @@ public class PerformanceTest extends BaseSQLRepoTest {
 
     @Test(enabled = false)
     public void test100Parsing() throws Exception {
-        long time = System.currentTimeMillis();
+        String data = FileUtils.readFileToString(new File(FOLDER_BASIC, "objects.xml"), "utf-8");
+        String lang = PrismContext.LANG_JSON;
 
-        int COUNT = 1000;
+        List<PrismObject<? extends Objectable>> list = prismContext.parserFor(data).parseObjects();
+        String[] dataArray = new String[list.size()];
+
+        int j = 0;
+        for (PrismObject o : list) {
+            dataArray[j] = prismContext.serializerFor(lang).serialize(o);
+            j++;
+        }
+
+        long time = System.currentTimeMillis();
+        int COUNT = 10000;
         for (int i = 0; i < COUNT; i++) {
-            List<PrismObject<? extends Objectable>> elements = prismContext.parserFor(new File(FOLDER_BASIC, "objects.xml")).parseObjects();
-            for (PrismObject obj : elements) {
-                prismContext.serializeObjectToString(obj, PrismContext.LANG_XML);
+            for (String s : dataArray) {
+                PrismObject o = prismContext.parserFor(s).parse();
+                prismContext.serializerFor(lang).serialize(o);
             }
         }
         LOGGER.info("xxx>> time: {}", (System.currentTimeMillis() - time));
@@ -187,19 +205,19 @@ public class PerformanceTest extends BaseSQLRepoTest {
         final String NS_P = "http://example.com/p";
 
         PrismProperty property = prism.findOrCreateProperty(
-                new ItemPath(ObjectType.F_EXTENSION, new QName(NS_P, "weapon")));
+                ItemPath.create(ObjectType.F_EXTENSION, new QName(NS_P, "weapon")));
         property.setRealValue("Ak-47-" + new Random().nextInt(10));
 
         property = prism.findOrCreateProperty(
-                new ItemPath(ObjectType.F_EXTENSION, new QName(NS_P, "shipName")));
+                ItemPath.create(ObjectType.F_EXTENSION, new QName(NS_P, "shipName")));
         property.setRealValue("smallBoat-" + new Random().nextInt(10));
 
         property = prism.findOrCreateProperty(
-                new ItemPath(ObjectType.F_EXTENSION, new QName(NS_P, "loot")));
+                ItemPath.create(ObjectType.F_EXTENSION, new QName(NS_P, "loot")));
         property.setRealValue(new Random().nextInt(10000));
 
         property = prism.findOrCreateProperty(
-                new ItemPath(ObjectType.F_EXTENSION, new QName(NS_P, "funeralDate")));
+                ItemPath.create(ObjectType.F_EXTENSION, new QName(NS_P, "funeralDate")));
         property.setRealValue(XMLGregorianCalendarType.asXMLGregorianCalendar(new Date()));
 
         return user;
@@ -239,7 +257,7 @@ public class PerformanceTest extends BaseSQLRepoTest {
     private void writeObject(ObjectType obj, Writer writer) throws IOException, SchemaException {
         PrismObject prism = obj.asPrismObject();
         prismContext.adopt(prism);
-        writer.write(prismContext.serializeObjectToString(prism, PrismContext.LANG_XML));
+        writer.write(prismContext.serializerFor(PrismContext.LANG_XML).serialize(prism));
         writer.write('\n');
     }
 

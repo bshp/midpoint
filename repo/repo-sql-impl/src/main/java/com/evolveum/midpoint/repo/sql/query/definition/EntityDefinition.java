@@ -1,30 +1,21 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.query.definition;
 
+import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
-import com.evolveum.midpoint.prism.path.NameItemPathSegment;
 import com.evolveum.midpoint.util.DebugDumpable;
 import com.evolveum.midpoint.util.QNameUtil;
 
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AssignmentType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ConstructionType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
-import org.apache.commons.lang.Validate;
+import org.jetbrains.annotations.NotNull;
 
 import javax.xml.namespace.QName;
 
@@ -57,7 +48,7 @@ public class EntityDefinition extends Definition {
 
     public List<Definition> getDefinitions() {
         if (definitions == null) {
-            definitions = new ArrayList<Definition>();
+            definitions = new ArrayList<>();
         }
 
         return Collections.unmodifiableList(definitions);
@@ -65,10 +56,10 @@ public class EntityDefinition extends Definition {
 
     public void addDefinition(Definition definition) {
         if (definitions == null) {
-            definitions = new ArrayList<Definition>();
+            definitions = new ArrayList<>();
         }
 
-        Definition oldDef = findDefinition(definition.getJaxbName(), Definition.class);
+        Definition oldDef = findLocalDefinition(definition.getJaxbName(), Definition.class);
         if (oldDef != null) {
             definitions.remove(oldDef);
         }
@@ -116,64 +107,53 @@ public class EntityDefinition extends Definition {
 
     @Override
     public <D extends Definition> D findDefinition(ItemPath path, Class<D> type) {
-        if (path == null || path.isEmpty()) {
+        if (ItemPath.isEmpty(path)) {
             if (type.isAssignableFrom(EntityDefinition.class)) {
                 return (D) this;
+            } else {
+                return null;
             }
         }
 
-        NameItemPathSegment first = (NameItemPathSegment) path.first();
-        ItemPath tail = path.tail();
-        if (ObjectType.F_METADATA.equals(first.getName())) {
+        ItemName firstName = path.firstToName();
+        ItemPath rest = path.rest();
+        if (QNameUtil.match(ObjectType.F_METADATA, firstName)) {
             //metadata is not an repository entity
-            first  = (NameItemPathSegment) tail.first();
-            tail = tail.tail();
-        } else if (QNameUtil.match(AssignmentType.F_CONSTRUCTION, first.getName()) &&
-                tail != null &&
-                tail.first() instanceof NameItemPathSegment &&
-                QNameUtil.match(ConstructionType.F_RESOURCE_REF, ((NameItemPathSegment) (tail.first())).getName())) {
+            firstName = rest.firstToName();
+            rest = rest.rest();
+        } else if (QNameUtil.match(AssignmentType.F_CONSTRUCTION, firstName) &&
+                rest.startsWithName(ConstructionType.F_RESOURCE_REF)) {
             // ugly hack: construction/resourceRef -> resourceRef
-            first = (NameItemPathSegment) tail.first();
-            tail = tail.tail();
+            firstName = rest.firstToName();
+            rest = rest.rest();
         }
 
-        if (tail.isEmpty()) {
-            return findDefinition(first.getName(), type);
+        if (rest.isEmpty()) {
+            return findLocalDefinition(firstName, type);
         } else {
-            Definition def = findDefinition(first.getName(), Definition.class);
+            Definition def = findLocalDefinition(firstName, Definition.class);
             if (def instanceof CollectionDefinition) {
                 CollectionDefinition collDef = (CollectionDefinition) def;
                 def = collDef.getDefinition();
             }
-
             if (def instanceof EntityDefinition) {
                 EntityDefinition nextEntity = (EntityDefinition) def;
-                return nextEntity.findDefinition(tail, type);
+                return nextEntity.findDefinition(rest, type);
+            } else {
+                return null;
             }
         }
-
-        return null;
     }
 
     @Override
-    public <D extends Definition> D findDefinition(QName jaxbName, Class<D> type) {
-        Validate.notNull(jaxbName, "Jaxb name must not be null.");
-        Validate.notNull(type, "Definition type must not be null.");
+    public <D extends Definition> D findLocalDefinition(@NotNull QName jaxbName, @NotNull Class<D> type) {
 
         for (Definition definition : getDefinitions()) {
-        	//TODO: using match instead of strict equals..is this OK for repository??this is the situation, we have "common" namepsace
-        	if (!QNameUtil.match(jaxbName, definition.getJaxbName())){
-        		continue;
-        	}
-//            if (!jaxbName.equals(definition.getJaxbName())) {
-//                continue;
-//            }
-
-            if (type.isAssignableFrom(definition.getClass())) {
+            //TODO: using match instead of strict equals..is this OK for repository??this is the situation, we have "common" namepsace
+            if (QNameUtil.match(jaxbName, definition.getJaxbName()) && type.isAssignableFrom(definition.getClass())) {
                 return (D) definition;
             }
         }
-
         return null;
     }
 }

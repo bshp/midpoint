@@ -1,22 +1,14 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2018 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.security;
 
 import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
+import com.evolveum.midpoint.model.api.authentication.MidPointUserProfilePrincipal;
 import com.evolveum.midpoint.security.api.AuthorizationConstants;
 import com.evolveum.midpoint.security.api.MidPointPrincipal;
 import com.evolveum.midpoint.util.logging.Trace;
@@ -26,9 +18,17 @@ import com.evolveum.midpoint.web.application.PageDescriptor;
 import com.evolveum.midpoint.web.component.menu.MainMenuItem;
 import com.evolveum.midpoint.web.component.menu.MenuItem;
 
+import org.apache.wicket.markup.ComponentTag;
+import org.apache.wicket.markup.MarkupStream;
+import org.apache.wicket.markup.html.WebMarkupContainer;
+import org.apache.wicket.request.Request;
+import org.apache.wicket.request.Response;
+import org.apache.wicket.request.cycle.RequestCycle;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.csrf.CsrfToken;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,28 +39,28 @@ public class SecurityUtils {
 
     private static final Trace LOGGER = TraceManager.getTrace(SecurityUtils.class);
 
-    public static MidPointPrincipal getPrincipalUser() {
+    public static MidPointUserProfilePrincipal getPrincipalUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         return getPrincipalUser(authentication);
     }
 
-    public static MidPointPrincipal getPrincipalUser(Authentication authentication) {
+    public static MidPointUserProfilePrincipal getPrincipalUser(Authentication authentication) {
         if (authentication == null) {
             LOGGER.trace("Authentication not available in security context.");
             return null;
         }
 
         Object principal = authentication.getPrincipal();
-        if (principal instanceof MidPointPrincipal) {
-        	return (MidPointPrincipal) principal;
+        if (principal instanceof MidPointUserProfilePrincipal) {
+            return (MidPointUserProfilePrincipal) principal;
         }
         if (AuthorizationConstants.ANONYMOUS_USER_PRINCIPAL.equals(principal)) {
-        	// silently ignore to avoid filling the logs
-        	return null;
+            // silently ignore to avoid filling the logs
+            return null;
         }
         LOGGER.debug("Principal user in security context holder is {} ({}) but not type of {}",
-                    new Object[]{principal, principal.getClass(), MidPointPrincipal.class.getName()});
+                principal, principal.getClass(), MidPointUserProfilePrincipal.class.getName());
         return null;
     }
 
@@ -94,5 +94,39 @@ public class SecurityUtils {
         }
 
         return WebComponentUtil.isAuthorized(list.toArray(new String[list.size()]));
+    }
+
+    public static WebMarkupContainer createHiddenInputForCsrf(String id) {
+        WebMarkupContainer field = new WebMarkupContainer(id) {
+
+            @Override
+            public void onComponentTagBody(MarkupStream markupStream, ComponentTag openTag) {
+                super.onComponentTagBody(markupStream, openTag);
+
+                appendHiddenInputForCsrf(getResponse());
+            }
+        };
+        field.setRenderBodyOnly(true);
+
+        return field;
+    }
+
+    public static void appendHiddenInputForCsrf(Response resp) {
+        CsrfToken csrfToken = getCsrfToken();
+        if (csrfToken == null) {
+            return;
+        }
+
+        String parameterName = csrfToken.getParameterName();
+        String value = csrfToken.getToken();
+
+        resp.write("<input type=\"hidden\" name=\"" + parameterName + "\" value=\"" + value + "\"/>");
+    }
+
+    public static CsrfToken getCsrfToken() {
+        Request req = RequestCycle.get().getRequest();
+        HttpServletRequest httpReq = (HttpServletRequest) req.getContainerRequest();
+
+        return (CsrfToken) httpReq.getAttribute("_csrf");
     }
 }

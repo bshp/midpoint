@@ -1,6 +1,13 @@
+/**
+ * Copyright (c) 2010-2019 Evolveum and contributors
+ *
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
+ */
 package com.evolveum.midpoint.web.session;
 
 import com.evolveum.midpoint.web.component.util.SelectableBean;
+import com.evolveum.midpoint.web.component.util.TreeSelectableBean;
 import com.evolveum.midpoint.web.page.admin.users.dto.TreeStateSet;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.OrgType;
 
@@ -10,21 +17,23 @@ import java.util.Set;
  * Created by honchar
  */
 public interface OrgTreeStateStorage {
-    public Set<SelectableBean<OrgType>> getExpandedItems();
+    Set<TreeSelectableBean<OrgType>> getExpandedItems();
 
-    public void setExpandedItems(TreeStateSet<SelectableBean<OrgType>> expandedItems);
+    void setExpandedItems(TreeStateSet<TreeSelectableBean<OrgType>> expandedItems);
 
-    public SelectableBean<OrgType> getSelectedItem();
+    TreeSelectableBean<OrgType> getSelectedItem();
 
-    public void setSelectedItem(SelectableBean<OrgType> selectedItem);
+    void setSelectedItem(TreeSelectableBean<OrgType> selectedItem);
 
-    public int getSelectedTabId();
+    int getSelectedTabId();
 
-    public void setSelectedTabId(int selectedTabId);
+    void setSelectedTabId(int selectedTabId);
 
-    public SelectableBean<OrgType> getCollapsedItem();
+    TreeSelectableBean<OrgType> getCollapsedItem();
 
-    public void setCollapsedItem(SelectableBean<OrgType> collapsedItem);
+    void setCollapsedItem(TreeSelectableBean<OrgType> collapsedItem);
 
+    boolean isInverse();
 
+    void setInverse(boolean inverse);
 }

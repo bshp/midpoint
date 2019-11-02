@@ -1,28 +1,27 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.task.api;
 
 import java.text.ParseException;
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
+import java.util.function.Function;
 
+import com.evolveum.midpoint.schema.cache.CacheConfigurationManager;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
+import org.jetbrains.annotations.NotNull;
+
+import com.evolveum.midpoint.prism.ItemDefinition;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.delta.ItemDelta;
+import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
+import com.evolveum.midpoint.repo.api.PreconditionViolationException;
+import com.evolveum.midpoint.repo.api.RepoAddOptions;
 import com.evolveum.midpoint.schema.GetOperationOptions;
 import com.evolveum.midpoint.schema.ResultHandler;
 import com.evolveum.midpoint.schema.SearchResultList;
@@ -32,12 +31,6 @@ import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.util.exception.ObjectAlreadyExistsException;
 import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
 import com.evolveum.midpoint.util.exception.SchemaException;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.CleanupPolicyType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.NodeType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.TaskType;
-
-import org.jetbrains.annotations.NotNull;
 
 /**
  * <p>Task Manager Interface.</p>
@@ -75,15 +68,6 @@ public interface TaskManager {
 
     //region Generic operations delegated from the model
     /**
-     *
-     * @param type
-     * @param query
-     * @param options
-     * @param parentResult
-     * @param <T>
-     * @return
-     * @throws SchemaException
-     *
      * Notes: Implemented options are:
      *
      * - noFetch: it causes task manager NOT to ask remote nodes about node/task status.
@@ -96,28 +80,13 @@ public interface TaskManager {
 
     /**
      * Counts the number of objects.
-     *
-     * @param type
-     * @param query
-     * @param parentResult
-     * @param <T>
-     * @return
-     * @throws SchemaException
      */
     <T extends ObjectType> int countObjects(Class<T> type, ObjectQuery query, OperationResult parentResult) throws SchemaException;
 
-    void waitForTransientChildren(Task task, OperationResult result);
+    void waitForTransientChildren(RunningTask task, OperationResult result);
 
     /**
      * TODO
-     *
-     * @param clazz
-     * @param oid
-     * @param options
-     * @param task
-     * @param result
-     * @param <T>
-     * @return
      */
     <T extends ObjectType> PrismObject<T> getObject(Class<T> clazz, String oid, Collection<SelectorOptions<GetOperationOptions>> options, OperationResult result) throws ObjectNotFoundException, SchemaException;
 
@@ -155,7 +124,12 @@ public interface TaskManager {
      * @throws IllegalArgumentException
      *             wrong OID format, etc.
      */
-    public String addTask(PrismObject<TaskType> taskPrism, OperationResult parentResult)
+    default String addTask(PrismObject<TaskType> taskPrism, OperationResult parentResult)
+            throws ObjectAlreadyExistsException, SchemaException {
+        return addTask(taskPrism, null, parentResult);
+    }
+
+    String addTask(PrismObject<TaskType> taskPrism, RepoAddOptions options, OperationResult parentResult)
             throws ObjectAlreadyExistsException, SchemaException;
 
     /**
@@ -188,7 +162,7 @@ public interface TaskManager {
      * @throws IllegalArgumentException
      *             wrong OID format, described change is not applicable
      */
-    public void modifyTask(String oid, Collection<? extends ItemDelta> modifications, OperationResult parentResult)
+    void modifyTask(String oid, Collection<? extends ItemDelta> modifications, OperationResult parentResult)
             throws ObjectNotFoundException, SchemaException, ObjectAlreadyExistsException;
 
     /**
@@ -209,84 +183,91 @@ public interface TaskManager {
      * @throws IllegalArgumentException
      *             wrong OID format, described change is not applicable
      */
-    public void deleteTask(String oid, OperationResult parentResult) throws ObjectNotFoundException, SchemaException;
+    void deleteTask(String oid, OperationResult parentResult) throws ObjectNotFoundException, SchemaException;
 
     //endregion
 
     //region Basic working with tasks (create, get, modify, delete)
     // ==================================================== Basic working with tasks (create, get, modify, delete)
 
-	/**
-	 * Creates new transient, running task instance.
-	 *
-	 * This is fact creates usual "synchronous" task.
-	 *
-	 * This is useful for normal day-to-day tasks that are either
-	 * synchronous or start as a synchronous and are switched to
-	 * asynchronous task later.
-	 *
-	 * @return transient, running task instance
-	 */
-	public Task createTaskInstance();
+    /**
+     * Creates new transient, running task instance.
+     *
+     * This is fact creates usual "synchronous" task.
+     *
+     * This is useful for normal day-to-day tasks that are either
+     * synchronous or start as a synchronous and are switched to
+     * asynchronous task later.
+     *
+     * @return transient, running task instance
+     */
+    Task createTaskInstance();
 
-	/**
-	 * Creates task instance from the XML task representation.
-	 *
-	 * @param taskPrism JAXB (XML) representation of the task
-	 * @return new Java representation of the task
-	 * @throws SchemaException The provided taskType is not compliant to schema
-	 */
-	@NotNull
-	Task createTaskInstance(PrismObject<TaskType> taskPrism, OperationResult parentResult) throws SchemaException;
+    /**
+     * Creates task instance from the XML task representation.
+     *
+     * @param taskPrism JAXB (XML) representation of the task
+     * @return new Java representation of the task
+     * @throws SchemaException The provided taskType is not compliant to schema
+     */
+    @NotNull
+    Task createTaskInstance(PrismObject<TaskType> taskPrism, OperationResult parentResult) throws SchemaException;
 
-	/**
-	 * Creates new transient, running task instance.
-	 *
-	 * This is fact creates usual "synchronous" task.
-	 *
-	 * This is useful for normal day-to-day tasks that are either
-	 * synchronous or start as a synchronous and are switched to
-	 * asynchronous task later.
-	 *
-	 * The result inside the task will be initialized with
-	 * specified operation name.
-	 *
-	 * @param operationName operation name to use as a root for new result in task
-	 * @return new Java representation of the task
-	 */
-	public Task createTaskInstance(String operationName);
+    /**
+     * Creates new transient, running task instance.
+     *
+     * This is fact creates usual "synchronous" task.
+     *
+     * This is useful for normal day-to-day tasks that are either
+     * synchronous or start as a synchronous and are switched to
+     * asynchronous task later.
+     *
+     * The result inside the task will be initialized with
+     * specified operation name.
+     *
+     * @param operationName operation name to use as a root for new result in task
+     * @return new Java representation of the task
+     */
+    Task createTaskInstance(String operationName);
 
-	/**
-	 * Creates task instance from the XML task representation.
-	 *
-	 * If there is not a result inside the task, it will create the
-	 * result with specified operation name.
-	 *
-	 * @param taskPrism Prism representation of the task
-	 * @param operationName operation name to use as a root for new result in task
-	 * @return new Java representation of the task
-	 * @throws SchemaException The provided taskType is not compliant to schema
-	 */
-	@NotNull
-	public Task createTaskInstance(PrismObject<TaskType> taskPrism, String operationName, OperationResult parentResult) throws SchemaException;
+    /**
+     * Creates task instance from the XML task representation.
+     *
+     * If there is not a result inside the task, it will create the
+     * result with specified operation name.
+     *
+     * @param taskPrism Prism representation of the task
+     * @param operationName operation name to use as a root for new result in task
+     * @return new Java representation of the task
+     * @throws SchemaException The provided taskType is not compliant to schema
+     */
+    @NotNull
+    Task createTaskInstance(PrismObject<TaskType> taskPrism, String operationName, OperationResult parentResult) throws SchemaException;
 
-	/**
-	 * Returns a task with specified OID.
-	 *
-	 * This operation will look up a task instance in the repository and return it in a form of Task object.
-	 *
-	 * Works only on persistent tasks.
-	 *
-	 * @param taskOid OID of the persistent task.
-	 * @return Task instance
-	 * @throws SchemaException error dealing with resource schema
-	 * @throws ObjectNotFoundException wrong OID format, etc.
-	 */
-	@NotNull
-	Task getTask(String taskOid, OperationResult parentResult) throws ObjectNotFoundException, SchemaException;
+    /**
+     * Returns a task with specified OID.
+     *
+     * This operation will look up a task instance in the repository and return it in a form of Task object.
+     *
+     * Works only on persistent tasks.
+     *
+     * @param taskOid OID of the persistent task.
+     * @return Task instance
+     * @throws SchemaException error dealing with resource schema
+     * @throws ObjectNotFoundException wrong OID format, etc.
+     */
+    @NotNull
+    Task getTask(String taskOid, OperationResult parentResult) throws ObjectNotFoundException, SchemaException;
 
-	@NotNull
-	Task getTask(String taskOid, Collection<SelectorOptions<GetOperationOptions>> options, OperationResult parentResult) throws ObjectNotFoundException, SchemaException;
+    @NotNull
+    Task getTaskWithResult(String taskOid, OperationResult parentResult) throws ObjectNotFoundException, SchemaException;
+
+    /**
+     * BEWARE: This method does not obey taskManager-related options, e.g. retrieve(F_SUBTASK). If you need to apply them,
+     * use getTaskObject instead. See MID-5374.
+     */
+    @NotNull
+    Task getTask(String taskOid, Collection<SelectorOptions<GetOperationOptions>> options, OperationResult parentResult) throws ObjectNotFoundException, SchemaException;
 
     /**
      * Returns a task with a given identifier.
@@ -294,21 +275,14 @@ public interface TaskManager {
      * (NOTE: Currently finds only persistent tasks. In the future, we plan to support searching for transient tasks as well.)
      *
      * @param identifier task identifier to search for
-     * @param parentResult
-     * @return
-     * @throws SchemaException
-     * @throws ObjectNotFoundException
      */
+    @NotNull
     Task getTaskByIdentifier(String identifier, OperationResult parentResult) throws SchemaException, ObjectNotFoundException;
 
     /**
      * TODO
-     *
-     * @param identifier
-     * @param options
-     * @param parentResult
-     * @return
      */
+    @NotNull
     PrismObject<TaskType> getTaskTypeByIdentifier(String identifier, Collection<SelectorOptions<GetOperationOptions>> options, OperationResult parentResult) throws SchemaException, ObjectNotFoundException;
 
     /**
@@ -320,24 +294,18 @@ public interface TaskManager {
      *
      * @param closedTasksPolicy specifies which tasks are to be deleted, e.g. how old they have to be
      * @param task task, within which context the cleanup executes (used to test for interruptions)
-     * @param opResult
-     * @throws SchemaException
      */
-    void cleanupTasks(CleanupPolicyType closedTasksPolicy, Task task, OperationResult opResult) throws SchemaException;
+    void cleanupTasks(CleanupPolicyType closedTasksPolicy, RunningTask task, OperationResult opResult) throws SchemaException;
 
     /**
      * This is a signal to task manager that a new task was created in the repository.
      * Task manager can react to it e.g. by creating shadow quartz job and trigger.
-     *
-     * @param oid
      */
     void onTaskCreate(String oid, OperationResult parentResult);
 
     /**
      * This is a signal to task manager that a task was removed from the repository.
      * Task manager can react to it e.g. by removing shadow quartz job and trigger.
-     *
-     * @param oid
      */
     void onTaskDelete(String oid, OperationResult parentResult);
     //endregion
@@ -345,7 +313,7 @@ public interface TaskManager {
     //region Searching for tasks
     // ==================================================== Searching for tasks
 
-    /**
+    /*
      * Returns tasks satisfying given query.
      *
      * Comparing to searchObjects(TaskType) in repo, there are the following differences:
@@ -371,7 +339,7 @@ public interface TaskManager {
      */
     //List<Task> searchTasks(ObjectQuery query, ClusterStatusInformation clusterStatusInformation, OperationResult result) throws SchemaException;
 
-    /**
+    /*
      * Returns the number of tasks satisfying given query.
      *
      * @param query search query
@@ -389,20 +357,26 @@ public interface TaskManager {
      *
      * @return tasks that currently run on this node.
      */
-    public Set<Task> getLocallyRunningTasks(OperationResult parentResult) throws TaskManagerException;
+    Collection<Task> getLocallyRunningTasks(OperationResult parentResult);
+
+    /**
+     * Returns the local scheduler information.
+     */
+    SchedulerInformationType getLocalSchedulerInformation(OperationResult parentResult);
+
+    void stopLocalScheduler(OperationResult parentResult);
+
+    void startLocalScheduler(OperationResult parentResult);
+
+    void stopLocalTask(String oid, OperationResult parentResult);
 
     /**
      * Returns locally-run task by identifier. Returned instance is the same as is being used to carrying out
      * operations. SO USE WITH CARE.
      *
      * EXPERIMENTAL. Should be replaced by something like "get operational information".
-     *
-     * @param lightweightIdentifier
-     * @param parentResult
-     * @return
-     * @throws TaskManagerException
      */
-    public Task getLocallyRunningTaskByIdentifier(String lightweightIdentifier);
+    RunningTask getLocallyRunningTaskByIdentifier(String lightweightIdentifier);
 
     //endregion
 
@@ -413,20 +387,40 @@ public interface TaskManager {
      * Suspends a set of tasks. Sets their execution status to SUSPENDED. Stops their execution (unless doNotStop is set).
      *
      * @param taskOids a collection of OIDs of tasks that have to be suspended
-     * @param waitTime how long (in milliseconds) to wait for stopping the execution of tasks;
+     * @param waitForStop how long (in milliseconds) to wait for stopping the execution of tasks;
      *                 WAIT_INDEFINITELY means wait indefinitely :)
      *                 DO_NOT_WAIT means stop the tasks, but do not wait for finishing their execution
      *                 DO_NOT_STOP means do not try to stop the task execution. Tasks will only be put into SUSPENDED state, and
      *                  their executions (if any) will be left as they are. Use this option only when you know what you're doing.
-     * @param parentResult
      * @return true if all the tasks were stopped, false if some tasks continue to run or if stopping was not requested (DO_NOT_STOP option)
+     *
+     * On error conditions does NOT throw an exception.
      */
     boolean suspendTasks(Collection<String> taskOids, long waitForStop, OperationResult parentResult);
 
     /**
-	 * Suspend a task. The same as above - stops one-member set.
-	 */
-	boolean suspendTask(Task task, long waitTime, OperationResult parentResult);
+     * Suspends a task. The same as above.
+     */
+    boolean suspendTaskQuietly(Task task, long waitTime, OperationResult parentResult)
+            throws ObjectAlreadyExistsException, ObjectNotFoundException, SchemaException;
+
+    /**
+     * Suspends a task. The same as above except that on error condition it DOES throw appropriate exception.
+     */
+    boolean suspendTask(Task task, long waitTime, OperationResult parentResult)
+            throws ObjectNotFoundException, SchemaException;
+
+    /**
+     * Suspends a task. The same as above except that on error condition it DOES throw appropriate exception.
+     */
+    boolean suspendTask(String taskOid, long waitTime, OperationResult parentResult)
+            throws SchemaException, ObjectNotFoundException;
+
+    /**
+     * After stopping a task puts it into CLOSED state (not SUSPENDED one).
+     */
+    @SuppressWarnings("UnusedReturnValue")
+    boolean suspendAndCloseTaskQuietly(Task task, long waitTime, OperationResult parentResult);
 
     /**
      * Suspends tasks and deletes them.
@@ -434,48 +428,61 @@ public interface TaskManager {
      * @param taskOidList List of task OIDs to be suspended and deleted.
      * @param suspendTimeout How long (in milliseconds) to wait for task suspension before proceeding with deletion.
      * @param alsoSubtasks Should also subtasks be deleted?
-     * @param parentResult
      */
     void suspendAndDeleteTasks(Collection<String> taskOidList, long suspendTimeout, boolean alsoSubtasks, OperationResult parentResult);
 
     /**
-	 * Resume suspended task.
-	 *
-	 * @param task task instance to be resumed.
-	 * @throws SchemaException
-	 * @throws ObjectNotFoundException
-	 */
-	public void resumeTask(Task task, OperationResult parentResult) throws ObjectNotFoundException, SchemaException;
+     * The same as above, but limited to a single task and throws the first exception encountered.
+     */
+    void suspendAndDeleteTask(String taskOid, long suspendTimeout, boolean alsoSubtasks, OperationResult parentResult)
+            throws SchemaException, ObjectNotFoundException;
+
+    /**
+     * Resume suspended task.
+     *
+     * @param task task instance to be resumed.
+     */
+    void resumeTask(Task task, OperationResult parentResult) throws ObjectNotFoundException, SchemaException;
+
+    void resumeTask(String taskOid, OperationResult parentResult) throws ObjectNotFoundException, SchemaException;
 
     /**
      * Resume suspended tasks.
      *
      * @param taskOids a collection of OIDs of tasks that have to be resumed
-     * @throws SchemaException
-     * @throws com.evolveum.midpoint.util.exception.ObjectNotFoundException
      */
     void resumeTasks(Collection<String> taskOids, OperationResult parentResult);
+
+    boolean suspendTaskTree(String coordinatorOid, long waitTime, OperationResult parentResult)
+            throws SchemaException, ObjectNotFoundException;
+
+    void resumeTaskTree(String coordinatorOid, OperationResult parentResult)
+            throws SchemaException, ObjectNotFoundException;
+
+    void reconcileWorkers(String coordinatorOid, WorkersReconciliationOptions options, OperationResult parentResult)
+            throws SchemaException, ObjectNotFoundException, ObjectAlreadyExistsException;
+
+    void deleteWorkersAndWorkState(String rootTaskOid, boolean deleteWorkers, long subtasksWaitTime, OperationResult parentResult)
+            throws SchemaException, ObjectNotFoundException;
+
+    /**
+     * TODO is this method really necessary?
+     */
+    void scheduleCoordinatorAndWorkersNow(String coordinatorOid, OperationResult parentResult) throws SchemaException, ObjectNotFoundException;
 
     /**
      * Puts a runnable/running task into WAITING state.
      *
      * @param task a runnable/running task
      * @param reason the reason for waiting, which is stored into the repository
-     * @param parentResult
-     * @throws ObjectNotFoundException
-     * @throws SchemaException
      */
     void pauseTask(Task task, TaskWaitingReason reason, OperationResult parentResult) throws ObjectNotFoundException, SchemaException;
 
     /**
      * Puts a WAITING task back into RUNNABLE state.
-     *
-     * @param task
-     * @param parentResult
-     * @throws ObjectNotFoundException
-     * @throws SchemaException
      */
-    void unpauseTask(Task task, OperationResult parentResult) throws ObjectNotFoundException, SchemaException;
+    void unpauseTask(Task task, OperationResult parentResult)
+            throws ObjectNotFoundException, SchemaException, PreconditionViolationException;
 
     /**
      * Switches the provided task to background, making it asynchronous.
@@ -485,32 +492,38 @@ public interface TaskManager {
      *
      * @param task task to switch to background.
      */
-    public void switchToBackground(Task task, OperationResult parentResult);
+    void switchToBackground(Task task, OperationResult parentResult);
+
+    /**
+     * Schedules RUNNABLE/CLOSED tasks to be run immediately. (If a task will really start immediately,
+     * depends e.g. on whether a scheduler is started, whether there are available threads, and so on.)
+     *
+     * @param taskOids a collection of OIDs of tasks that have to be scheduled
+     *
+     * Proceeds quietly - i.e. on exception it simply logs it.
+     */
+    void scheduleTasksNow(Collection<String> taskOids, OperationResult parentResult);
 
     /**
      * Schedules a RUNNABLE task or CLOSED single-run task to be run immediately. (If the task will really start immediately,
      * depends e.g. on whether a scheduler is started, whether there are available threads, and so on.)
      *
-     * @param task
-     * @param parentResult
+     * Throws appropriate exceptions.
      */
     void scheduleTaskNow(Task task, OperationResult parentResult) throws SchemaException, ObjectNotFoundException;
 
     /**
-     * Schedules a RUNNABLE/CLOSED tasks to be run immediately. (If a task will really start immediately,
-     * depends e.g. on whether a scheduler is started, whether there are available threads, and so on.)
-     *
-     * @param taskOids a collection of OIDs of tasks that have to be scheduled
-     * @param parentResult
+     * The same as above.
      */
-    void scheduleTasksNow(Collection<String> taskOids, OperationResult parentResult);
+    void scheduleTaskNow(String taskOid, OperationResult parentResult) throws SchemaException, ObjectNotFoundException;
+
     //endregion
 
-    //region Working with nodes (searching, mananging)
+    //region Working with nodes (searching, managing)
     // ==================================================== Working with nodes (searching, mananging)
 
 
-    /**
+    /*
      * Returns the number of nodes satisfying given query.
      *
      * @param query search query
@@ -522,14 +535,12 @@ public interface TaskManager {
 
     /**
      * Returns identifier for current node.
-     * @return
      */
     String getNodeId();
 
     /**
      * Checks whether supplied node is the current node.
      *
-     * @param node
      * @return true if node is the current node
      */
     boolean isCurrentNode(PrismObject<NodeType> node);
@@ -537,9 +548,6 @@ public interface TaskManager {
     /**
      * Deletes a node from the repository.
      * (Checks whether the node is not up before deleting it.)
-     *
-     * @param nodeOid
-     * @param result
      */
     void deleteNode(String nodeOid, OperationResult result) throws SchemaException, ObjectNotFoundException;
     //endregion
@@ -547,42 +555,42 @@ public interface TaskManager {
     //region Managing state of the node(s)
     // ==================================================== Managing state of the node(s)
 
-	/**
+    /**
      * Shuts down current node. Stops all tasks and cluster manager thread as well.
      * Waits until all tasks on this node finish.
-	 */
-	void shutdown();
+     */
+    void shutdown();
 
-	/**
-	 * Deactivates service threads (temporarily).
-	 *
-	 * This will suspend all background activity such as scanning threads, heartbeats and similar mechanisms.
-	 *
-	 * Note: The threads are normally activated after task manager implementation starts. This methods should not be used
-	 * in a normal case.
-	 *
-	 *  WARNING: this feature is intended for development-time diagnostics and should not be used on production environments.
-	 *  Suspending the threads may affect correct behavior of the system (such as timeouts on heartbeats). Use this feature
-	 *  only if you really know what you are doing.
+    /**
+     * Deactivates service threads (temporarily).
+     *
+     * This will suspend all background activity such as scanning threads, heartbeats and similar mechanisms.
+     *
+     * Note: The threads are normally activated after task manager implementation starts. This methods should not be used
+     * in a normal case.
+     *
+     *  WARNING: this feature is intended for development-time diagnostics and should not be used on production environments.
+     *  Suspending the threads may affect correct behavior of the system (such as timeouts on heartbeats). Use this feature
+     *  only if you really know what you are doing.
      *
      *  timeToWait is only for orientation = it may be so that the implementation would wait 2 or 3 times this value
      *  (if it waits separately for several threads completion)
-	 */
-	boolean deactivateServiceThreads(long timeToWait, OperationResult parentResult);
+     */
+    boolean deactivateServiceThreads(long timeToWait, OperationResult parentResult);
 
-	/**
-	 * Re-activates the service threads after they have been deactivated.
-	 */
-	void reactivateServiceThreads(OperationResult parentResult);
+    /**
+     * Re-activates the service threads after they have been deactivated.
+     */
+    void reactivateServiceThreads(OperationResult parentResult);
 
-	/**
-	 * Returns true if the service threads are running.
-	 *
-	 * This method returns true in a normal case. It returns false is the threads were temporarily suspended.
-	 *
-	 * @return true if the service threads are running.
-	 */
-	boolean getServiceThreadsActivationState();
+    /**
+     * Returns true if the service threads are running.
+     *
+     * This method returns true in a normal case. It returns false is the threads were temporarily suspended.
+     *
+     * @return true if the service threads are running.
+     */
+    boolean getServiceThreadsActivationState();
 
     /**
      * Stops the scheduler on a given node. This means that at that node no tasks will be started.
@@ -600,8 +608,6 @@ public interface TaskManager {
      * @param waitTime how long to wait for task shutdown, in milliseconds
      *                 0 = indefinitely
      *                 -1 = do not wait at all
-     * @param parentResult
-     * @return
      */
     boolean stopSchedulersAndTasks(Collection<String> nodeIdentifiers, long waitTime, OperationResult parentResult);
 
@@ -610,7 +616,6 @@ public interface TaskManager {
      * TaskManager is not in an error state.
      *
      * @param nodeIdentifier Node on which the scheduler should be started. Null means current node.
-     * @return true if the operation succeeded; false otherwise.
      */
     void startScheduler(String nodeIdentifier, OperationResult parentResult);
 
@@ -643,8 +648,6 @@ public interface TaskManager {
 
     /**
      * Synchronizes information in midPoint repository and task scheduling database.
-     *
-     * @param parentResult
      */
     void synchronizeTasks(OperationResult parentResult);
 
@@ -652,23 +655,17 @@ public interface TaskManager {
      * Gets next scheduled execution time for a given task.
      *
      * @param oid OID of the task
-     * @param result
      * @return null if there's no next scheduled execution for a given task or if a task with given OID does not exist
      */
     Long getNextRunStartTime(String oid, OperationResult result);
 
     /**
      * Gets a list of all task categories.
-     *
-     * @return
      */
     List<String> getAllTaskCategories();
 
     /**
      * Returns a default handler URI for a given task category.
-     *
-     * @param category
-     * @return
      */
     String getHandlerUriForCategory(String category);
 
@@ -687,7 +684,82 @@ public interface TaskManager {
      */
     void registerHandler(String uri, TaskHandler handler);
 
-	void registerTaskDeletionListener(TaskDeletionListener listener);
+    /**
+     * Registers additional handler URI for a given handler.
+     * The difference from registerHandler() is that these additional URIs are not returned when searching for a handler
+     * matching a given task category.
+     */
+    void registerAdditionalHandlerUri(String uri, TaskHandler handler);
+
+    void registerTaskDeletionListener(TaskDeletionListener listener);
+
     //endregion
 
+    /**
+     * TODO. EXPERIMENTAL.
+     */
+    ObjectQuery narrowQueryForWorkBucket(ObjectQuery query, Class<? extends ObjectType> type,
+            Function<ItemPath, ItemDefinition<?>> itemDefinitionProvider, Task workerTask,
+            WorkBucketType workBucket, OperationResult opResult) throws SchemaException, ObjectNotFoundException;
+
+    TaskHandler createAndRegisterPartitioningTaskHandler(String handlerUri, Function<Task, TaskPartitionsDefinition> partitioningStrategy);
+
+    void setFreeBucketWaitInterval(long value);
+
+    /**
+     * EXPERIMENTAL. Relaxes some assumptions on cluster structure e.g. that IP addresses of cluster members must be different.
+     * To be used for demonstration/testing only. Avoid using in production environments.
+     */
+    boolean isLocalNodeClusteringEnabled();
+
+    /**
+     * EXPERIMENTAL. Used to provide midPoint URL path (typically "/midpoint") when determined by the web layer.
+     */
+    void setWebContextPath(String path);
+
+    String getRunningTasksThreadsDump(OperationResult parentResult);
+
+    String recordRunningTasksThreadsDump(String cause, OperationResult parentResult) throws ObjectAlreadyExistsException;
+
+    String getTaskThreadsDump(String taskOid, OperationResult parentResult) throws SchemaException, ObjectNotFoundException;
+
+    String recordTaskThreadsDump(String taskOid, String cause, OperationResult parentResult) throws SchemaException, ObjectNotFoundException,
+            ObjectAlreadyExistsException;
+
+    /**
+     * Use only for tests. Otherwise considered to be an ugly hack.
+     */
+    RunningTask createFakeRunningTask(Task task);
+
+    TaskHandler getHandler(String handlerUri);
+
+    NodeType getLocalNode();
+
+    // TEMPORARY HACK -- DO NOT USE OUTSIDE task-quartz-impl module
+    Object getWorkStateManager();
+
+    // A little bit of hack as well
+    CacheConfigurationManager getCacheConfigurationManager();
+
+    boolean isDynamicProfilingEnabled();
+
+    Tracer getTracer();
+
+    boolean isClustered();
+
+    // EXPERIMENTAL
+    boolean isTracingOverridden();
+
+    // EXPERIMENTAL
+    @NotNull
+    Collection<TracingRootType> getGlobalTracingRequestedFor();
+
+    // EXPERIMENTAL
+    TracingProfileType getGlobalTracingProfile();
+
+    // EXPERIMENTAL
+    void setGlobalTracingOverride(@NotNull Collection<TracingRootType> roots, @NotNull TracingProfileType profile);
+
+    // EXPERIMENTAL
+    void removeGlobalTracingOverride();
 }

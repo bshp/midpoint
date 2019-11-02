@@ -1,23 +1,15 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.page.admin.users;
 
 import com.evolveum.midpoint.gui.api.component.tabs.PanelTab;
 import com.evolveum.midpoint.gui.api.model.CountableLoadableModel;
 import com.evolveum.midpoint.gui.api.model.LoadableModel;
+import com.evolveum.midpoint.gui.api.prism.ShadowWrapper;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.security.api.AuthorizationConstants;
 import com.evolveum.midpoint.task.api.Task;
@@ -27,8 +19,7 @@ import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.application.AuthorizationAction;
 import com.evolveum.midpoint.web.application.PageDescriptor;
 import com.evolveum.midpoint.web.component.FocusSummaryPanel;
-import com.evolveum.midpoint.web.component.assignment.AssignmentDto;
-import com.evolveum.midpoint.web.component.assignment.AssignmentEditorDto;
+import com.evolveum.midpoint.web.component.ObjectSummaryPanel;
 import com.evolveum.midpoint.web.component.objectdetails.AbstractObjectMainPanel;
 import com.evolveum.midpoint.web.component.objectdetails.FocusMainPanel;
 import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
@@ -55,9 +46,9 @@ import java.util.List;
  * Created by honchar.
  */
 @PageDescriptor(url = "/admin/mergeObjects", encoder = OnePageParameterEncoder.class, action = {
-        @AuthorizationAction(actionUri = PageAdminUsers.AUTH_USERS_ALL,
-                label = PageAdminUsers.AUTH_USERS_ALL_LABEL,
-                description = PageAdminUsers.AUTH_USERS_ALL_DESCRIPTION),
+        @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_USERS_ALL_URL,
+                label = "PageAdminUsers.auth.usersAll.label",
+                description = "PageAdminUsers.auth.usersAll.description"),
         @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_USER_URL,
                 label = "PageUser.auth.user.label",
                 description = "PageUser.auth.user.description"),
@@ -65,9 +56,9 @@ import java.util.List;
                 label = "PageMergeObjects.auth.mergeObjects.label",
                 description = "PageMergeObjects.auth.mergeObjects.description") })
 public class PageMergeObjects<F extends FocusType> extends PageAdminFocus {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private static final String DOT_CLASS = PageMergeObjects.class.getName() + ".";
+    private static final String DOT_CLASS = PageMergeObjects.class.getName() + ".";
     private static final String OPERATION_DELETE_USER = DOT_CLASS + "deleteUser";
     private static final String OPERATION_MERGE_OBJECTS = DOT_CLASS + "mergeObjects";
     private static final Trace LOGGER = TraceManager.getTrace(PageMergeObjects.class);
@@ -132,19 +123,19 @@ public class PageMergeObjects<F extends FocusType> extends PageAdminFocus {
     @Override
     protected AbstractObjectMainPanel<UserType> createMainPanel(String id){
 
-    	//empty assignments model
-    	CountableLoadableModel<AssignmentType> assignemtns = new CountableLoadableModel<AssignmentType>() {
-        	private static final long serialVersionUID = 1L;
+        //empty assignments model
+        CountableLoadableModel<AssignmentType> assignemtns = new CountableLoadableModel<AssignmentType>() {
+            private static final long serialVersionUID = 1L;
 
             @Override
             protected List<AssignmentType> load() {
                 return new ArrayList<>();
             }
-    	};
+        };
 
-    	//empty policy rules  model
-    	 CountableLoadableModel<AssignmentType> policyRules = new CountableLoadableModel<AssignmentType>() {
-         	private static final long serialVersionUID = 1L;
+        //empty policy rules  model
+         CountableLoadableModel<AssignmentType> policyRules = new CountableLoadableModel<AssignmentType>() {
+             private static final long serialVersionUID = 1L;
 
              @Override
              protected List<AssignmentType> load() {
@@ -153,19 +144,19 @@ public class PageMergeObjects<F extends FocusType> extends PageAdminFocus {
          };
 
          //empty projections model
-         LoadableModel<List<FocusSubwrapperDto<ShadowType>>> shadows = new LoadableModel<List<FocusSubwrapperDto<ShadowType>>>() {
-         	private static final long serialVersionUID = 1L;
+         LoadableModel<List<ShadowWrapper>> shadows = new LoadableModel<List<ShadowWrapper>>() {
+             private static final long serialVersionUID = 1L;
                      @Override
-                     protected List<FocusSubwrapperDto<ShadowType>> load() {
+                     protected List<ShadowWrapper> load() {
                          return new ArrayList<>();
                      }
                  };
 
         return new FocusMainPanel<UserType>(id, getObjectModel(), shadows, this) {
 
-			private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
-			@Override
+            @Override
             protected List<ITab> createTabs(final PageAdminObjectDetails<UserType> parentPage) {
                 List<ITab> tabs = new ArrayList<>();
                 tabs.add(
@@ -201,7 +192,7 @@ public class PageMergeObjects<F extends FocusType> extends PageAdminFocus {
     }
 
     @Override
-    protected void setSummaryPanelVisibility(FocusSummaryPanel summaryPanel){
+    protected void setSummaryPanelVisibility(ObjectSummaryPanel summaryPanel){
         summaryPanel.setVisible(false);
     }
 
@@ -225,7 +216,7 @@ public class PageMergeObjects<F extends FocusType> extends PageAdminFocus {
     }
 
     @Override
-    public boolean isEditingFocus() {
+    public boolean isOidParameterExists() {
         return true;
     }
 
@@ -241,7 +232,7 @@ public class PageMergeObjects<F extends FocusType> extends PageAdminFocus {
 
         } catch (Exception ex){
             result.recomputeStatus();
-            result.recordFatalError("Couldn't merge objects.", ex);
+            result.recordFatalError(getString("PageMergeObjects.message.saveOrPreviewPerformed.fatalError"), ex);
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't merge objects", ex);
             showResult(result);
         }

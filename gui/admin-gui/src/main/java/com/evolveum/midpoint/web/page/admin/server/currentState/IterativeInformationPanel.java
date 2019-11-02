@@ -1,22 +1,14 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.page.admin.server.currentState;
 
 import com.evolveum.midpoint.gui.api.component.BasePanel;
 import com.evolveum.midpoint.gui.api.page.PageBase;
+import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.prism.xml.XmlTypeConverter;
 import com.evolveum.midpoint.task.api.TaskCategory;
 import com.evolveum.midpoint.util.logging.Trace;
@@ -28,7 +20,6 @@ import com.evolveum.midpoint.web.page.admin.server.dto.TaskDtoExecutionStatus;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.IterativeTaskInformationType;
 import org.apache.commons.lang.time.DurationFormatUtils;
 import org.apache.wicket.markup.html.basic.Label;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 
 import javax.xml.datatype.XMLGregorianCalendar;
@@ -43,7 +34,7 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
 
     private static final Trace LOGGER = TraceManager.getTrace(IterativeInformationPanel.class);
 
-	private static final String ID_EXECUTION_TIME = "executionTime";
+    private static final String ID_EXECUTION_TIME = "executionTime";
     private static final String ID_OBJECTS_PROCESSED_SUCCESS = "objectsProcessedSuccess";
     private static final String ID_OBJECTS_PROCESSED_SUCCESS_TIME = "objectsProcessedSuccessTime";
     private static final String ID_LAST_OBJECT_PROCESSED_SUCCESS = "lastObjectProcessedSuccess";
@@ -68,36 +59,36 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
 
     public IterativeInformationPanel(String id, IModel<TaskCurrentStateDto> model, final PageBase pageBase) {
         super(id, model);
-		initLayout();
+        initLayout(pageBase);
     }
 
-    protected void initLayout() {
+    protected void initLayout(PageBase pageBase) {
 
-		Label executionTime = new Label(ID_EXECUTION_TIME, new AbstractReadOnlyModel<String>() {
-			@Override
-			public String getObject() {
-				TaskDto dto = getModel().getObject().getTaskDto();
-				if (dto == null) {
-					return null;
-				}
-				Long started = dto.getLastRunStartTimestampLong();
-				Long finished = dto.getLastRunFinishTimestampLong();
-				if (started == null) {
-					return null;
-				}
-				if (TaskDtoExecutionStatus.RUNNING.equals(dto.getExecution()) || finished == null || finished < started) {
-					return getString("TaskStatePanel.message.executionTime.notFinished", formatDate(new Date(started)),
-							DurationFormatUtils.formatDurationHMS(System.currentTimeMillis() - started));
-				} else {
-					return getString("TaskStatePanel.message.executionTime.finished",
-							formatDate(new Date(started)), formatDate(new Date(finished)),
-							DurationFormatUtils.formatDurationHMS(finished - started));
-				}
-			}
-		});
-		add(executionTime);
+        Label executionTime = new Label(ID_EXECUTION_TIME, new IModel<String>() {
+            @Override
+            public String getObject() {
+                TaskDto dto = getModel().getObject().getTaskDto();
+                if (dto == null) {
+                    return null;
+                }
+                Long started = dto.getLastRunStartTimestampLong();
+                Long finished = dto.getLastRunFinishTimestampLong();
+                if (started == null) {
+                    return null;
+                }
+                if (TaskDtoExecutionStatus.RUNNING.equals(dto.getExecution()) || finished == null || finished < started) {
+                    return getString("TaskStatePanel.message.executionTime.notFinished", formatDate(new Date(started), pageBase),
+                            DurationFormatUtils.formatDurationHMS(System.currentTimeMillis() - started));
+                } else {
+                    return getString("TaskStatePanel.message.executionTime.finished",
+                            formatDate(new Date(started), pageBase), formatDate(new Date(finished), pageBase),
+                            DurationFormatUtils.formatDurationHMS(finished - started));
+                }
+            }
+        });
+        add(executionTime);
 
-		Label processedSuccess = new Label(ID_OBJECTS_PROCESSED_SUCCESS, new AbstractReadOnlyModel<String>() {
+        Label processedSuccess = new Label(ID_OBJECTS_PROCESSED_SUCCESS, new IModel<String>() {
             @Override
             public String getObject() {
                 TaskCurrentStateDto dto = getModelObject();
@@ -117,7 +108,7 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
         });
         add(processedSuccess);
 
-        Label processedSuccessTime = new Label(ID_OBJECTS_PROCESSED_SUCCESS_TIME, new AbstractReadOnlyModel<String>() {
+        Label processedSuccessTime = new Label(ID_OBJECTS_PROCESSED_SUCCESS_TIME, new IModel<String>() {
             @Override
             public String getObject() {
                 TaskCurrentStateDto dto = getModelObject();
@@ -139,7 +130,7 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
         });
         add(processedSuccessTime);
 
-        Label lastProcessedSuccess = new Label(ID_LAST_OBJECT_PROCESSED_SUCCESS, new AbstractReadOnlyModel<String>() {
+        Label lastProcessedSuccess = new Label(ID_LAST_OBJECT_PROCESSED_SUCCESS, new IModel<String>() {
             @Override
             public String getObject() {
                 TaskCurrentStateDto dto = getModelObject();
@@ -160,7 +151,7 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
         });
         add(lastProcessedSuccess);
 
-        Label lastProcessedSuccessTime = new Label(ID_LAST_OBJECT_PROCESSED_SUCCESS_TIME, new AbstractReadOnlyModel<String>() {
+        Label lastProcessedSuccessTime = new Label(ID_LAST_OBJECT_PROCESSED_SUCCESS_TIME, new IModel<String>() {
             @Override
             public String getObject() {
                 TaskCurrentStateDto dto = getModelObject();
@@ -176,13 +167,13 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
                 } else {
                     if (showAgo(dto)) {
                         return getString("TaskStatePanel.message.timeInfoWithDurationAndAgo",
-                                formatDate(info.getLastSuccessEndTimestamp()),
-                                DurationFormatUtils.formatDurationWords(System.currentTimeMillis() -
-                                        XmlTypeConverter.toMillis(info.getLastSuccessEndTimestamp()), true, true),
+                                formatDate(info.getLastSuccessEndTimestamp(), pageBase),
+                                WebComponentUtil.formatDurationWordsForLocal(System.currentTimeMillis() -
+                                        XmlTypeConverter.toMillis(info.getLastSuccessEndTimestamp()), true, true, pageBase),
                                 info.getLastSuccessDuration());
                     } else {
                         return getString("TaskStatePanel.message.timeInfoWithDuration",
-                                formatDate(info.getLastSuccessEndTimestamp()),
+                                formatDate(info.getLastSuccessEndTimestamp(), pageBase),
                                 info.getLastSuccessDuration());
                     }
                 }
@@ -190,7 +181,7 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
         });
         add(lastProcessedSuccessTime);
 
-        Label processedFailure = new Label(ID_OBJECTS_PROCESSED_FAILURE, new AbstractReadOnlyModel<String>() {
+        Label processedFailure = new Label(ID_OBJECTS_PROCESSED_FAILURE, new IModel<String>() {
             @Override
             public String getObject() {
                 TaskCurrentStateDto dto = getModelObject();
@@ -211,7 +202,7 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
         });
         add(processedFailure);
 
-        Label processedFailureTime = new Label(ID_OBJECTS_PROCESSED_FAILURE_TIME, new AbstractReadOnlyModel<String>() {
+        Label processedFailureTime = new Label(ID_OBJECTS_PROCESSED_FAILURE_TIME, new IModel<String>() {
             @Override
             public String getObject() {
                 TaskCurrentStateDto dto = getModelObject();
@@ -233,7 +224,7 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
         });
         add(processedFailureTime);
 
-        Label lastProcessedFailure = new Label(ID_LAST_OBJECT_PROCESSED_FAILURE, new AbstractReadOnlyModel<String>() {
+        Label lastProcessedFailure = new Label(ID_LAST_OBJECT_PROCESSED_FAILURE, new IModel<String>() {
             @Override
             public String getObject() {
                 TaskCurrentStateDto dto = getModelObject();
@@ -254,7 +245,7 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
         });
         add(lastProcessedFailure);
 
-        Label lastProcessedFailureTime = new Label(ID_LAST_OBJECT_PROCESSED_FAILURE_TIME, new AbstractReadOnlyModel<String>() {
+        Label lastProcessedFailureTime = new Label(ID_LAST_OBJECT_PROCESSED_FAILURE_TIME, new IModel<String>() {
             @Override
             public String getObject() {
                 TaskCurrentStateDto dto = getModelObject();
@@ -270,13 +261,13 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
                 } else {
                     if (showAgo(dto)) {
                         return getString("TaskStatePanel.message.timeInfoWithDurationAndAgo",
-                                formatDate(info.getLastFailureEndTimestamp()),
-                                DurationFormatUtils.formatDurationWords(System.currentTimeMillis() -
-                                        XmlTypeConverter.toMillis(info.getLastFailureEndTimestamp()), true, true),
+                                formatDate(info.getLastFailureEndTimestamp(), pageBase),
+                                WebComponentUtil.formatDurationWordsForLocal(System.currentTimeMillis() -
+                                        XmlTypeConverter.toMillis(info.getLastFailureEndTimestamp()), true, true, pageBase),
                                 info.getLastFailureDuration());
                     } else {
                         return getString("TaskStatePanel.message.timeInfoWithDuration",
-                                formatDate(info.getLastFailureEndTimestamp()),
+                                formatDate(info.getLastFailureEndTimestamp(), pageBase),
                                 info.getLastFailureDuration());
                     }
                 }
@@ -284,7 +275,7 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
         });
         add(lastProcessedFailureTime);
 
-        Label lastError = new Label(ID_LAST_ERROR, new AbstractReadOnlyModel<String>() {
+        Label lastError = new Label(ID_LAST_ERROR, new IModel<String>() {
             @Override
             public String getObject() {
                 TaskCurrentStateDto dto = getModelObject();
@@ -300,7 +291,7 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
         });
         add(lastError);
 
-        Label currentObjectProcessed = new Label(ID_CURRENT_OBJECT_PROCESSED, new AbstractReadOnlyModel<String>() {
+        Label currentObjectProcessed = new Label(ID_CURRENT_OBJECT_PROCESSED, new IModel<String>() {
             @Override
             public String getObject() {
                 TaskCurrentStateDto dto = getModelObject();
@@ -316,7 +307,7 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
         });
         add(currentObjectProcessed);
 
-        Label currentObjectProcessedTime = new Label(ID_CURRENT_OBJECT_PROCESSED_TIME, new AbstractReadOnlyModel<String>() {
+        Label currentObjectProcessedTime = new Label(ID_CURRENT_OBJECT_PROCESSED_TIME, new IModel<String>() {
             @Override
             public String getObject() {
                 TaskCurrentStateDto dto = getModelObject();
@@ -331,48 +322,46 @@ public class IterativeInformationPanel extends BasePanel<TaskCurrentStateDto> {
                     return null;
                 } else {
                     return getString("TaskStatePanel.message.timeInfoWithAgo",
-                            formatDate(info.getCurrentObjectStartTimestamp()),
-                            DurationFormatUtils.formatDurationWords(System.currentTimeMillis() -
-                                    XmlTypeConverter.toMillis(info.getCurrentObjectStartTimestamp()), true, true));
+                            formatDate(info.getCurrentObjectStartTimestamp(), pageBase),
+                            WebComponentUtil.formatDurationWordsForLocal(System.currentTimeMillis() -
+                                    XmlTypeConverter.toMillis(info.getCurrentObjectStartTimestamp()), true, true, pageBase));
                 }
             }
         });
         add(currentObjectProcessedTime);
 
-        Label objectsTotal = new Label(ID_OBJECTS_TOTAL, new AbstractReadOnlyModel<String>() {
-            @Override
-            public String getObject() {
-                TaskCurrentStateDto dto = getModelObject();
-                if (dto == null) {
-                    return null;
-                }
-                IterativeTaskInformationType info = dto.getIterativeTaskInformationType();
-                if (info == null) {
-                    return null;
-                }
-                int objectsTotal = info.getTotalSuccessCount() + info.getTotalFailureCount();
-                if (WALL_CLOCK_AVG_CATEGORIES.contains(dto.getTaskDto().getCategory())) {
-                    Long avg = getWallClockAverage(dto, objectsTotal);
-                    if (avg != null) {
-                        return getString("TaskStatePanel.message.objectsTotal",
-                                objectsTotal, avg);
-                    }
-                }
-                return String.valueOf(objectsTotal);
+        Label objectsTotal = new Label(ID_OBJECTS_TOTAL, (IModel<String>) () -> {
+            TaskCurrentStateDto dto = getModelObject();
+            if (dto == null) {
+                return null;
             }
+            IterativeTaskInformationType info = dto.getIterativeTaskInformationType();
+            if (info == null) {
+                return null;
+            }
+            int objectsTotal1 = info.getTotalSuccessCount() + info.getTotalFailureCount();
+            if (WALL_CLOCK_AVG_CATEGORIES.contains(dto.getTaskDto().getCategory())) {
+                Long avg = getWallClockAverage(dto, objectsTotal1);
+                if (avg != null) {
+                    long throughput = avg != 0 ? 60000 / avg : 0;       // TODO what if avg == 0?
+                    return getString("TaskStatePanel.message.objectsTotal",
+                            objectsTotal1, avg, throughput);
+                }
+            }
+            return String.valueOf(objectsTotal1);
         });
         add(objectsTotal);
     }
 
-    private String formatDate(XMLGregorianCalendar date) {
-        return formatDate(XmlTypeConverter.toDate(date));
+    private String formatDate(XMLGregorianCalendar date, PageBase pageBase) {
+        return formatDate(XmlTypeConverter.toDate(date), pageBase);
     }
 
-    private String formatDate(Date date) {
+    private String formatDate(Date date, PageBase pageBase) {
         if (date == null) {
             return null;
         }
-        return date.toLocaleString();
+        return WebComponentUtil.getLongDateTimeFormattedValue(date, pageBase);
     }
 
     protected boolean showAgo(TaskCurrentStateDto dto) {

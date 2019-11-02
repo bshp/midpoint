@@ -1,21 +1,13 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.model.impl.scripting;
 
+import com.evolveum.midpoint.model.api.ModelPublicConstants;
 import com.evolveum.midpoint.model.api.ModelService;
 import com.evolveum.midpoint.model.api.ScriptExecutionException;
 import com.evolveum.midpoint.model.impl.ModelObjectResolver;
@@ -24,11 +16,13 @@ import com.evolveum.midpoint.model.impl.scripting.expressions.SearchEvaluator;
 import com.evolveum.midpoint.model.impl.scripting.expressions.SelectEvaluator;
 import com.evolveum.midpoint.model.impl.scripting.helpers.ScriptingJaxbUtil;
 import com.evolveum.midpoint.prism.*;
-import com.evolveum.midpoint.prism.marshaller.QueryConvertor;
 import com.evolveum.midpoint.prism.query.ObjectFilter;
 import com.evolveum.midpoint.repo.common.expression.ExpressionFactory;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
+import com.evolveum.midpoint.schema.expression.ExpressionProfile;
+import com.evolveum.midpoint.schema.expression.VariablesMap;
 import com.evolveum.midpoint.schema.result.OperationResult;
+import com.evolveum.midpoint.schema.util.MiscSchemaUtil;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.task.api.TaskManager;
 import com.evolveum.midpoint.util.exception.CommunicationException;
@@ -52,8 +46,6 @@ import javax.xml.namespace.QName;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static java.util.Collections.emptyMap;
 
 /**
  * Main entry point for evaluating scripting expressions.
@@ -98,7 +90,7 @@ public class ScriptingExpressionEvaluator {
         SearchExpressionType search = new SearchExpressionType();
         search.setType(objectType);
         if (filter != null) {
-            search.setSearchFilter(QueryConvertor.createSearchFilterType(filter, prismContext));
+            search.setSearchFilter(prismContext.getQueryConverter().createSearchFilterType(filter));
         }
         ActionExpressionType action = new ActionExpressionType();
         action.setType(actionName);
@@ -134,58 +126,84 @@ public class ScriptingExpressionEvaluator {
         }
         OperationResult result = parentResult.createSubresult(DOT_CLASS + "evaluateExpressionInBackground");
         task.setExtensionPropertyValue(SchemaConstants.SE_EXECUTE_SCRIPT, executeScriptCommand);
-        task.setHandlerUri(ScriptExecutionTaskHandler.HANDLER_URI);
+        task.setHandlerUri(ModelPublicConstants.SCRIPT_EXECUTION_TASK_HANDLER_URI);
         taskManager.switchToBackground(task, result);
         result.computeStatus();
     }
 
-	/**
-	 * Main entry point.
-	 */
-	public ExecutionContext evaluateExpression(@NotNull ExecuteScriptType executeScript, Map<String, Object> initialVariables, Task task, OperationResult result) throws ScriptExecutionException {
-		return evaluateExpression(executeScript, initialVariables, false, task, result);
+    /**
+     * Asynchronously executes any scripting expression.
+     *
+     * @param executeScriptCommand ExecuteScript to be executed.
+     * @param task Task in context of which the script should execute. The task should be "clean", i.e.
+     *             (1) transient, (2) without any handler. This method puts the task into background,
+     *             and assigns IterativeScriptExecutionTaskHandler to it, to execute the script.
+     */
+    public void evaluateIterativeExpressionInBackground(ExecuteScriptType executeScriptCommand, Task task, OperationResult parentResult) throws SchemaException {
+        if (!task.isTransient()) {
+            throw new IllegalStateException("Task must be transient");
+        }
+        if (task.getHandlerUri() != null) {
+            throw new IllegalStateException("Task must not have a handler");
+        }
+        OperationResult result = parentResult.createSubresult(DOT_CLASS + "evaluateExpressionInBackground");
+        task.setExtensionPropertyValue(SchemaConstants.SE_EXECUTE_SCRIPT, executeScriptCommand);
+        task.setHandlerUri(ModelPublicConstants.ITERATIVE_SCRIPT_EXECUTION_TASK_HANDLER_URI);
+        taskManager.switchToBackground(task, result);
+        result.computeStatus();
     }
 
-	/**
-	 * Entry point for privileged execution.
-	 * Note that privileged execution means
-	 */
-	public ExecutionContext evaluateExpressionPrivileged(@NotNull ExecuteScriptType executeScript, @NotNull Map<String, Object> initialVariables, Task task, OperationResult result) throws ScriptExecutionException {
-		return evaluateExpression(executeScript, initialVariables, true, task, result);
-	}
+    /**
+     * Main entry point.
+     */
+    public ExecutionContext evaluateExpression(@NotNull ExecuteScriptType executeScript, VariablesMap initialVariables,
+            boolean recordProgressAndIterationStatistics, Task task, OperationResult result) throws ScriptExecutionException {
+        return evaluateExpression(executeScript, initialVariables, false, recordProgressAndIterationStatistics, task, result);
+    }
 
-	/**
-	 * Convenience method (if we don't have full ExecuteScriptType).
-	 */
-	public ExecutionContext evaluateExpression(ScriptingExpressionType expression, Task task, OperationResult result) throws ScriptExecutionException {
-		return evaluateExpression(createExecuteScriptCommand(expression), emptyMap(), task, result);
-	}
+    /**
+     * Entry point for privileged execution.
+     * Note that privileged execution means
+     */
+    public ExecutionContext evaluateExpressionPrivileged(@NotNull ExecuteScriptType executeScript, @NotNull VariablesMap initialVariables, Task task, OperationResult result) throws ScriptExecutionException {
+        return evaluateExpression(executeScript, initialVariables, true, false, task, result);
+    }
 
-	private ExecutionContext evaluateExpression(@NotNull ExecuteScriptType executeScript, Map<String, Object> initialVariables, boolean privileged, Task task, OperationResult result) throws ScriptExecutionException {
-		Validate.notNull(executeScript.getScriptingExpression(), "Scripting expression must be present");
-		try {
-			Map<String, Object> frozenVariables = VariablesUtil.initialPreparation(initialVariables, executeScript.getVariables(), expressionFactory, modelObjectResolver, prismContext, task, result);
-			PipelineData pipelineData = PipelineData.parseFrom(executeScript.getInput(), frozenVariables, prismContext);
-			ExecutionContext context = new ExecutionContext(executeScript.getOptions(), task, this, privileged, frozenVariables);
-			PipelineData output = evaluateExpression(executeScript.getScriptingExpression().getValue(), pipelineData, context, result);
-			context.setFinalOutput(output);
-			result.computeStatusIfUnknown();
-			context.computeResults();
-			return context;
-		} catch (ExpressionEvaluationException | SchemaException | ObjectNotFoundException | RuntimeException | CommunicationException | ConfigurationException | SecurityViolationException e) {
-			result.recordFatalError("Couldn't execute script", e);
-			throw new ScriptExecutionException("Couldn't execute script: " + e.getMessage(), e);
-		}
-	}
+    /**
+     * Convenience method (if we don't have full ExecuteScriptType).
+     */
+    public ExecutionContext evaluateExpression(ScriptingExpressionType expression, Task task, OperationResult result) throws ScriptExecutionException {
+        return evaluateExpression(createExecuteScriptCommand(expression), VariablesMap.emptyMap(), false, task, result);
+    }
 
-	// not to be called from outside
-	public PipelineData evaluateExpression(JAXBElement<? extends ScriptingExpressionType> expression, PipelineData input, ExecutionContext context, OperationResult parentResult) throws ScriptExecutionException {
+    private ExecutionContext evaluateExpression(@NotNull ExecuteScriptType executeScript, VariablesMap initialVariables,
+            boolean privileged, boolean recordProgressAndIterationStatistics, Task task, OperationResult result) throws ScriptExecutionException {
+        Validate.notNull(executeScript.getScriptingExpression(), "Scripting expression must be present");
+        ExpressionProfile expressionProfile = MiscSchemaUtil.getExpressionProfile();
+        try {
+            VariablesMap frozenVariables = VariablesUtil.initialPreparation(initialVariables, executeScript.getVariables(), expressionFactory, modelObjectResolver, prismContext, expressionProfile, task, result);
+            PipelineData pipelineData = PipelineData.parseFrom(executeScript.getInput(), frozenVariables, prismContext);
+            ExecutionContext context = new ExecutionContext(executeScript.getOptions(), task, this,
+                    privileged, recordProgressAndIterationStatistics, frozenVariables);
+            PipelineData output = evaluateExpression(executeScript.getScriptingExpression().getValue(), pipelineData, context, result);
+            context.setFinalOutput(output);
+            result.computeStatusIfUnknown();
+            context.computeResults();
+            return context;
+        } catch (ExpressionEvaluationException | SchemaException | ObjectNotFoundException | RuntimeException | CommunicationException | ConfigurationException | SecurityViolationException e) {
+            result.recordFatalError("Couldn't execute script", e);
+            throw new ScriptExecutionException("Couldn't execute script: " + e.getMessage(), e);
+        }
+    }
+
+    // not to be called from outside
+    public PipelineData evaluateExpression(JAXBElement<? extends ScriptingExpressionType> expression, PipelineData input, ExecutionContext context, OperationResult parentResult) throws ScriptExecutionException {
         return evaluateExpression(expression.getValue(), input, context, parentResult);
     }
 
     // not to be called from outside
     public PipelineData evaluateExpression(ScriptingExpressionType value, PipelineData input, ExecutionContext context, OperationResult parentResult) throws ScriptExecutionException {
-    	context.checkTaskStop();
+        context.checkTaskStop();
         OperationResult globalResult = parentResult.createMinorSubresult(DOT_CLASS + "evaluateExpression");
         PipelineData output;
         if (value instanceof ExpressionPipelineType) {
@@ -259,7 +277,7 @@ public class ScriptingExpressionEvaluator {
                 } else if (object instanceof Containerable) {
                     value = ((Containerable) object).asPrismContainerValue();
                 } else {
-                    value = new PrismPropertyValue<>(object);
+                    value = prismContext.itemFactory().createPropertyValue(object);
                 }
             }
             if (value.isRaw()) {
@@ -274,7 +292,7 @@ public class ScriptingExpressionEvaluator {
     public PipelineData evaluateConstantStringExpression(RawType constant, ExecutionContext context, OperationResult result) throws ScriptExecutionException {
         try {
             String value = constant.getParsedRealValue(String.class);
-            return PipelineData.createItem(new PrismPropertyValue<>(value), context.getInitialVariables());
+            return PipelineData.createItem(prismContext.itemFactory().createPropertyValue(value), context.getInitialVariables());
         } catch (SchemaException e) {
             throw new ScriptExecutionException(e.getMessage(), e);
         }

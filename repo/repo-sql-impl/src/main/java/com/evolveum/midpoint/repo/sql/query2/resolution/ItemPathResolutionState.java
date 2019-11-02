@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.query2.resolution;
@@ -19,9 +10,7 @@ package com.evolveum.midpoint.repo.sql.query2.resolution;
 import com.evolveum.midpoint.prism.ItemDefinition;
 import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.path.ItemPath;
-import com.evolveum.midpoint.prism.path.ParentPathSegment;
 import com.evolveum.midpoint.repo.sql.query.QueryException;
-import com.evolveum.midpoint.repo.sql.query2.definition.JpaDataNodeDefinition;
 import com.evolveum.midpoint.repo.sql.query2.definition.JpaLinkDefinition;
 import com.evolveum.midpoint.util.DebugDumpable;
 import com.evolveum.midpoint.util.DebugUtil;
@@ -77,7 +66,7 @@ public class ItemPathResolutionState implements DebugDumpable {
     }
 
     public boolean isFinal() {
-        return ItemPath.isNullOrEmpty(remainingItemPath);
+        return ItemPath.isEmpty(remainingItemPath);
     }
 
     /**
@@ -96,9 +85,9 @@ public class ItemPathResolutionState implements DebugDumpable {
         // used e.g. for Exists (some-path, some-conditions AND Equals(../xxx, yyy))
         //
         // This is brutal hack, to be thought again.
-        if (remainingItemPath.startsWith(ParentPathSegment.class) && hqlDataInstance.getParentItem() != null) {
+        if (remainingItemPath.startsWithParent() && hqlDataInstance.getParentItem() != null) {
             return new ItemPathResolutionState(
-                    remainingItemPath.tail(),
+                    remainingItemPath.rest(),
                     hqlDataInstance.getParentItem(),
                     itemPathResolver);
 
@@ -106,13 +95,13 @@ public class ItemPathResolutionState implements DebugDumpable {
         DataSearchResult<?> result = hqlDataInstance.getJpaDefinition().nextLinkDefinition(remainingItemPath, itemDefinition, prismContext);
         LOGGER.trace("nextLinkDefinition on '{}' returned '{}'", remainingItemPath, result != null ? result.getLinkDefinition() : "(null)");
         if (result == null) {       // sorry we failed (however, this should be caught before -> so IllegalStateException)
-            throw new IllegalStateException("Couldn't find '" + remainingItemPath + "' in " + hqlDataInstance.getJpaDefinition());
+            throw new IllegalStateException("Couldn't find '" + remainingItemPath + "' in " + hqlDataInstance.getJpaDefinition() +", looks like item can't be used in search.");
         }
         JpaLinkDefinition linkDefinition = result.getLinkDefinition();
         String newHqlPath = hqlDataInstance.getHqlPath();
         if (linkDefinition.hasJpaRepresentation()) {
             if (singletonOnly && linkDefinition.isMultivalued()) {
-                throw new QueryException("Collections are not allowable for right-side paths");     // TODO better message + context
+                throw new QueryException("Collections are not allowable for right-side paths nor for dereferencing");     // TODO better message + context
             }
             if (!linkDefinition.isEmbedded() || linkDefinition.isMultivalued()) {
                 LOGGER.trace("Adding join for '{}' to context", linkDefinition);
@@ -122,13 +111,13 @@ public class ItemPathResolutionState implements DebugDumpable {
             }
         }
         HqlDataInstance<?> parentDataInstance;
-		if (!remainingItemPath.startsWith(ParentPathSegment.class)) {
-			// TODO what about other special cases? (@, ...)
-			parentDataInstance = hqlDataInstance;
-		} else {
-			parentDataInstance = null;
-		}
-		return new ItemPathResolutionState(
+        if (!remainingItemPath.startsWithParent()) {
+            // TODO what about other special cases? (@, ...)
+            parentDataInstance = hqlDataInstance;
+        } else {
+            parentDataInstance = null;
+        }
+        return new ItemPathResolutionState(
                 result.getRemainder(),
                 new HqlDataInstance<>(newHqlPath, result.getTargetDefinition(), parentDataInstance),
                 itemPathResolver);

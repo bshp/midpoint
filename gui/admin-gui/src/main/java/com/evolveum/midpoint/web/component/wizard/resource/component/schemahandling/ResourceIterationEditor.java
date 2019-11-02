@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2014 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.component.wizard.resource.component.schemahandling;
 
@@ -92,9 +83,9 @@ public class ResourceIterationEditor extends BasePanel<IterationSpecificationTyp
     private IModel<IterationSpecificationTypeDto> model;
 
     public ResourceIterationEditor(String id, IModel<IterationSpecificationType> iteration,
-			PageResourceWizard parentPage){
+            PageResourceWizard parentPage){
         super(id, iteration);
-		initLayout(parentPage);
+        initLayout(parentPage);
     }
 
     @Override
@@ -139,7 +130,7 @@ public class ResourceIterationEditor extends BasePanel<IterationSpecificationTyp
         getModel();
         TextField maxIteration = new TextField<>(ID_MAX_ITERATION, new PropertyModel<Integer>(model,
                 IterationSpecificationTypeDto.F_ITERATION + "." + "maxIterations"));
-		parentPage.addEditingEnabledBehavior(maxIteration);
+        parentPage.addEditingEnabledBehavior(maxIteration);
         add(maxIteration);
 
         prepareIterationSubsectionBody(IterationSpecificationType.F_TOKEN_EXPRESSION.getLocalPart(), ID_TOKEN_DESCRIPTION,
@@ -189,17 +180,17 @@ public class ResourceIterationEditor extends BasePanel<IterationSpecificationTyp
     }
 
     private void prepareIterationSubsectionBody(String containerValue, String descriptionId, String variableId,
-			String returnMultiplicityId, String expressionType, final String expression,
-			final String languageId, final String policyId, final String prefix,
-			final String languageContainerId, final String policyContainerId, PageResourceWizard parentPage){
+            String returnMultiplicityId, String expressionType, final String expression,
+            final String languageId, final String policyId, final String prefix,
+            final String languageContainerId, final String policyContainerId, PageResourceWizard parentPage){
         TextArea description = new TextArea<>(descriptionId, new PropertyModel<String>(model,
                 IterationSpecificationTypeDto.F_ITERATION + "." + containerValue + ".description"));
-		parentPage.addEditingEnabledBehavior(description);
+        parentPage.addEditingEnabledBehavior(description);
         add(description);
 
         MultiValueTextEditPanel variableList = new MultiValueTextEditPanel<ExpressionVariableDefinitionType>(variableId,
-                new PropertyModel<List<ExpressionVariableDefinitionType>>(model,
-                        IterationSpecificationTypeDto.F_ITERATION + "." + containerValue + ".variable"), null, false, true, parentPage.getReadOnlyModel()) {
+            new PropertyModel<>(model,
+                IterationSpecificationTypeDto.F_ITERATION + "." + containerValue + ".variable"), null, false, true, parentPage.getReadOnlyModel()) {
 
             @Override
             protected IModel<String> createTextModel(final IModel<ExpressionVariableDefinitionType> model) {
@@ -231,11 +222,11 @@ public class ResourceIterationEditor extends BasePanel<IterationSpecificationTyp
         add(variableList);
 
         DropDownChoice returnMultiplicity = new DropDownChoice<>(returnMultiplicityId,
-                new PropertyModel<ExpressionReturnMultiplicityType>(model,
-                        IterationSpecificationTypeDto.F_ITERATION + "." + containerValue + ".returnMultiplicity"),
+            new PropertyModel<>(model,
+                IterationSpecificationTypeDto.F_ITERATION + "." + containerValue + ".returnMultiplicity"),
                 WebComponentUtil.createReadonlyModelFromEnum(ExpressionReturnMultiplicityType.class),
-                new EnumChoiceRenderer<ExpressionReturnMultiplicityType>(this));
-		parentPage.addEditingEnabledBehavior(returnMultiplicity);
+            new EnumChoiceRenderer<>(this));
+        parentPage.addEditingEnabledBehavior(returnMultiplicity);
         add(returnMultiplicity);
 
     }

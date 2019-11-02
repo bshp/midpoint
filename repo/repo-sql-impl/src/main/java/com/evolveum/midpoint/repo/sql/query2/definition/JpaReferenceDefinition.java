@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.query2.definition;
@@ -20,8 +11,8 @@ import com.evolveum.midpoint.prism.ItemDefinition;
 import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.Visitor;
 import com.evolveum.midpoint.prism.path.ItemPath;
-import com.evolveum.midpoint.prism.path.ObjectReferencePathSegment;
 import com.evolveum.midpoint.repo.sql.query2.resolution.DataSearchResult;
+import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import org.apache.commons.lang.Validate;
 
 /**
@@ -44,11 +35,11 @@ public class JpaReferenceDefinition extends JpaDataNodeDefinition {
 
     @Override
     public DataSearchResult nextLinkDefinition(ItemPath path, ItemDefinition itemDefinition, PrismContext prismContext) {
-        if (path.first() instanceof ObjectReferencePathSegment) {
+        if (ItemPath.isObjectReference(path.first())) {
             // returning artificially created transition definition, used to allow dereferencing target object in a generic way
-            return new DataSearchResult(
-                    new JpaLinkDefinition(new ObjectReferencePathSegment(), "target", null, false, referencedEntityDefinition.getResolvedEntityDefinition()),
-                    path.tail());
+            return new DataSearchResult<>(
+                    new JpaLinkDefinition<>(SchemaConstants.PATH_OBJECT_REFERENCE, "target", null, false, referencedEntityDefinition.getResolvedEntityDefinition()),
+                    path.rest());
         } else {
             return null;
         }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2018 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.certification.test;
@@ -19,7 +10,6 @@ package com.evolveum.midpoint.certification.test;
 import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.delta.ObjectDelta;
-import com.evolveum.midpoint.prism.delta.builder.DeltaBuilder;
 import com.evolveum.midpoint.schema.SearchResultList;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.task.api.Task;
@@ -32,7 +22,6 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 
-import static com.evolveum.midpoint.test.IntegrationTestTools.display;
 import static org.testng.AssertJUnit.assertEquals;
 
 /**
@@ -44,12 +33,12 @@ import static org.testng.AssertJUnit.assertEquals;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class TestAdHocCertification extends AbstractCertificationTest {
 
-	protected static final File TEST_DIR = new File("src/test/resources/adhoc");
+    protected static final File TEST_DIR = new File("src/test/resources/adhoc");
 
-	protected static final File ASSIGNMENT_CERT_DEF_FILE = new File(TEST_DIR, "adhoc-certification-assignment.xml");
+    protected static final File ASSIGNMENT_CERT_DEF_FILE = new File(TEST_DIR, "adhoc-certification-assignment.xml");
     protected static final String ASSIGNMENT_CERT_DEF_OID = "540940e9-4ac5-4340-ba85-fd7e8b5e6686";
 
-	protected static final File MODIFICATION_CERT_DEF_FILE = new File(TEST_DIR, "adhoc-certification-modification.xml");
+    protected static final File MODIFICATION_CERT_DEF_FILE = new File(TEST_DIR, "adhoc-certification-modification.xml");
     protected static final String MODIFICATION_CERT_DEF_OID = "83a16584-bb2a-448c-aee1-82fc6d577bcb";
 
     protected static final File ORG_LABORATORY_FILE = new File(TEST_DIR, "org-laboratory.xml");
@@ -92,17 +81,16 @@ public class TestAdHocCertification extends AbstractCertificationTest {
         result.computeStatus();
         TestUtil.assertSuccess(result);
 
-		SearchResultList<PrismObject<AccessCertificationCampaignType>> campaigns = repositoryService
-				.searchObjects(AccessCertificationCampaignType.class, null, null, result);
-		assertEquals("Wrong # of campaigns", 1, campaigns.size());
-		AccessCertificationCampaignType campaign = campaigns.get(0).asObjectable();
+        SearchResultList<PrismObject<AccessCertificationCampaignType>> campaigns = getAllCampaigns(result);
+        assertEquals("Wrong # of campaigns", 1, campaigns.size());
+        AccessCertificationCampaignType campaign = campaigns.get(0).asObjectable();
 
-		campaign = getCampaignWithCases(campaign.getOid());
+        campaign = getCampaignWithCases(campaign.getOid());
         display("campaign", campaign);
-        assertAfterCampaignStart(campaign, assignmentCertificationDefinition, 1);		// beware, maybe not all details would match (in the future) - then adapt this test
-        assertPercentComplete(campaign, 0, 0, 0);      // no cases, no problems
-		assertCases(campaign.getOid(), 1);
-	}
+        assertSanityAfterCampaignStart(campaign, assignmentCertificationDefinition, 1);        // beware, maybe not all details would match (in the future) - then adapt this test
+        assertPercentCompleteAll(campaign, 0, 0, 0);      // no cases, no problems
+        assertCasesCount(campaign.getOid(), 1);
+    }
 
     @Test
     public void test020ModifyIndigo() throws Exception {
@@ -117,10 +105,10 @@ public class TestAdHocCertification extends AbstractCertificationTest {
         // WHEN
         TestUtil.displayWhen(TEST_NAME);
         @SuppressWarnings({ "unchecked", "raw" })
-		ObjectDelta<UserType> delta = (ObjectDelta<UserType>) DeltaBuilder.deltaFor(UserType.class, prismContext)
-				.item(UserType.F_DESCRIPTION).replace("new description")
-				.item(UserType.F_ACTIVATION, ActivationType.F_ADMINISTRATIVE_STATUS).replace(ActivationStatusType.DISABLED)
-				.asObjectDelta(USER_INDIGO_OID);
+        ObjectDelta<UserType> delta = prismContext.deltaFor(UserType.class)
+                .item(UserType.F_DESCRIPTION).replace("new description")
+                .item(UserType.F_ACTIVATION, ActivationType.F_ADMINISTRATIVE_STATUS).replace(ActivationStatusType.DISABLED)
+                .asObjectDelta(USER_INDIGO_OID);
         executeChanges(delta, null, task, result);
 
         // THEN
@@ -128,17 +116,16 @@ public class TestAdHocCertification extends AbstractCertificationTest {
         result.computeStatus();
         TestUtil.assertSuccess(result);
 
-		SearchResultList<PrismObject<AccessCertificationCampaignType>> campaigns = repositoryService
-				.searchObjects(AccessCertificationCampaignType.class, null, null, result);
-		assertEquals("Wrong # of campaigns", 2, campaigns.size());
-		AccessCertificationCampaignType campaign = campaigns.stream()
-				.filter(c -> MODIFICATION_CERT_DEF_OID.equals(c.asObjectable().getDefinitionRef().getOid()))
-				.findFirst()
-				.orElseThrow(() -> new AssertionError("No modification-triggered campaign")).asObjectable();
+        SearchResultList<PrismObject<AccessCertificationCampaignType>> campaigns = getAllCampaigns(result);
+        assertEquals("Wrong # of campaigns", 2, campaigns.size());
+        AccessCertificationCampaignType campaign = campaigns.stream()
+                .filter(c -> MODIFICATION_CERT_DEF_OID.equals(c.asObjectable().getDefinitionRef().getOid()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No modification-triggered campaign")).asObjectable();
 
-		campaign = getCampaignWithCases(campaign.getOid());
+        campaign = getCampaignWithCases(campaign.getOid());
         display("campaign", campaign);
-        assertAfterCampaignStart(campaign, modificationCertificationDefinition, 1);		// beware, maybe not all details would match (in the future) - then adapt this test
-        assertPercentComplete(campaign, 0, 0, 0);      // no cases, no problems
-	}
+        assertSanityAfterCampaignStart(campaign, modificationCertificationDefinition, 1);        // beware, maybe not all details would match (in the future) - then adapt this test
+        assertPercentCompleteAll(campaign, 0, 0, 0);      // no cases, no problems
+    }
 }

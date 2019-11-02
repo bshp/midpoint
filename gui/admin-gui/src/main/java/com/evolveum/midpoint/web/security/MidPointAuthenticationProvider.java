@@ -1,22 +1,16 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.security;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
+import org.springframework.context.MessageSourceAware;
+import org.springframework.context.support.MessageSourceAccessor;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -36,48 +30,67 @@ import com.evolveum.midpoint.util.logging.TraceManager;
  * @author lazyman
  * @author Radovan Semancik
  */
-public class MidPointAuthenticationProvider implements AuthenticationProvider {
+public class MidPointAuthenticationProvider implements AuthenticationProvider, MessageSourceAware {
 
-	private static final Trace LOGGER = TraceManager.getTrace(MidPointAuthenticationProvider.class);
+    private static final Trace LOGGER = TraceManager.getTrace(MidPointAuthenticationProvider.class);
 
-	@Autowired
-	private transient AuthenticationEvaluator<PasswordAuthenticationContext> passwordAuthenticationEvaluator;
+    private MessageSourceAccessor messages;
 
-	@Override
-	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+    @Override
+    public void setMessageSource(MessageSource messageSource) {
+        this.messages = new MessageSourceAccessor(messageSource);
+    }
 
-		String enteredUsername = (String) authentication.getPrincipal();
-		LOGGER.trace("Authenticating username '{}'", enteredUsername);
+    @Autowired
+    private transient AuthenticationEvaluator<PasswordAuthenticationContext> passwordAuthenticationEvaluator;
 
-		ConnectionEnvironment connEnv = ConnectionEnvironment.create(SchemaConstants.CHANNEL_GUI_USER_URI);
+    @Override
+    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
 
-		Authentication token;
-		if (authentication instanceof UsernamePasswordAuthenticationToken) {
-			String enteredPassword = (String) authentication.getCredentials();
-			token = passwordAuthenticationEvaluator.authenticate(connEnv, new PasswordAuthenticationContext(enteredUsername, enteredPassword));
-		} else if (authentication instanceof PreAuthenticatedAuthenticationToken) {
-			token = passwordAuthenticationEvaluator.authenticateUserPreAuthenticated(connEnv, enteredUsername);
-		} else {
-			LOGGER.error("Unsupported authentication {}", authentication);
-			throw new AuthenticationServiceException("web.security.provider.unavailable");
-		}
+        try {
+            String enteredUsername = (String) authentication.getPrincipal();
+            LOGGER.trace("Authenticating username '{}'", enteredUsername);
 
-		MidPointPrincipal principal = (MidPointPrincipal)token.getPrincipal();
+            ConnectionEnvironment connEnv = ConnectionEnvironment.create(SchemaConstants.CHANNEL_GUI_USER_URI);
 
-		LOGGER.debug("User '{}' authenticated ({}), authorities: {}", authentication.getPrincipal(),
-				authentication.getClass().getSimpleName(), principal.getAuthorities());
-		return token;
-	}
+            try {
+                Authentication token;
+                if (authentication instanceof UsernamePasswordAuthenticationToken) {
+                    String enteredPassword = (String) authentication.getCredentials();
+                    token = passwordAuthenticationEvaluator.authenticate(connEnv, new PasswordAuthenticationContext(enteredUsername, enteredPassword));
+                } else if (authentication instanceof PreAuthenticatedAuthenticationToken) {
+                    token = passwordAuthenticationEvaluator.authenticateUserPreAuthenticated(connEnv, enteredUsername);
+                } else {
+                    LOGGER.error("Unsupported authentication {}", authentication);
+                    throw new AuthenticationServiceException("web.security.provider.unavailable");
+                }
 
-	@Override
-	public boolean supports(Class<?> authentication) {
-		if (UsernamePasswordAuthenticationToken.class.equals(authentication)) {
-			return true;
-		}
-		if (PreAuthenticatedAuthenticationToken.class.equals(authentication)) {
-			return true;
-		}
+                MidPointPrincipal principal = (MidPointPrincipal)token.getPrincipal();
 
-		return false;
-	}
+                LOGGER.debug("User '{}' authenticated ({}), authorities: {}", authentication.getPrincipal(),
+                        authentication.getClass().getSimpleName(), principal.getAuthorities());
+                return token;
+
+            } catch (AuthenticationException e) {
+                LOGGER.info("Authentication failed for {}: {}", enteredUsername, e.getMessage());
+                throw e;
+            }
+        } catch (RuntimeException | Error e) {
+            // Make sure to explicitly log all runtime errors here. Spring security is doing very poor job and does not log this properly.
+            LOGGER.error("Authentication (runtime) error: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    @Override
+    public boolean supports(Class<?> authentication) {
+        if (UsernamePasswordAuthenticationToken.class.equals(authentication)) {
+            return true;
+        }
+        if (PreAuthenticatedAuthenticationToken.class.equals(authentication)) {
+            return true;
+        }
+
+        return false;
+    }
 }

@@ -1,18 +1,9 @@
 <?xml version="1.0"?>
 <!--
-  ~ Copyright (c) 2010-2017 Evolveum
+  ~ Copyright (c) 2010-2017 Evolveum and contributors
   ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~     http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
+  ~ This work is dual-licensed under the Apache License 2.0
+  ~ and European Union Public License. See LICENSE file for details.
   -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -24,7 +15,7 @@
     <parent>
         <artifactId>infra</artifactId>
         <groupId>com.evolveum.midpoint</groupId>
-        <version>3.7-SNAPSHOT</version>
+        <version>4.1-SNAPSHOT</version>
     </parent>
     <scm>
         <connection>https://github.com/Evolveum/midpoint.git</connection>
@@ -34,13 +25,60 @@
     <dependencies>
         <dependency>
             <groupId>com.evolveum.midpoint.infra</groupId>
-            <artifactId>prism</artifactId>
-            <version>3.7-SNAPSHOT</version>
+            <artifactId>prism-api</artifactId>
+            <version>4.1-SNAPSHOT</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.activation</groupId>
+                    <artifactId>activation</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>javax.xml.bind</groupId>
+                    <artifactId>jaxb-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.evolveum.midpoint.infra</groupId>
+            <artifactId>prism-impl</artifactId>
+            <version>4.1-SNAPSHOT</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.sun.activation</groupId>
+                    <artifactId>javax.activation</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>javax.xml.bind</groupId>
+                    <artifactId>jaxb-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.evolveum.midpoint.infra</groupId>
             <artifactId>util</artifactId>
-            <version>3.7-SNAPSHOT</version>
+            <version>4.1-SNAPSHOT</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.activation</groupId>
+                    <artifactId>activation</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>javax.xml.bind</groupId>
+                    <artifactId>jaxb-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
         </dependency>
         <dependency>
             <groupId>commons-collections</groupId>
@@ -62,18 +100,18 @@
             <groupId>com.sun.xml.bind</groupId>
             <artifactId>jaxb-xjc</artifactId>
         </dependency>
-        <dependency>
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>javax.xml.bind</groupId>-->
+<!--            <artifactId>jaxb-api</artifactId>-->
+<!--        </dependency>-->
         <dependency>
             <groupId>stax</groupId>
             <artifactId>stax-api</artifactId>
         </dependency>
         <dependency>
-			<groupId>net.sf.jasperreports</groupId>
-			<artifactId>jasperreports</artifactId>
-		</dependency>
+            <groupId>net.sf.jasperreports</groupId>
+            <artifactId>jasperreports</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.jetbrains</groupId>
             <artifactId>annotations-java5</artifactId>
@@ -90,11 +128,11 @@
             <groupId>org.apache.cxf</groupId>
             <artifactId>cxf-rt-transports-jms</artifactId>
             <exclusions>
-				<exclusion>
-					<groupId>com.sun.xml.bind</groupId>
-					<artifactId>jaxb-xjc</artifactId>
-				</exclusion>
-			</exclusions>
+                <exclusion>
+                    <groupId>com.sun.xml.bind</groupId>
+                    <artifactId>jaxb-xjc</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency> -->
         <dependency>
             <groupId>org.jvnet.jaxb2_commons</groupId>
@@ -104,8 +142,29 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
         </dependency>
-        
-        <!--  Testing dependecies  -->
+        <dependency>
+            <groupId>commons-configuration</groupId>
+            <artifactId>commons-configuration</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>javax.xml.ws</groupId>
+            <artifactId>jaxws-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.geronimo.specs</groupId>
+            <artifactId>geronimo-ws-metadata_2.0_spec</artifactId>
+        </dependency>
+
+        <!--  Testing dependencies  -->
         <dependency>
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
@@ -114,7 +173,7 @@
         <dependency>
             <groupId>com.evolveum.midpoint.tools</groupId>
             <artifactId>test-ng</artifactId>
-            <version>3.7-SNAPSHOT</version>
+            <version>4.1-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -135,59 +194,6 @@
     </dependencies>
     <build>
         <plugins>
-            <!-- <plugin>
-                   <groupId>org.jvnet.jaxb2.maven2</groupId>
-                   <artifactId>maven-jaxb2-plugin</artifactId>
-                   <version>0.7.0</version>
-                   <executions>
-                       <execution>
-                           <goals>
-                               <goal>generate</goal>
-                           </goals>
-                       </execution>
-                   </executions>
-                   <configuration>
-                       <args>
-                           <arg>-XtoString</arg>
-                           <arg>-Xequals</arg>
-                           <arg>-XhashCode</arg>
-                           <arg>-Xcopyable</arg>
-                           <arg>-Xmergeable</arg>
-                       </args>
-                       <plugins>
-                           <plugin>
-                               <groupId>org.jvnet.jaxb2_commons</groupId>
-                               <artifactId>jaxb2-basics</artifactId>
-                               <version>0.6.3</version>
-                           </plugin>
-                       </plugins>
-                   </configuration>
-               </plugin>  -->
-            <!-- <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>unpack-prism-schema-files</id>
-                        <phase>compile</phase>
-                        <goals>
-                            <goal>unpack</goal>
-                        </goals>
-                        <configuration>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>com.evolveum.midpoint.infra</groupId>
-                                    <artifactId>prism</artifactId>
-                                    <version>${project.version}</version>
-                                    <type>jar</type>
-                                </artifactItem>
-                            </artifactItems>
-                            <includes>**/*.xsd,**/*.dtd,**/*.wsdl</includes>
-                            <outputDirectory>${project.basedir}/target/additional-schemas/prism</outputDirectory>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin> -->
             <plugin>
                 <!-- Used to pull XSD files from the JAR -->
                 <groupId>com.evolveum.midpoint.tools</groupId>
@@ -204,14 +210,14 @@
                             <artifactItems>
                                 <artifactItem>
                                     <groupId>com.evolveum.midpoint.infra</groupId>
-                                    <artifactId>prism</artifactId>
+                                    <artifactId>prism-impl</artifactId>
                                     <version>${project.version}</version>
                                     <type>jar</type>
                                 </artifactItem>
                             </artifactItems>
                             <translateSchemaLocation>false</translateSchemaLocation>
                             <includes>**/*.xsd,**/*.dtd,**/*.wsdl</includes>
-                            <outputDirectory>${project.basedir}/target/additional-schemas/prism</outputDirectory>
+                            <outputDirectory>${project.basedir}/target/additional-schemas/prism-impl</outputDirectory>
                         </configuration>
                     </execution>
                 </executions>
@@ -234,7 +240,7 @@
                                     <extraargs>
                                         <extraarg>-impl</extraarg>
                                         <extraarg>-verbose</extraarg>
-                                        <extraarg>-validate</extraarg>
+                                        <!--<extraarg>-validate</extraarg> ERROR: Property 'http://javax.xml.XMLConstants/property/accessExternalSchema' is not recognized. -->
                                         <extraarg>-xjc-Xts</extraarg>
                                         <extraarg>-xjc-XhashCode</extraarg>
                                         <extraarg>
@@ -250,7 +256,7 @@
                                         <extraarg>http://prism.evolveum.com/xml/ns/public/annotation-3</extraarg>
                                         <extraarg>-nexclude</extraarg>
                                         <extraarg>http://prism.evolveum.com/xml/ns/public/query-3</extraarg>
-                                        <!-- 										<extraargs>-version</extraargs> -->
+                                        <!--                                         <extraargs>-version</extraargs> -->
                                         <extraarg>-xjc-Xmidpoint</extraarg>
                                     </extraargs>
                                 </wsdlOption>
@@ -266,7 +272,7 @@
                                     <extraargs>
                                         <extraarg>-impl</extraarg>
                                         <extraarg>-verbose</extraarg>
-                                        <extraarg>-validate</extraarg>
+                                        <!--<extraarg>-validate</extraarg> ERROR: Property 'http://javax.xml.XMLConstants/property/accessExternalSchema' is not recognized. -->
                                         <extraarg>-xjc-Xts</extraarg>
                                         <extraarg>-xjc-XhashCode</extraarg>
                                         <extraarg>
@@ -282,7 +288,7 @@
                                         <extraarg>http://prism.evolveum.com/xml/ns/public/annotation-3</extraarg>
                                         <extraarg>-nexclude</extraarg>
                                         <extraarg>http://prism.evolveum.com/xml/ns/public/query-3</extraarg>
-                                        <!-- 										<extraargs>-version</extraargs> -->
+                                        <!--                                         <extraargs>-version</extraargs> -->
                                         <extraarg>-xjc-Xmidpoint</extraarg>
                                     </extraargs>
                                 </wsdlOption>
@@ -307,19 +313,19 @@
                     <dependency>
                         <groupId>com.evolveum.midpoint.tools</groupId>
                         <artifactId>xjc-plugin</artifactId>
-                        <version>3.7-SNAPSHOT</version>
+                        <version>4.1-SNAPSHOT</version>
                     </dependency>
                     <dependency>
-		                <groupId>com.sun.xml.bind</groupId>
-		                <artifactId>jaxb-xjc</artifactId>
-		                <version>${jaxb-xjc.version}</version>
-		            </dependency>
+                        <groupId>com.sun.xml.bind</groupId>
+                        <artifactId>jaxb-xjc</artifactId>
+                        <version>${jaxb-xjc.version}</version>
+                    </dependency>
                 </dependencies>
             </plugin>
             <plugin>
                 <groupId>com.evolveum.midpoint.infra</groupId>
                 <artifactId>prism-maven-plugin</artifactId>
-                <version>3.7-SNAPSHOT</version>
+                <version>4.1-SNAPSHOT</version>
                 <configuration>
                     <schemaFiles>
                         <schemaFile>src/main/resources/xml/ns/public/common/common-3.xsd</schemaFile>

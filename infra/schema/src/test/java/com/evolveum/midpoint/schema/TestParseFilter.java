@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2014 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.schema;
 
@@ -39,31 +30,31 @@ import static org.testng.AssertJUnit.assertEquals;
  */
 public class TestParseFilter {
 
-	public static final File FILTER_FILE = new File(TestConstants.COMMON_DIR, "filter.xml");
+    public static final File FILTER_FILE = new File(TestConstants.COMMON_DIR, "filter.xml");
 
-	@BeforeSuite
-	public void setup() throws SchemaException, SAXException, IOException {
-		PrettyPrinter.setDefaultNamespacePrefix(MidPointConstants.NS_MIDPOINT_PUBLIC_PREFIX);
-		PrismTestUtil.resetPrismContext(MidPointPrismContextFactory.FACTORY);
-	}
+    @BeforeSuite
+    public void setup() throws SchemaException, SAXException, IOException {
+        PrettyPrinter.setDefaultNamespacePrefix(MidPointConstants.NS_MIDPOINT_PUBLIC_PREFIX);
+        PrismTestUtil.resetPrismContext(MidPointPrismContextFactory.FACTORY);
+    }
 
 
-	@Test
-	public void testParseFilterFile() throws Exception {
-		System.out.println("===[ testParseFilterFile ]===");
+    @Test
+    public void testParseFilterFile() throws Exception {
+        System.out.println("===[ testParseFilterFile ]===");
 
-		// GIVEN
-		PrismContext prismContext = PrismTestUtil.getPrismContext();
+        // GIVEN
+        PrismContext prismContext = PrismTestUtil.getPrismContext();
 
-		// WHEN
-		SearchFilterType filter = prismContext.parserFor(FILTER_FILE).parseRealValue(SearchFilterType.class);
+        // WHEN
+        SearchFilterType filter = prismContext.parserFor(FILTER_FILE).parseRealValue(SearchFilterType.class);
 
-		// THEN
-		System.out.println("Parsed filter:");
-		System.out.println(filter.debugDump());
+        // THEN
+        System.out.println("Parsed filter:");
+        System.out.println(filter.debugDump());
 
-        String serialized = PrismTestUtil.serializeJaxbElementToString(new JAXBElement<SearchFilterType>(
-                new QName(SchemaConstants.NS_QUERY, "filter"), SearchFilterType.class, filter));
+        String serialized = PrismTestUtil.serializeJaxbElementToString(new JAXBElement<>(
+            new QName(SchemaConstants.NS_QUERY, "filter"), SearchFilterType.class, filter));
         System.out.println("JAXB serialization result:\n"+serialized);
 
         // WHEN2

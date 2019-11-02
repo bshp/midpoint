@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.server.handlers;
@@ -34,54 +25,54 @@ import org.apache.wicket.model.PropertyModel;
  */
 public class LiveSyncHandlerPanel extends ResourceRelatedHandlerPanel<LiveSyncHandlerDto> {
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private static final String ID_TOKEN_CONTAINER = "tokenContainer";
-	private static final String ID_TOKEN = "token";
-	private static final String ID_DELETE_TOKEN = "deleteToken";
+    private static final String ID_TOKEN_CONTAINER = "tokenContainer";
+    private static final String ID_TOKEN = "token";
+    private static final String ID_DELETE_TOKEN = "deleteToken";
 
         private static final String ID_TOKEN_RETRY_CONTAINER = "retryUnhandledErrContainer";
-	private static final String ID_TOKEN_RETRY_CHECKBOX_CONTAINER = "retryUnhandledErrCheckboxContainer";
-	private static final String ID_TOKEN_RETRY_CHECKBOX = "retryUnhandledErrCheckbox";
+    private static final String ID_TOKEN_RETRY_CHECKBOX_CONTAINER = "retryUnhandledErrCheckboxContainer";
+    private static final String ID_TOKEN_RETRY_CHECKBOX = "retryUnhandledErrCheckbox";
 
-	public LiveSyncHandlerPanel(String id, IModel<LiveSyncHandlerDto> handlerDtoModel, PageTaskEdit parentPage) {
-		super(id, handlerDtoModel, parentPage);
-		initLayout(parentPage);
-	}
+    public LiveSyncHandlerPanel(String id, IModel<LiveSyncHandlerDto> handlerDtoModel, PageTaskEdit parentPage) {
+        super(id, handlerDtoModel, parentPage);
+        initLayout(parentPage);
+    }
 
-	private void initLayout(final PageTaskEdit parentPage) {
-		WebMarkupContainer tokenContainer = new WebMarkupContainer(ID_TOKEN_CONTAINER);
-		tokenContainer.add(new VisibleEnableBehaviour() {
-			@Override
-			public boolean isVisible() {
-				return true;	//TODO
-			}
-		});
-		tokenContainer.add(new Label(ID_TOKEN, new PropertyModel<>(getModel(), LiveSyncHandlerDto.F_TOKEN)));
+    private void initLayout(final PageTaskEdit parentPage) {
+        WebMarkupContainer tokenContainer = new WebMarkupContainer(ID_TOKEN_CONTAINER);
+        tokenContainer.add(new VisibleEnableBehaviour() {
+            @Override
+            public boolean isVisible() {
+                return true;    //TODO
+            }
+        });
+        tokenContainer.add(new Label(ID_TOKEN, new PropertyModel<>(getModel(), LiveSyncHandlerDto.F_TOKEN)));
 
-		LinkIconPanel deleteTokenPanel = new LinkIconPanel(ID_DELETE_TOKEN, new Model("fa fa-fw fa-trash-o fa-lg text-danger"), createStringResource("LiveSyncHandlerPanel.deleteToken")) {
-			@Override
-			protected void onClickPerformed(AjaxRequestTarget target) {
-				parentPage.getController().deleteSyncTokenPerformed(target);
-			}
-		};
-		deleteTokenPanel.add(new VisibleEnableBehaviour() {
-			@Override
-			public boolean isVisible() {
-				return !parentPage.isEdit() && getModelObject().hasToken();		// TODO ... and security
-			}
-		});
-		deleteTokenPanel.setRenderBodyOnly(true);
-		tokenContainer.add(deleteTokenPanel);
-		add(tokenContainer);
+        LinkIconPanel deleteTokenPanel = new LinkIconPanel(ID_DELETE_TOKEN, new Model("fa fa-fw fa-trash-o fa-lg text-danger"), createStringResource("LiveSyncHandlerPanel.deleteToken")) {
+            @Override
+            protected void onClickPerformed(AjaxRequestTarget target) {
+                parentPage.getController().deleteSyncTokenPerformed(target);
+            }
+        };
+        deleteTokenPanel.add(new VisibleEnableBehaviour() {
+            @Override
+            public boolean isVisible() {
+                return !parentPage.isEdit() && getModelObject().hasToken();        // TODO ... and security
+            }
+        });
+        deleteTokenPanel.setRenderBodyOnly(true);
+        tokenContainer.add(deleteTokenPanel);
+        add(tokenContainer);
 
                 WebMarkupContainer retryContainer = new WebMarkupContainer(ID_TOKEN_RETRY_CONTAINER);
-		add(retryContainer);
-		WebMarkupContainer retryCheckboxContainer = new WebMarkupContainer(ID_TOKEN_RETRY_CHECKBOX_CONTAINER);
-		retryContainer.add(retryCheckboxContainer);
-		CheckBox retryCheckbox = new CheckBox(ID_TOKEN_RETRY_CHECKBOX, new PropertyModel<Boolean>(getModel(), ResourceRelatedHandlerDto.F_TOKEN_RETRY_UNHANDLED_ERR));
-		retryCheckbox.add(enabledIfEdit);
-		retryCheckboxContainer.add(retryCheckbox);
-	}
+        add(retryContainer);
+        WebMarkupContainer retryCheckboxContainer = new WebMarkupContainer(ID_TOKEN_RETRY_CHECKBOX_CONTAINER);
+        retryContainer.add(retryCheckboxContainer);
+        CheckBox retryCheckbox = new CheckBox(ID_TOKEN_RETRY_CHECKBOX, new PropertyModel<>(getModel(), ResourceRelatedHandlerDto.F_TOKEN_RETRY_UNHANDLED_ERR));
+        retryCheckbox.add(enabledIfEdit);
+        retryCheckboxContainer.add(retryCheckbox);
+    }
 
 }

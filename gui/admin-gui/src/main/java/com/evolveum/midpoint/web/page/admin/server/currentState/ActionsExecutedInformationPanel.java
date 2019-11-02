@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.server.currentState;
@@ -29,7 +20,6 @@ import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.PropertyModel;
 
@@ -37,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * @author mederly
@@ -59,23 +50,23 @@ public class ActionsExecutedInformationPanel extends BasePanel<ActionsExecutedIn
 
     public ActionsExecutedInformationPanel(String id, IModel<ActionsExecutedInformationDto> model) {
         super(id, model);
-		initLayout();
+        initLayout();
     }
 
     boolean showResultingActionsOnly = true;
 
     protected void initLayout() {
 
-		WebMarkupContainer tableLinesContainer = new WebMarkupContainer(ID_OBJECTS_TABLE_LINES_CONTAINER);
+        WebMarkupContainer tableLinesContainer = new WebMarkupContainer(ID_OBJECTS_TABLE_LINES_CONTAINER);
         ListView tableLines = new ListView<ActionsExecutedObjectsTableLineDto>(ID_OBJECTS_TABLE_LINES,
-                new AbstractReadOnlyModel<List<ActionsExecutedObjectsTableLineDto>>() {
+                new IModel<List<ActionsExecutedObjectsTableLineDto>>() {
                     @Override
                     public List<ActionsExecutedObjectsTableLineDto> getObject() {
-						final ActionsExecutedInformationDto modelObject = getModelObject();
-						if (modelObject == null) {
-							return new ArrayList<>();
-						}
-						if (showResultingActionsOnly) {
+                        final ActionsExecutedInformationDto modelObject = getModelObject();
+                        if (modelObject == null) {
+                            return new ArrayList<>();
+                        }
+                        if (showResultingActionsOnly) {
                             return modelObject.getUniqueObjectsTableLines();
                         } else {
                             return modelObject.getObjectsTableLines();
@@ -84,7 +75,7 @@ public class ActionsExecutedInformationPanel extends BasePanel<ActionsExecutedIn
                 }
         ) {
             protected void populateItem(final ListItem<ActionsExecutedObjectsTableLineDto> item) {
-                item.add(new Label(ID_OBJECT_TYPE, new AbstractReadOnlyModel<String>() {
+                item.add(new Label(ID_OBJECT_TYPE, new IModel<String>() {
                     @Override
                     public String getObject() {
                         String key = item.getModelObject().getObjectTypeLocalizationKey();
@@ -95,13 +86,13 @@ public class ActionsExecutedInformationPanel extends BasePanel<ActionsExecutedIn
                         }
                     }
                 }));
-                item.add(new Label(ID_OPERATION, new AbstractReadOnlyModel<String>() {
+                item.add(new Label(ID_OPERATION, new IModel<String>() {
                     @Override
                     public String getObject() {
                         return createStringResource(item.getModelObject().getOperation()).getString();
                     }
                 }));
-                item.add(new Label(ID_CHANNEL, new AbstractReadOnlyModel<String>() {
+                item.add(new Label(ID_CHANNEL, new IModel<String>() {
                     @Override
                     public String getObject() {
                         String channel = item.getModelObject().getChannel();
@@ -121,33 +112,35 @@ public class ActionsExecutedInformationPanel extends BasePanel<ActionsExecutedIn
             }
         };
         tableLinesContainer.add(tableLines);
-		tableLinesContainer.setOutputMarkupId(true);
-		add(tableLinesContainer);
+        tableLinesContainer.setOutputMarkupId(true);
+        add(tableLinesContainer);
 
-		final Label showResultingActionsOnlyLabel = new Label(ID_SHOW_RESULTING_ACTIONS_ONLY_LABEL, new AbstractReadOnlyModel<String>() {
-			@Override
-			public String getObject() {
-				return showResultingActionsOnly ?
-						createStringResource("ActionsExecutedInformationPanel.showingResultingActionsOnly").getString() :
-						createStringResource("ActionsExecutedInformationPanel.showingAllActions").getString();
-			}
-		});
-		showResultingActionsOnlyLabel.setOutputMarkupId(true);
-		add(showResultingActionsOnlyLabel);
-        add(new AjaxFallbackLink<String>(ID_SHOW_RESULTING_ACTIONS_ONLY_LINK) {
+        final Label showResultingActionsOnlyLabel = new Label(ID_SHOW_RESULTING_ACTIONS_ONLY_LABEL, new IModel<String>() {
             @Override
-            public void onClick(AjaxRequestTarget ajaxRequestTarget) {
+            public String getObject() {
+                return showResultingActionsOnly ?
+                        createStringResource("ActionsExecutedInformationPanel.showingResultingActionsOnly").getString() :
+                        createStringResource("ActionsExecutedInformationPanel.showingAllActions").getString();
+            }
+        });
+        showResultingActionsOnlyLabel.setOutputMarkupId(true);
+        add(showResultingActionsOnlyLabel);
+        add(new AjaxFallbackLink<String>(ID_SHOW_RESULTING_ACTIONS_ONLY_LINK) {
+
+            private static final long serialVersionUID = 1L;
+            @Override
+            public void onClick(Optional<AjaxRequestTarget> ajaxRequestTarget) {
                 showResultingActionsOnly = !showResultingActionsOnly;
-                ajaxRequestTarget.add(ActionsExecutedInformationPanel.this);
+                ajaxRequestTarget.get().add(ActionsExecutedInformationPanel.this);
             }
         });
 
-		add(new VisibleEnableBehaviour() {
-			@Override
-			public boolean isVisible() {
-				return getModelObject() != null;
-			}
-		});
+        add(new VisibleEnableBehaviour() {
+            @Override
+            public boolean isVisible() {
+                return getModelObject() != null;
+            }
+        });
     }
 
     public boolean isShowResultingActionsOnly() {

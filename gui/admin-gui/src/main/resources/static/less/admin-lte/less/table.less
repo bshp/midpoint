@@ -37,23 +37,25 @@
         border: 1px solid @box-border-color;
       }
     }
-    > tr.delete, tr.deleted {
-      background-color: @brand-danger;
-      a {
-        color: #FFFFFF !important;;
-      }
-    }
-    > tr.add, tr.added {
-      background-color: @brand-success;
-      a {
-        color: #FFFFFF !important;;
-      }
-    }
   }
   > thead > tr {
     > th,
     > td {
       border-bottom-width: 2px;
+    }
+  }
+}
+
+.table-word-break {
+  > thead,
+  > tbody,
+  > tfoot {
+    > tr {
+      > th,
+      > td {
+        word-break: break-all;
+        max-width: 40%;
+      }
     }
   }
 }

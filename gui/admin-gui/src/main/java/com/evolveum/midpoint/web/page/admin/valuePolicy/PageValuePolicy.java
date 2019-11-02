@@ -1,28 +1,33 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.valuePolicy;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
+import org.apache.wicket.ajax.AjaxRequestTarget;
+import org.apache.wicket.extensions.markup.html.tabs.AbstractTab;
+import org.apache.wicket.extensions.markup.html.tabs.ITab;
+import org.apache.wicket.markup.html.WebMarkupContainer;
+import org.apache.wicket.model.Model;
+import org.apache.wicket.request.mapper.parameter.PageParameters;
+
 import com.evolveum.midpoint.gui.api.model.LoadableModel;
+import com.evolveum.midpoint.gui.api.page.PageBase;
+import com.evolveum.midpoint.gui.api.prism.ItemStatus;
+import com.evolveum.midpoint.gui.api.prism.PrismObjectWrapper;
 import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.gui.api.util.WebModelServiceUtils;
+import com.evolveum.midpoint.gui.impl.factory.PrismObjectWrapperFactory;
+import com.evolveum.midpoint.gui.impl.factory.WrapperContext;
 import com.evolveum.midpoint.prism.PrismObject;
-import com.evolveum.midpoint.prism.PrismObjectValue;
-import com.evolveum.midpoint.schema.GetOperationOptions;
-import com.evolveum.midpoint.schema.SelectorOptions;
+import com.evolveum.midpoint.prism.delta.ObjectDelta;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.security.api.AuthorizationConstants;
 import com.evolveum.midpoint.task.api.Task;
@@ -34,16 +39,16 @@ import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.application.AuthorizationAction;
 import com.evolveum.midpoint.web.application.PageDescriptor;
 import com.evolveum.midpoint.web.application.Url;
+import com.evolveum.midpoint.web.component.AjaxButton;
+import com.evolveum.midpoint.web.component.AjaxSubmitButton;
+import com.evolveum.midpoint.web.component.TabbedPanel;
 import com.evolveum.midpoint.web.component.form.Form;
+import com.evolveum.midpoint.web.page.admin.PageAdmin;
 import com.evolveum.midpoint.web.page.admin.valuePolicy.component.ValuePolicyBasicPanel;
-import com.evolveum.midpoint.web.page.admin.valuePolicy.component.ValuePolicyDto;
 import com.evolveum.midpoint.web.page.admin.valuePolicy.component.ValuePolicySummaryPanel;
 import com.evolveum.midpoint.web.util.OnePageParameterEncoder;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ValuePolicyType;
-import org.apache.wicket.model.PropertyModel;
-import org.apache.wicket.request.mapper.parameter.PageParameters;
-
-import java.util.Collection;
 
 /**
  * Created by matus on 9/11/2017.
@@ -51,19 +56,19 @@ import java.util.Collection;
 
 @PageDescriptor(
         urls = {
-                @Url(mountUrl = "/admin/valuepolicy", matchUrlForSecurity = "/admin/valuepolicy")
+                @Url(mountUrl = "/admin/valuepolicy",
+                        matchUrlForSecurity = "/admin/valuepolicy")
         },
         action = {
-                @AuthorizationAction(actionUri = PageAdminValuePolicies.AUTH_VALUE_POLICIES_ALL,
-                        label = PageAdminValuePolicies.AUTH_VALUE_POLICIES_ALL_LABEL,
-                        description = PageAdminValuePolicies.AUTH_VALUE_POLICIES_ALL_DESCRIPTION),
+                @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_VALUE_POLICIES_ALL_URL,
+                        label = "PageAdminValuePolicies.auth.valuePoliciesAll.label",
+                        description = "PageAdminValuePolicies.auth.valuePoliciesAll.description"),
                 @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_VALUE_POLICY_URL,
                         label = "PageValuePolicy.auth.valuePolcy.label",
                         description = "PageValuePolicy.auth.valuePolicy.description")
         })
 
-
-public class PageValuePolicy extends PageAdminValuePolicies {
+public class PageValuePolicy extends PageAdmin {
 
     private static final long serialVersionUID = 1L;
 
@@ -73,27 +78,37 @@ public class PageValuePolicy extends PageAdminValuePolicies {
     private static final String DOT_CLASS = PageValuePolicy.class.getName() + ".";
 
     private static final String OPERATION_LOAD_DEFINITION = DOT_CLASS + "loadDefinition";
+    private static final String OPERATION_LOAD_VALUEPOLICY = DOT_CLASS + "loadValuePolicy";
+    private static final String OPERATION_SAVE_VALUEPOLICY = DOT_CLASS + "saveValuePolicy";
 
     private static final String ID_MAIN_FORM = "mainForm";
-    private static final String ID_BASIC_INFO_CONTAINER = "constructBasicInfoContainer";
-    private static final String ID_VALUE_POLICY_NAME = "valuePolicyName";
     private static final String ID_SUMMARY_PANEL = "summaryPanel";
-    private static final String ID_BASIC_PANEL = "basicPanel";
+    private static final String ID_TAB_PANEL = "tabPanel";
+   // private static final String ID_VALUE_POLICY_BASIC_DETAIL = "valuePolicyBasic";
 
-    private LoadableModel<ValuePolicyDto> valuePolicyModel;
+    private static final String ID_LABEL_SIZE = "col-md-4";
+    private static final String ID_INPUT_SIZE = "col-md-8";
+
+    private static final String ID_BACK_BUTTON = "backButton";
+    private static final String ID_SAVE_BUTTON = "saveButton";
+
+
+    private LoadableModel<PrismObjectWrapper<ValuePolicyType>> valuePolicyModel;
     private String policyOid;
 
     public PageValuePolicy(PageParameters parameters) {
-        policyOid = parameters.get(OnePageParameterEncoder.PARAMETER).toString();
-        getPageParameters().overwriteWith(parameters);
+        if (parameters != null){
+            policyOid = parameters.get(OnePageParameterEncoder.PARAMETER).toString();
+            getPageParameters().overwriteWith(parameters);
+        }
         initModels();
         initLayout();
     }
 
     private void initModels() {
-        valuePolicyModel = new LoadableModel<ValuePolicyDto>(false) {
+        valuePolicyModel = new LoadableModel<PrismObjectWrapper<ValuePolicyType>>(false) {
             @Override
-            protected ValuePolicyDto load() {
+            protected PrismObjectWrapper<ValuePolicyType> load() {
                 if (policyOid != null) {
                     return loadValuePolicy(policyOid);
                 } else {
@@ -107,47 +122,144 @@ public class PageValuePolicy extends PageAdminValuePolicies {
         };
     }
 
-    private ValuePolicyDto createValuePolicy() throws SchemaException {
+    private PrismObjectWrapper<ValuePolicyType> createValuePolicy() throws SchemaException {
+        Task task = createSimpleTask(OPERATION_LOAD_VALUEPOLICY);
 
-        ValuePolicyType valuePolicy = getPrismContext().createObjectable(ValuePolicyType.class);
+        PrismObject<ValuePolicyType> valuePolicyObject  = getPrismContext().createObject(ValuePolicyType.class);
 
-        return new ValuePolicyDto(valuePolicy);
+        PrismObjectWrapperFactory<ValuePolicyType> owf = getRegistry().getObjectWrapperFactory(valuePolicyObject.getDefinition());
+        WrapperContext context = new WrapperContext(task, task.getResult());
+        PrismObjectWrapper<ValuePolicyType> valuePolicyWrapper = owf.createObjectWrapper(valuePolicyObject, ItemStatus.ADDED, context);
+
+//        PrismObjectWrapper<ValuePolicyType> valuePolicyWrapper = ObjectWrapperUtil.createObjectWrapper("","", valuePolicyObject, ContainerStatus.ADDING,task, WebComponentUtil.getPageBase(this));
+
+        return valuePolicyWrapper;
     }
 
-    private ValuePolicyDto loadValuePolicy(String policyOid) {
+    private PrismObjectWrapper<ValuePolicyType> loadValuePolicy(String policyOid) {
         Task task = createSimpleTask(OPERATION_LOAD_DEFINITION);
         OperationResult result = task.getResult();
-        ValuePolicyDto valuePolicyDto = null;
+        PrismObjectWrapper<ValuePolicyType> valuePolicyWrapper = null;
         try {
-            Collection<SelectorOptions<GetOperationOptions>> options = SelectorOptions.createCollection(GetOperationOptions.createResolveNames());
             PrismObject<ValuePolicyType> valuePolicyObject =
-                    WebModelServiceUtils.loadObject(ValuePolicyType.class, policyOid, options,
+                    WebModelServiceUtils.loadObject(ValuePolicyType.class, policyOid,
                             PageValuePolicy.this, task, result);
-            ValuePolicyType valuePolicyType = PrismObjectValue.asObjectable(valuePolicyObject);
-            valuePolicyDto = new ValuePolicyDto(valuePolicyType);
+            PrismObjectWrapperFactory<ValuePolicyType> owf = getRegistry().getObjectWrapperFactory(valuePolicyObject.getDefinition());
+            WrapperContext context = new WrapperContext(task, result);
+            valuePolicyWrapper = owf.createObjectWrapper(valuePolicyObject, ItemStatus.NOT_CHANGED, context);
+
             result.recordSuccessIfUnknown();
         } catch (Exception ex) {
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't get definition", ex);
-            result.recordFatalError("Couldn't get definition.", ex);
+            result.recordFatalError(getString("PageValuePolicy.message.loadValuePolicy.fatalError"), ex);
         }
         result.recomputeStatus();
 
         if (!WebComponentUtil.isSuccessOrHandledError(result)) {
             showResult(result);
         }
-        return valuePolicyDto;
+        return valuePolicyWrapper;
     }
 
-
     protected void initLayout() {
-        ValuePolicySummaryPanel summaryPanel = new ValuePolicySummaryPanel(ID_SUMMARY_PANEL, new PropertyModel<>(valuePolicyModel, "prismObject"), this);
+        // TODO should be used if valuePolicyObject is edited
+        ValuePolicySummaryPanel summaryPanel = new ValuePolicySummaryPanel(ID_SUMMARY_PANEL,
+                Model.of(valuePolicyModel.getObject().getObject().asObjectable()), this);
         add(summaryPanel);
 
         Form mainForm = new Form(ID_MAIN_FORM);
         add(mainForm);
-        ValuePolicyBasicPanel basicPanel = new ValuePolicyBasicPanel(ID_BASIC_PANEL, valuePolicyModel);
-        mainForm.add(basicPanel);
 
+
+       // List<ItemPath> itemPath = new ArrayList<>();
+       // itemPath.add(ItemPath.EMPTY_PATH);
+
+        // itemPath.add(prismContext.path(ValuePolicyType.F_STRING_POLICY));
+
+
+       //PrismPanel<ValuePolicyType> valuePolicyForm = new PrismPanel<>(ID_VALUE_POLICY_BASIC_DETAIL, new ContainerWrapperListFromObjectWrapperModel<ValuePolicyType,ValuePolicyType>(valuePolicyModel, itemPath),null, mainForm, null, this);
+
+       // mainForm.add(valuePolicyForm);
+        initTabs(mainForm);
+        initButtons(mainForm);
+
+    }
+    private void initTabs(Form mainForm){
+        List<ITab> tabs = new ArrayList<>();
+            PageBase baseParameter = this;
+        tabs.add(new AbstractTab(createStringResource("PageValuePolicy.basic")) {
+            @Override
+            public WebMarkupContainer getPanel(String panelId) {
+                return new ValuePolicyBasicPanel(panelId,mainForm,valuePolicyModel);
+            }
+        });
+
+      //  tabs.add(new AbstractTab(createStringResource("PageValuePolicy.stringPolicy")) {
+       //     @Override
+        //    public WebMarkupContainer getPanel(String panelId) {
+          //      return new ValuePolicyStringPoliciesPanel(panelId,mainForm,valuePolicyModel,baseParameter);
+           // }
+       // });
+        TabbedPanel tabPanel = WebComponentUtil.createTabPanel(ID_TAB_PANEL, this, tabs, null);
+        mainForm.add(tabPanel);
+
+    }
+    private void initButtons(Form mainForm){
+        AjaxButton backButton = new AjaxButton(ID_BACK_BUTTON,createStringResource("PageValuePolicy.button.back")){
+            @Override
+            public void onClick(AjaxRequestTarget target) {
+                redirectBack();
+            }
+        };
+        mainForm.add(backButton);
+
+        AjaxSubmitButton saveButton = new AjaxSubmitButton(ID_SAVE_BUTTON,createStringResource("PageValuePolicy.button.save")) {
+            @Override
+            protected void onSubmit(AjaxRequestTarget target) {
+                savePerformed(target);
+            }
+        };
+        mainForm.add(saveButton);
+    }
+
+    private void savePerformed(AjaxRequestTarget target) {
+        LOGGER.debug("Saving value policy.");
+
+        OperationResult result = new OperationResult(OPERATION_SAVE_VALUEPOLICY);
+        try {
+            WebComponentUtil.revive(valuePolicyModel, getPrismContext());
+            PrismObjectWrapper<ValuePolicyType> wrapper = valuePolicyModel.getObject();
+            ObjectDelta<ValuePolicyType> delta = wrapper.getObjectDelta();
+            if (delta == null) {
+                return;
+            }
+            if (delta.getPrismContext() == null) {
+                getPrismContext().adopt(delta);
+            }
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace("Computed value policy delta:\n{}", new Object[]{delta.debugDump(3)});
+            }
+
+            if (delta.isEmpty()) {
+                return;
+            }
+
+            Task task = createSimpleTask(OPERATION_SAVE_VALUEPOLICY);
+            Collection<ObjectDelta<? extends ObjectType>> deltas = new ArrayList<>();
+            deltas.add(delta);
+            getModelService().executeChanges(deltas, null, task, result);
+            result.recomputeStatus();
+        } catch (Exception ex) {
+            result.recordFatalError(getString("PageValuePolicy.message.savePerformed.fatalError"), ex);
+            LoggingUtils.logUnexpectedException(LOGGER, "Couldn't save value policy", ex);
+        }
+        if (!result.isSuccess()) {
+            showResult(result);
+            target.add(getFeedbackPanel());
+        } else {
+            showResult(result);
+            redirectBack();
+        }
     }
 
 }

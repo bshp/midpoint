@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 /**
@@ -22,7 +13,9 @@ package com.evolveum.midpoint.schema;
 import static com.evolveum.midpoint.prism.util.PrismAsserts.assertPropertyValue;
 
 import com.evolveum.midpoint.prism.*;
+import com.evolveum.midpoint.prism.impl.PrismContextImpl;
 import com.evolveum.midpoint.prism.path.ItemPath;
+import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.util.PrismAsserts;
 import com.evolveum.midpoint.prism.util.PrismTestUtil;
@@ -92,18 +85,18 @@ public class TestJaxbParsing {
 
         user.checkConsistence();
         assertPropertyValue(user, UserType.F_NAME, PrismTestUtil.createPolyString("jack"));
-        assertPropertyValue(user, new QName(SchemaConstants.NS_C, "fullName"), new PolyString("Jack Sparrow", "jack sparrow"));
-        assertPropertyValue(user, new QName(SchemaConstants.NS_C, "givenName"), new PolyString("Jack", "jack"));
-        assertPropertyValue(user, new QName(SchemaConstants.NS_C, "familyName"), new PolyString("Sparrow", "sparrow"));
-        assertPropertyValue(user, new QName(SchemaConstants.NS_C, "honorificPrefix"), new PolyString("Cpt.", "cpt"));
+        assertPropertyValue(user, new ItemName(SchemaConstants.NS_C, "fullName"), new PolyString("Jack Sparrow", "jack sparrow"));
+        assertPropertyValue(user, new ItemName(SchemaConstants.NS_C, "givenName"), new PolyString("Jack", "jack"));
+        assertPropertyValue(user, new ItemName(SchemaConstants.NS_C, "familyName"), new PolyString("Sparrow", "sparrow"));
+        assertPropertyValue(user, new ItemName(SchemaConstants.NS_C, "honorificPrefix"), new PolyString("Cpt.", "cpt"));
         assertPropertyValue(user.findContainer(UserType.F_EXTENSION),
-                new QName(NS_FOO, "bar"), "BAR");
-        PrismProperty<ProtectedStringType> password = user.findOrCreateContainer(UserType.F_EXTENSION).findProperty(new QName(NS_FOO, "password"));
+                new ItemName(NS_FOO, "bar"), "BAR");
+        PrismProperty<ProtectedStringType> password = user.findOrCreateContainer(UserType.F_EXTENSION).findProperty(new ItemName(NS_FOO, "password"));
         assertNotNull(password);
         // TODO: check inside
         assertPropertyValue(user.findOrCreateContainer(UserType.F_EXTENSION),
-                new QName(NS_FOO, "num"), 42);
-        PrismProperty<?> multi = user.findOrCreateContainer(UserType.F_EXTENSION).findProperty(new QName(NS_FOO, "multi"));
+                new ItemName(NS_FOO, "num"), 42);
+        PrismProperty<?> multi = user.findOrCreateContainer(UserType.F_EXTENSION).findProperty(new ItemName(NS_FOO, "multi"));
         assertEquals(3, multi.getValues().size());
 
         // WHEN
@@ -132,23 +125,37 @@ public class TestJaxbParsing {
         account.revive(prismContext);
 
         System.out.println("Parsed account:");
-        System.out.println(account.debugDump());
+        System.out.println(account.debugDump(1));
 
         account.checkConsistence();
         assertPropertyValue(account, ShadowType.F_NAME, PrismTestUtil.createPolyString("jack"));
         assertPropertyValue(account, ShadowType.F_OBJECT_CLASS,
-        		new QName("http://midpoint.evolveum.com/xml/ns/public/resource/instance/ef2bc95b-76e0-59e2-86d6-3d4f02d3ffff", "AccountObjectClass"));
+                new QName("http://midpoint.evolveum.com/xml/ns/public/resource/instance/ef2bc95b-76e0-59e2-86d6-3d4f02d3ffff", "AccountObjectClass"));
         assertPropertyValue(account, ShadowType.F_INTENT, "default");
 
         // TODO: more asserts
     }
 
     @Test
-    public void testParseExpressionFromJaxb() throws SchemaException, SAXException, IOException, JAXBException {
+    public void testParseModernRoleFromJaxb() throws SchemaException, SAXException, IOException, JAXBException {
+        System.out.println("\n\n ===[ testParseModernRoleFromJaxb ]===\n");
+        testParseRoleFromJaxb(new File(TestConstants.COMMON_DIR, "role.xml"));
+    }
+
+    /**
+     * Test of parsing role with elements that were removed in 4.0.
+     */
+    @Test
+    public void testParseLegacyRoleFromJaxb() throws SchemaException, SAXException, IOException, JAXBException {
+        System.out.println("\n\n ===[ testParseLegacyRoleFromJaxb ]===\n");
+        testParseRoleFromJaxb(new File(TestConstants.COMMON_DIR, "role-legacy.xml"));
+    }
+
+    public void testParseRoleFromJaxb(File file) throws SchemaException, SAXException, IOException, JAXBException {
 
         PrismContext prismContext = PrismTestUtil.getPrismContext();
 
-        RoleType roleType = PrismTestUtil.parseObjectable(new File(TestConstants.COMMON_DIR, "role.xml"), RoleType.class);
+        RoleType roleType = PrismTestUtil.parseObjectable(file, RoleType.class);
 
         // WHEN
 
@@ -157,16 +164,14 @@ public class TestJaxbParsing {
 
         // THEN
         System.out.println("Parsed role:");
-        System.out.println(role.debugDump());
+        System.out.println(role.debugDump(1));
 
         role.checkConsistence();
         assertPropertyValue(role, RoleType.F_NAME, PrismTestUtil.createPolyString("r3"));
-        PrismAsserts.assertEquals("Wrong number of approver expressions", 1, role.asObjectable().getApproverExpression().size());
-        Object o = role.asObjectable().getApproverExpression().get(0).getExpressionEvaluator().get(0).getValue();
-        PrismAsserts.assertEquals("Invalid evaluator type", ScriptExpressionEvaluatorType.class, o.getClass());
-        String code = ((ScriptExpressionEvaluatorType) o).getCode();
-        PrismAsserts.assertEquals("Incorrect code parsed", "midpoint.oid2ort(user.getOid())", code);
+
+        // TODO: more asserts?
     }
+
 
     @Test
     public void testParseGenericObjectFromJaxb() throws Exception {
@@ -189,11 +194,11 @@ public class TestJaxbParsing {
         assertNotNull(extension);
 
         PrismAsserts.assertPropertyValue(extension, SchemaTestConstants.EXTENSION_STRING_TYPE_ELEMENT, "X marks the spot");
-		PrismAsserts.assertPropertyValue(extension, SchemaTestConstants.EXTENSION_INT_TYPE_ELEMENT, 1234);
-		PrismAsserts.assertPropertyValue(extension, SchemaTestConstants.EXTENSION_DOUBLE_TYPE_ELEMENT, 456.789D);
-		PrismAsserts.assertPropertyValue(extension, SchemaTestConstants.EXTENSION_LONG_TYPE_ELEMENT, 567890L);
-		XMLGregorianCalendar calendar = DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-05-30T09:10:11");
-		PrismAsserts.assertPropertyValue(extension, SchemaTestConstants.EXTENSION_DATE_TYPE_ELEMENT, calendar);
+        PrismAsserts.assertPropertyValue(extension, SchemaTestConstants.EXTENSION_INT_TYPE_ELEMENT, 1234);
+        PrismAsserts.assertPropertyValue(extension, SchemaTestConstants.EXTENSION_DOUBLE_TYPE_ELEMENT, 456.789D);
+        PrismAsserts.assertPropertyValue(extension, SchemaTestConstants.EXTENSION_LONG_TYPE_ELEMENT, 567890L);
+        XMLGregorianCalendar calendar = DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-05-30T09:10:11");
+        PrismAsserts.assertPropertyValue(extension, SchemaTestConstants.EXTENSION_DATE_TYPE_ELEMENT, calendar);
 
         //todo locations ????? how to test DOM ??????
     }
@@ -210,7 +215,7 @@ public class TestJaxbParsing {
         Document document = DOMUtil.getDocument();
 //        Element path = document.createElementNS(SchemaConstantsGenerated.NS_TYPES, "path");
 //        path.setTextContent("c:credentials/c:password");
-        ItemPath path = new ItemPath(SchemaConstantsGenerated.C_CREDENTIALS, CredentialsType.F_PASSWORD);
+        ItemPath path = ItemPath.create(SchemaConstantsGenerated.C_CREDENTIALS, CredentialsType.F_PASSWORD);
         item1.setPath(new ItemPathType(path));
         ProtectedStringType protectedString = new ProtectedStringType();
         protectedString.setEncryptedData(new EncryptedDataType());
@@ -218,7 +223,7 @@ public class TestJaxbParsing {
         item1.getValue().add(value);
 
         String xml = PrismTestUtil.serializeJaxbElementToString(
-                new JAXBElement<Object>(new QName("http://www.example.com", "custom"), Object.class, delta));
+            new JAXBElement<>(new QName("http://www.example.com", "custom"), Object.class, delta));
         assertNotNull(xml);
     }
 
@@ -252,22 +257,6 @@ public class TestJaxbParsing {
 
     private String dumpResult(String data, JAXBElement jaxb) {
         return "Parsed expression evaluator: "  + data + " as " + jaxb + " (name=" + jaxb.getName() + ", declaredType=" + jaxb.getDeclaredType() + ", value=" + jaxb.getValue() + ")";
-    }
-
-    @Test
-    public void testParseValueFilterWithAny() throws Exception {
-
-        PrismContext prismContext = PrismTestUtil.getPrismContext();
-
-        Document doc = DOMUtil.parseFile(new File(TestConstants.COMMON_DIR, "value-filter-with-any.xml"));
-        Element rootElement = DOMUtil.getFirstChildElement(doc);
-
-        // WHEN
-
-        Object parsedObject = prismContext.parserFor(rootElement).parseRealValue();
-
-        // THEN
-        System.out.println("Parsed object: "  + parsedObject);
     }
 
 }

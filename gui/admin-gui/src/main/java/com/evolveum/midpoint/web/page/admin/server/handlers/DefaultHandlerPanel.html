@@ -16,18 +16,20 @@
   -->
 
 <html xmlns="http://www.w3.org/1999/xhtml"
-	xmlns:wicket="http://wicket.apache.org">
+    xmlns:wicket="http://wicket.apache.org">
 <body>
 <wicket:panel>
     <div class="box box-success">
         <div class="box-body no-padding">
-            <table class="table table-striped">
-                <tr wicket:id="objectRefContainer">
-                    <td><wicket:message key="pageTaskEdit.objectRef"/></td>
-                    <td><span wicket:id="objectRef"/></td>
-                </tr>
-                <wicket:child/>
-            </table>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <tr wicket:id="objectRefContainer">
+                        <td><wicket:message key="pageTaskEdit.objectRef"/></td>
+                        <td><span wicket:id="objectRef"/></td>
+                    </tr>
+                    <wicket:child/>
+                </table>
+            </div>
         </div>
     </div>
 </wicket:panel>

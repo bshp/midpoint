@@ -1,29 +1,16 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.report.impl;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 
-import javax.xml.namespace.QName;
-
-import com.evolveum.midpoint.prism.Containerable;
-import com.evolveum.midpoint.prism.PrismContainerValue;
+import com.evolveum.midpoint.prism.*;
 import net.sf.jasperreports.engine.JRDataSource;
 import net.sf.jasperreports.engine.JRDataset;
 import net.sf.jasperreports.engine.JRException;
@@ -36,11 +23,11 @@ import net.sf.jasperreports.engine.query.JRAbstractQueryExecuter;
 import org.apache.commons.lang.StringUtils;
 
 import com.evolveum.midpoint.audit.api.AuditEventRecord;
-import com.evolveum.midpoint.prism.PrismObject;
-import com.evolveum.midpoint.prism.PrismPropertyValue;
 import com.evolveum.midpoint.report.api.ReportService;
 import com.evolveum.midpoint.schema.GetOperationOptions;
 import com.evolveum.midpoint.schema.SelectorOptions;
+import com.evolveum.midpoint.schema.expression.TypedValue;
+import com.evolveum.midpoint.schema.expression.VariablesMap;
 import com.evolveum.midpoint.util.exception.CommunicationException;
 import com.evolveum.midpoint.util.exception.ConfigurationException;
 import com.evolveum.midpoint.util.exception.ExpressionEvaluationException;
@@ -52,161 +39,166 @@ import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.audit_3.AuditEventRecordType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.ReportType;
 
 public abstract class MidPointQueryExecutor extends JRAbstractQueryExecuter {
 
-	private static final Trace LOGGER = TraceManager.getTrace(MidPointLocalQueryExecutor.class);
-	private Object query;
-	private String script;
-	private Class type;
-	private ReportService reportService;
+    private static final Trace LOGGER = TraceManager.getTrace(MidPointLocalQueryExecutor.class);
 
-	public String getScript() {
-		return script;
-	}
-	public Object getQuery() {
-		return query;
-	}
-	public Class getType() {
-		return type;
-	}
+    private Object query;
+    private String script;
+    private Class type;
 
-	protected Map<QName, Object> getParameters(){
-		JRParameter[] params = dataset.getParameters();
-		Map<QName, Object> expressionParameters = new HashMap<QName, Object>();
-		for (JRParameter param : params){
-			if (param.isSystemDefined()){
-				continue;
-			}
-			//LOGGER.trace(((JRBaseParameter)param).getName());
-			Object v = getParameterValue(param.getName());
-			try{
-			expressionParameters.put(new QName(param.getName()), new PrismPropertyValue(v));
-			} catch (Exception e){
-				//just skip properties that are not important for midpoint
-			}
+    public String getScript() {
+        return script;
+    }
+    public Object getQuery() {
+        return query;
+    }
+    public Class getType() {
+        return type;
+    }
 
-			LOGGER.trace("p.val: {}", v);
-		}
-		return expressionParameters;
-	}
+    protected abstract <T> TypedValue<T> createTypedPropertyValue(T realValue, Class<T> valueClass);
 
-	protected Map<QName, Object> getPromptingParameters(){
-		JRParameter[] params = dataset.getParameters();
-		Map<QName, Object> expressionParameters = new HashMap<QName, Object>();
-		for (JRParameter param : params){
-			if (param.isSystemDefined()){
-				continue;
-			}
-			if (!param.isForPrompting()){
-				continue;
-			}
-			//LOGGER.trace(((JRBaseParameter)param).getName());
-			Object v = getParameterValue(param.getName());
-			try{
-			expressionParameters.put(new QName(param.getName()), new PrismPropertyValue(v));
-			} catch (Exception e){
-				//just skip properties that are not important for midpoint
-			}
+    protected VariablesMap getParameters(){
+        JRParameter[] params = dataset.getParameters();
+        VariablesMap expressionParameters = new VariablesMap();
+        for (JRParameter param : params){
+            if (param.isSystemDefined()){
+                continue;
+            }
+            //LOGGER.trace(((JRBaseParameter)param).getName());
+            Object v = getParameterValue(param.getName());
+            try{
+            expressionParameters.put(param.getName(), createTypedPropertyValue(v, (Class)param.getValueClass()));
+            } catch (Exception e){
+                //just skip properties that are not important for midpoint
+            }
 
-			LOGGER.trace("p.val: {}", v);
-		}
-		return expressionParameters;
-	}
+            LOGGER.trace("p.val: {}", v);
+        }
+        return expressionParameters;
+    }
 
-	protected abstract Object getParsedQuery(String query, Map<QName, Object> expressionParameters) throws  SchemaException, ObjectNotFoundException, ExpressionEvaluationException, CommunicationException, ConfigurationException, SecurityViolationException;
+    protected VariablesMap getPromptingParameters() {
+        JRParameter[] params = dataset.getParameters();
+        VariablesMap expressionParameters = new VariablesMap();
+        for (JRParameter param : params) {
+            if (param.isSystemDefined()) {
+                continue;
+            }
+            if (!param.isForPrompting()) {
+                continue;
+            }
+            //LOGGER.trace(((JRBaseParameter)param).getName());
+            Object v = getParameterValue(param.getName());
+            try{
+            expressionParameters.put(param.getName(), createTypedPropertyValue(v, (Class)param.getValueClass()));
+            } catch (Exception e){
+                //just skip properties that are not important for midpoint
+            }
 
-	protected String getParsedScript(String script){
-		String normalized = script.replace("<code>", "");
-		return normalized.replace("</code>", "");
-	}
+            LOGGER.trace("p.val: {}", v);
+        }
+        return expressionParameters;
+    }
 
-		protected MidPointQueryExecutor(JasperReportsContext jasperReportsContext, JRDataset dataset,
-			Map<String, ? extends JRValueParameter> parametersMap) {
-		super(jasperReportsContext, dataset, parametersMap);
-	}
+    protected abstract Object getParsedQuery(String query, VariablesMap expressionParameters) throws  SchemaException, ObjectNotFoundException, ExpressionEvaluationException, CommunicationException, ConfigurationException, SecurityViolationException;
 
-	protected abstract Collection<PrismObject<? extends ObjectType>> searchObjects(Object query, Collection<SelectorOptions<GetOperationOptions>> options) throws SchemaException, ObjectNotFoundException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException;
+    protected String getParsedScript(String script){
+        String normalized = script.replace("<code>", "");
+        return normalized.replace("</code>", "");
+    }
 
-	protected abstract Collection<PrismContainerValue<? extends Containerable>> evaluateScript(String script, Map<QName, Object> parameters) throws SchemaException, ObjectNotFoundException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException;
+        protected MidPointQueryExecutor(JasperReportsContext jasperReportsContext, JRDataset dataset,
+            Map<String, ? extends JRValueParameter> parametersMap) {
+        super(jasperReportsContext, dataset, parametersMap);
+    }
 
-	protected abstract Collection<AuditEventRecord> searchAuditRecords(String script, Map<QName, Object> parameters) throws SchemaException, ExpressionEvaluationException, ObjectNotFoundException;
+    protected abstract Collection<PrismObject<? extends ObjectType>> searchObjects(Object query, Collection<SelectorOptions<GetOperationOptions>> options) throws SchemaException, ObjectNotFoundException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException;
 
-	protected abstract JRDataSource createDataSourceFromObjects(Collection<PrismObject<? extends ObjectType>> results);
+    protected abstract Collection<PrismContainerValue<? extends Containerable>> evaluateScript(String script, VariablesMap parameters) throws SchemaException, ObjectNotFoundException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException;
 
-	protected abstract JRDataSource createDataSourceFromContainerValues(Collection<PrismContainerValue<? extends Containerable>> results);
+    protected abstract Collection<AuditEventRecord> searchAuditRecords(String script, VariablesMap parameters) throws SchemaException, ExpressionEvaluationException, ObjectNotFoundException, CommunicationException, ConfigurationException, SecurityViolationException;
 
-	@Override
-	protected void parseQuery() {
-		try {
+    protected abstract JRDataSource createDataSourceFromObjects(Collection<PrismObject<? extends ObjectType>> results);
 
-			String s = dataset.getQuery().getText();
-			LOGGER.trace("query: " + s);
-			if (StringUtils.isEmpty(s)) {
-				query = null;
-			} else {
-				if (s.startsWith("<filter")) {
-					query = getParsedQuery(s, getParameters());
-					// getParsedQuery(s, expressionParameters);
-				} else if (s.startsWith("<code")) {
-					script = getParsedScript(s);
-				}
-			}
-		} catch (SchemaException | ObjectNotFoundException | ExpressionEvaluationException | CommunicationException | ConfigurationException | SecurityViolationException e) {
-			// TODO Auto-generated catch block
-			throw new SystemException(e.getMessage(), e);
-		}
+    protected abstract JRDataSource createDataSourceFromContainerValues(Collection<PrismContainerValue<? extends Containerable>> results);
 
-	}
+    @Override
+    protected void parseQuery() {
+        try {
 
-	@Override
-	public JRDataSource createDatasource() throws JRException {
-		try {
-			if (query == null && script == null){
-				throw new JRException("Neither query, nor script defined in the report.");
-			}
+            String s = dataset.getQuery().getText();
+            LOGGER.trace("query: " + s);
+            if (StringUtils.isEmpty(s)) {
+                query = null;
+            } else {
+                if (s.startsWith("<filter")) {
+                    query = getParsedQuery(s, getParameters());
+                    // getParsedQuery(s, expressionParameters);
+                } else if (s.startsWith("<code")) {
+                    script = getParsedScript(s);
+                }
+            }
+        } catch (SchemaException | ObjectNotFoundException | ExpressionEvaluationException | CommunicationException | ConfigurationException | SecurityViolationException e) {
+            // TODO Auto-generated catch block
+            throw new SystemException(e.getMessage(), e);
+        }
 
-			if (query != null) {
-				Collection<PrismObject<? extends ObjectType>> results;
-				results = searchObjects(query, SelectorOptions.createCollection(GetOperationOptions.createRaw()));
-				return createDataSourceFromObjects(results);
-			} else {
-				if (script.contains("AuditEventRecord")){
-					Collection<AuditEventRecord> audtiEventRecords = searchAuditRecords(script, getPromptingParameters());
-					Collection<AuditEventRecordType> auditEventRecordsType = new ArrayList<>();
-					for (AuditEventRecord aer : audtiEventRecords){
-						AuditEventRecordType aerType = aer.createAuditEventRecordType(true);
-						auditEventRecordsType.add(aerType);
-					}
-					return new JRBeanCollectionDataSource(auditEventRecordsType);
-				} else {
-					Collection<PrismContainerValue<? extends Containerable>> results;
-					results = evaluateScript(script, getParameters());
-					return createDataSourceFromContainerValues(results);
-				}
-			}
-		} catch (SchemaException | ObjectNotFoundException | SecurityViolationException
-				| CommunicationException | ConfigurationException | ExpressionEvaluationException e) {
-			// TODO Auto-generated catch block
-			throw new JRException(e);
-		}
-	}
+    }
 
-	@Override
-	public void close() {
-//		throw new UnsupportedOperationException("QueryExecutor.close() not supported");
-		//nothing to DO
-	}
+    @Override
+    public JRDataSource createDatasource() throws JRException {
+        try {
+            if (query == null && script == null){
+                throw new JRException("Neither query, nor script defined in the report.");
+            }
 
-	@Override
-	public boolean cancelQuery() throws JRException {
-		 throw new UnsupportedOperationException("QueryExecutor.cancelQuery() not supported");
-	}
+            if (query != null) {
+                Collection<PrismObject<? extends ObjectType>> results;
+                results = searchObjects(query, SelectorOptions.createCollection(GetOperationOptions.createRaw()));
+                return createDataSourceFromObjects(results);
+            } else {
+                if (isAuditReport()) {
+                    Collection<AuditEventRecord> audtiEventRecords = searchAuditRecords(script, getPromptingParameters());
+                    Collection<AuditEventRecordType> auditEventRecordsType = new ArrayList<>();
+                    for (AuditEventRecord aer : audtiEventRecords){
+                        AuditEventRecordType aerType = aer.createAuditEventRecordType(true);
+                        auditEventRecordsType.add(aerType);
+                    }
+                    return new JRBeanCollectionDataSource(auditEventRecordsType);
+                } else {
+                    Collection<PrismContainerValue<? extends Containerable>> results;
+                    results = evaluateScript(script, getParameters());
+                    return createDataSourceFromContainerValues(results);
+                }
+            }
+        } catch (SchemaException | ObjectNotFoundException | SecurityViolationException
+                | CommunicationException | ConfigurationException | ExpressionEvaluationException e) {
+            // TODO Auto-generated catch block
+            throw new JRException(e);
+        }
+    }
 
-	@Override
-	protected String getParameterReplacement(String parameterName) {
-		 throw new UnsupportedOperationException("QueryExecutor.getParameterReplacement() not supported");
-	}
+    protected abstract boolean isAuditReport();
+
+    @Override
+    public void close() {
+//        throw new UnsupportedOperationException("QueryExecutor.close() not supported");
+        //nothing to DO
+    }
+
+    @Override
+    public boolean cancelQuery() throws JRException {
+         throw new UnsupportedOperationException("QueryExecutor.cancelQuery() not supported");
+    }
+
+    @Override
+    protected String getParameterReplacement(String parameterName) {
+         throw new UnsupportedOperationException("QueryExecutor.getParameterReplacement() not supported");
+    }
 
 
 

@@ -1,23 +1,15 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.data.common.container;
 
 import com.evolveum.midpoint.prism.PrismContainerValue;
 import com.evolveum.midpoint.prism.PrismContext;
+import com.evolveum.midpoint.repo.sql.SqlRepositoryServiceImpl;
 import com.evolveum.midpoint.repo.sql.data.RepositoryContext;
 import com.evolveum.midpoint.repo.sql.data.common.RAccessCertificationCampaign;
 import com.evolveum.midpoint.repo.sql.data.common.embedded.RActivation;
@@ -48,6 +40,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+
+import static com.evolveum.midpoint.schema.util.CertCampaignTypeUtil.norm;
 
 /**
  * @author lazyman
@@ -89,6 +83,7 @@ public class RAccessCertificationCase implements Container<RAccessCertificationC
     private XMLGregorianCalendar reviewDeadline;
     private XMLGregorianCalendar remediedTimestamp;
     private String currentStageOutcome;
+    private Integer iteration;
     private Integer stageNumber;
     private String outcome;
 
@@ -96,7 +91,7 @@ public class RAccessCertificationCase implements Container<RAccessCertificationC
     }
 
     @Id
-    @org.hibernate.annotations.ForeignKey(name = "fk_acc_cert_case_owner")
+    @JoinColumn(foreignKey = @ForeignKey(name = "fk_acc_cert_case_owner"))
     @MapsId("owner")
     @ManyToOne(fetch = FetchType.LAZY)
     @OwnerGetter(ownerClass = RAccessCertificationCampaign.class)
@@ -121,7 +116,6 @@ public class RAccessCertificationCase implements Container<RAccessCertificationC
 
     @JaxbName(localPart = "workItem")
     @OneToMany(mappedBy = "owner", orphanRemoval = true)
-    @org.hibernate.annotations.ForeignKey(name = "none")
     @Cascade({org.hibernate.annotations.CascadeType.ALL})
     public Set<RAccessCertificationWorkItem> getWorkItems() {
         return workItems;
@@ -172,6 +166,11 @@ public class RAccessCertificationCase implements Container<RAccessCertificationC
 
     public String getCurrentStageOutcome() {
         return currentStageOutcome;
+    }
+
+    @Column(nullable = false)
+    public Integer getIteration() {
+        return iteration;
     }
 
     public Integer getStageNumber() {
@@ -233,6 +232,10 @@ public class RAccessCertificationCase implements Container<RAccessCertificationC
         this.currentStageOutcome = currentStageOutcome;
     }
 
+    public void setIteration(Integer iteration) {
+        this.iteration = iteration;
+    }
+
     public void setStageNumber(Integer stageNumber) {
         this.stageNumber = stageNumber;
     }
@@ -271,6 +274,7 @@ public class RAccessCertificationCase implements Container<RAccessCertificationC
                 Objects.equals(reviewDeadline, that.reviewDeadline) &&
                 Objects.equals(remediedTimestamp, that.remediedTimestamp) &&
                 currentStageOutcome == that.currentStageOutcome &&
+                Objects.equals(iteration, that.iteration) &&
                 Objects.equals(stageNumber, that.stageNumber) &&
                 Objects.equals(outcome, that.outcome);
     }
@@ -278,7 +282,7 @@ public class RAccessCertificationCase implements Container<RAccessCertificationC
     @Override
     public int hashCode() {
         return Objects.hash(fullObject, ownerOid, id, workItems, objectRef, targetRef, tenantRef, orgRef, activation,
-                reviewRequestedTimestamp, reviewDeadline, remediedTimestamp, currentStageOutcome, stageNumber,
+                reviewRequestedTimestamp, reviewDeadline, remediedTimestamp, currentStageOutcome, iteration, stageNumber,
                 outcome);
     }
 
@@ -305,45 +309,46 @@ public class RAccessCertificationCase implements Container<RAccessCertificationC
     }
 
     public static RAccessCertificationCase toRepo(@NotNull RAccessCertificationCampaign owner, AccessCertificationCaseType case1, RepositoryContext context) throws DtoTranslationException {
-		RAccessCertificationCase rCase = new RAccessCertificationCase();
-		rCase.setOwner(owner);
+        RAccessCertificationCase rCase = new RAccessCertificationCase();
+        rCase.setOwner(owner);
         toRepo(rCase, case1, context);
         return rCase;
     }
 
     public static RAccessCertificationCase toRepo(String ownerOid, AccessCertificationCaseType case1, RepositoryContext context) throws DtoTranslationException {
-		RAccessCertificationCase rCase = new RAccessCertificationCase();
-		rCase.setOwnerOid(ownerOid);
+        RAccessCertificationCase rCase = new RAccessCertificationCase();
+        rCase.setOwnerOid(ownerOid);
         toRepo(rCase, case1, context);
         return rCase;
     }
 
     private static RAccessCertificationCase toRepo(RAccessCertificationCase rCase, AccessCertificationCaseType case1,
-			RepositoryContext context) throws DtoTranslationException {
+            RepositoryContext context) throws DtoTranslationException {
         rCase.setTransient(null);       // we don't try to advise hibernate - let it do its work, even if it would cost some SELECTs
         rCase.setId(RUtil.toInteger(case1.getId()));
-        rCase.setObjectRef(RUtil.jaxbRefToEmbeddedRepoRef(case1.getObjectRef(), context.prismContext));
-        rCase.setTargetRef(RUtil.jaxbRefToEmbeddedRepoRef(case1.getTargetRef(), context.prismContext));
-        rCase.setTenantRef(RUtil.jaxbRefToEmbeddedRepoRef(case1.getTenantRef(), context.prismContext));
-        rCase.setOrgRef(RUtil.jaxbRefToEmbeddedRepoRef(case1.getOrgRef(), context.prismContext));
+        rCase.setObjectRef(RUtil.jaxbRefToEmbeddedRepoRef(case1.getObjectRef(), context.relationRegistry));
+        rCase.setTargetRef(RUtil.jaxbRefToEmbeddedRepoRef(case1.getTargetRef(), context.relationRegistry));
+        rCase.setTenantRef(RUtil.jaxbRefToEmbeddedRepoRef(case1.getTenantRef(), context.relationRegistry));
+        rCase.setOrgRef(RUtil.jaxbRefToEmbeddedRepoRef(case1.getOrgRef(), context.relationRegistry));
         if (case1.getActivation() != null) {
             RActivation activation = new RActivation();
-            RActivation.copyFromJAXB(case1.getActivation(), activation, context);
+            RActivation.fromJaxb(case1.getActivation(), activation, context);
             rCase.setActivation(activation);
         }
-		for (AccessCertificationWorkItemType workItem : case1.getWorkItem()) {
-			rCase.getWorkItems().add(RAccessCertificationWorkItem.toRepo(rCase, workItem, context));
-		}
+        for (AccessCertificationWorkItemType workItem : case1.getWorkItem()) {
+            rCase.getWorkItems().add(RAccessCertificationWorkItem.toRepo(rCase, workItem, context));
+        }
         rCase.setReviewRequestedTimestamp(case1.getCurrentStageCreateTimestamp());
         rCase.setReviewDeadline(case1.getCurrentStageDeadline());
         rCase.setRemediedTimestamp(case1.getRemediedTimestamp());
         rCase.setCurrentStageOutcome(case1.getCurrentStageOutcome());
+        rCase.setIteration(norm(case1.getIteration()));
         rCase.setStageNumber(case1.getStageNumber());
         rCase.setOutcome(case1.getOutcome());
         PrismContainerValue<AccessCertificationCaseType> cvalue = case1.asPrismContainerValue();
         String xml;
         try {
-            xml = context.prismContext.xmlSerializer().serialize(cvalue, SchemaConstantsGenerated.C_VALUE);
+            xml = context.prismContext.serializerFor(SqlRepositoryServiceImpl.DATA_LANGUAGE).serialize(cvalue, SchemaConstantsGenerated.C_VALUE);
         } catch (SchemaException e) {
             throw new IllegalStateException("Couldn't serialize certification case to string", e);
         }
@@ -363,7 +368,7 @@ public class RAccessCertificationCase implements Container<RAccessCertificationC
         String xml = RUtil.getXmlFromByteArray(fullObject, false);
         LOGGER.trace("RAccessCertificationCase full object to be parsed\n{}", xml);
         try {
-            return prismContext.parserFor(xml).xml().compat().parseRealValue(AccessCertificationCaseType.class);
+            return prismContext.parserFor(xml).language(SqlRepositoryServiceImpl.DATA_LANGUAGE).compat().parseRealValue(AccessCertificationCaseType.class);
         } catch (SchemaException e) {
             LOGGER.debug("Couldn't parse certification case because of schema exception ({}):\nData: {}", e, xml);
             throw e;

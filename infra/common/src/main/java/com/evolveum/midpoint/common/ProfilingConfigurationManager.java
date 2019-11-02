@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.common;
@@ -33,17 +24,17 @@ public class ProfilingConfigurationManager {
     private static final Trace LOGGER = TraceManager.getTrace(ProfilingConfigurationManager.class);
 
     private static final String REQUEST_FILTER_LOGGER_CLASS_NAME = "com.evolveum.midpoint.web.util.MidPointProfilingServletFilter";
-    private static final String SUBSYSTEM_PROFILING_LOGGER = "com.evolveum.midpoint.util.aspect.ProfilingDataManager";
-    private static final String APPENDER_IDM_PROFILE = "IDM-PROFILE_LOG";
+    private static final String SUBSYSTEM_PROFILING_LOGGER = ProfilingDataManager.class.getName();
+    private static final String APPENDER_IDM_PROFILE = "MIDPOINT_PROFILE_LOG";
 
     /**
      *  In this method, we perform the check of systemConfiguration object, searching for any data
      *  related to profilingConfiguration
      * */
     public static LoggingConfigurationType checkSystemProfilingConfiguration(PrismObject<SystemConfigurationType> systemConfigurationPrism){
-    	if (systemConfigurationPrism == null) {
-    		return null;
-    	}
+        if (systemConfigurationPrism == null) {
+            return null;
+        }
         SystemConfigurationType systemConfig = systemConfigurationPrism.asObjectable();
         ProfilingConfigurationType profilingConfig = systemConfig.getProfilingConfiguration();
         boolean isSubsystemConfig;
@@ -112,8 +103,9 @@ public class ProfilingConfigurationManager {
         }
 
         //Check the dump interval
-        if(profilingConfig.getDumpInterval() != null)
+        if(profilingConfig.getDumpInterval() != null) {
             dumpInterval = profilingConfig.getDumpInterval();
+        }
 
         performanceProfiling = checkXsdBooleanValue(profilingConfig.isPerformanceStatistics());
         requestProfiling = checkXsdBooleanValue(profilingConfig.isRequestFilter());
@@ -129,9 +121,6 @@ public class ProfilingConfigurationManager {
     }
 
     private static boolean checkXsdBooleanValue(Boolean value){
-        if(value == null || !value)
-            return false;
-        else
-            return true;
+        return value != null && value;
     }
 }

@@ -1,23 +1,16 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2014 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.data.common;
 
 import com.evolveum.midpoint.repo.sql.data.common.id.RFocusPhotoId;
+import com.evolveum.midpoint.repo.sql.helpers.modify.Ignore;
 import com.evolveum.midpoint.repo.sql.query2.definition.NotQueryable;
+import com.evolveum.midpoint.repo.sql.util.EntityState;
 import com.evolveum.midpoint.repo.sql.util.RUtil;
 import org.hibernate.annotations.ForeignKey;
 
@@ -28,10 +21,13 @@ import java.util.Arrays;
 /**
  * @author lazyman
  */
+@Ignore
 @IdClass(RFocusPhotoId.class)
 @Entity
 @Table(name = "m_focus_photo")
-public class RFocusPhoto implements Serializable {
+public class RFocusPhoto implements Serializable, EntityState {
+
+    private Boolean trans;
 
     private RFocus owner;
     private String ownerOid;
@@ -62,6 +58,15 @@ public class RFocusPhoto implements Serializable {
         return photo;
     }
 
+    @Transient
+    public Boolean isTransient() {
+        return trans;
+    }
+
+    public void setTransient(Boolean trans) {
+        this.trans = trans;
+    }
+
     public void setOwner(RFocus owner) {
         this.owner = owner;
     }
@@ -79,15 +84,13 @@ public class RFocusPhoto implements Serializable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        RFocusPhoto that = (RFocusPhoto) o;
+        RFocusPhoto photo = (RFocusPhoto) o;
 
-        if (!Arrays.equals(photo, that.photo)) return false;
-
-        return true;
+        return getOwnerOid() != null ? getOwnerOid().equals(photo.getOwnerOid()) : photo.getOwnerOid() == null;
     }
 
     @Override
     public int hashCode() {
-        return photo != null ? Arrays.hashCode(photo) : 0;
+        return getOwnerOid() != null ? getOwnerOid().hashCode() : 0;
     }
 }

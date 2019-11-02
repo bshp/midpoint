@@ -1,30 +1,25 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.schema.constants;
 
 import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
 import com.evolveum.midpoint.util.QNameUtil;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
-
 import org.apache.commons.lang.Validate;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.xml.namespace.QName;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Locale;
+import java.util.ResourceBundle;
 
 /**
  * @author lazyman
@@ -72,13 +67,16 @@ public enum ObjectTypes {
 
     FOCUS_TYPE(FocusType.COMPLEX_TYPE, SchemaConstants.C_FOCUS, FocusType.class, ObjectManager.MODEL, "focus"),
 
+    ASSIGNMENT_HOLDER_TYPE(AssignmentHolderType.COMPLEX_TYPE, SchemaConstantsGenerated.C_ASSIGNMENT_HOLDER,
+            AssignmentHolderType.class, ObjectManager.MODEL, "assignmentHolders"),
+
     REPORT(ReportType.COMPLEX_TYPE, SchemaConstants.C_REPORT, ReportType.class, ObjectManager.MODEL, "reports"),
 
     REPORT_OUTPUT(ReportOutputType.COMPLEX_TYPE, SchemaConstants.C_REPORT_OUTPUT, ReportOutputType.class,
                   ObjectManager.MODEL, "reportOutputs"),
 
     SECURITY_POLICY(SecurityPolicyType.COMPLEX_TYPE, SchemaConstants.C_SECURITY_POLICY, SecurityPolicyType.class,
-    			ObjectManager.MODEL, "securityPolicies"),
+                ObjectManager.MODEL, "securityPolicies"),
 
     LOOKUP_TABLE(LookupTableType.COMPLEX_TYPE, SchemaConstantsGenerated.C_LOOKUP_TABLE, LookupTableType.class,
             ObjectManager.MODEL, "lookupTables"),
@@ -97,43 +95,52 @@ public enum ObjectTypes {
     SERVICE(ServiceType.COMPLEX_TYPE, SchemaConstantsGenerated.C_SERVICE, ServiceType.class, ObjectManager.MODEL,
             "services"),
 
-    CASE(CaseType.COMPLEX_TYPE, SchemaConstantsGenerated.C_CASE, CaseType.class, ObjectManager.EMULATED,
+    CASE(CaseType.COMPLEX_TYPE, SchemaConstantsGenerated.C_CASE, CaseType.class, ObjectManager.MODEL,
             "cases"),
-    
+
     FUNCTION_LIBRARY(FunctionLibraryType.COMPLEX_TYPE, SchemaConstantsGenerated.C_FUNCTION_LIBRARY, FunctionLibraryType.class, ObjectManager.MODEL,
             "functionLibraries"),
+
+    OBJECT_COLLECTION(ObjectCollectionType.COMPLEX_TYPE, SchemaConstantsGenerated.C_OBJECT_COLLECTION, ObjectCollectionType.class, ObjectManager.MODEL,
+            "objectCollections"),
+
+    ARCHETYPE(ArchetypeType.COMPLEX_TYPE, SchemaConstantsGenerated.C_ARCHETYPE, ArchetypeType.class, ObjectManager.MODEL,
+            "archetypes"),
+
+    DASHBOARD(DashboardType.COMPLEX_TYPE, SchemaConstantsGenerated.C_DASHBOARD, DashboardType.class, ObjectManager.MODEL,
+            "dashboards"),
 
     // this should be at end, because otherwise it presents itself as entry for all subtypes of ObjectType
     OBJECT(SchemaConstants.C_OBJECT_TYPE, SchemaConstants.C_OBJECT, ObjectType.class, ObjectManager.MODEL, "objects");
 
-	public List<ObjectTypes> thisAndSupertypes() {
-		List<ObjectTypes> rv = new ArrayList<>();
-		rv.add(this);
-		ObjectTypes superType = superType();
-		if (superType != null) {
-			rv.addAll(superType.thisAndSupertypes());
-		}
-		return rv;
-	}
-
-	public ObjectTypes superType() {
-		return getObjectTypeIfKnown(classDefinition.getSuperclass());
-	}
-
-	public enum ObjectManager {
-        PROVISIONING, TASK_MANAGER, MODEL, WORKFLOW, REPOSITORY, EMULATED
+    public List<ObjectTypes> thisAndSupertypes() {
+        List<ObjectTypes> rv = new ArrayList<>();
+        rv.add(this);
+        ObjectTypes superType = superType();
+        if (superType != null) {
+            rv.addAll(superType.thisAndSupertypes());
+        }
+        return rv;
     }
 
-    private QName type;
-    private QName name;
-    private Class<? extends ObjectType> classDefinition;
-    private ObjectManager objectManager;
-    private String restType;
+    public ObjectTypes superType() {
+        return getObjectTypeIfKnown(classDefinition.getSuperclass());
+    }
 
-    ObjectTypes(QName type, QName name, Class<? extends ObjectType> classDefinition,
-			ObjectManager objectManager, String restType) {
+    public enum ObjectManager {
+        PROVISIONING, TASK_MANAGER, MODEL, REPOSITORY
+    }
+
+    @NotNull private final QName type;
+    @NotNull private final QName elementName;
+    @NotNull private final Class<? extends ObjectType> classDefinition;
+    @NotNull private final ObjectManager objectManager;
+    @NotNull private final String restType;
+
+    ObjectTypes(@NotNull QName type, @NotNull QName elementName, @NotNull Class<? extends ObjectType> classDefinition,
+            @NotNull ObjectManager objectManager, @NotNull String restType) {
         this.type = type;
-        this.name = name;
+        this.elementName = elementName;
         this.classDefinition = classDefinition;
         this.objectManager = objectManager;
         this.restType = restType;
@@ -151,34 +158,37 @@ public enum ObjectTypes {
         return type.getLocalPart();
     }
 
-    public QName getQName() {
-        return name;
+    @NotNull
+    public QName getElementName() {
+        return elementName;
     }
 
+    @NotNull
     public QName getTypeQName() {
         return type;
     }
 
+    @NotNull
     public Class<? extends ObjectType> getClassDefinition() {
         return classDefinition;
     }
 
+    @NotNull
     public String getRestType() {
         return restType;
     }
 
-    public void setRestType(String restType) {
-        this.restType = restType;
-    }
-
+    @NotNull
     public String getObjectTypeUri() {
         return QNameUtil.qNameToUri(getTypeQName());
     }
 
+    @NotNull
     public ObjectManager getObjectManager() {
         return objectManager;
     }
 
+    @NotNull
     public static ObjectTypes getObjectType(String objectType) {
         for (ObjectTypes type : values()) {
             if (type.getValue().equals(objectType)) {
@@ -211,6 +221,7 @@ public enum ObjectTypes {
         throw new IllegalArgumentException("Unsupported object type qname " + typeQName);
     }
 
+    @NotNull
     public static ObjectTypes getObjectTypeFromUri(String objectTypeUri) {
         for (ObjectTypes type : values()) {
             if (type.getObjectTypeUri().equals(objectTypeUri)) {
@@ -220,6 +231,7 @@ public enum ObjectTypes {
         throw new IllegalArgumentException("Unsupported object type uri " + objectTypeUri);
     }
 
+    @NotNull
     public static String getObjectTypeUri(String objectType) {
         return getObjectType(objectType).getObjectTypeUri();
     }
@@ -233,10 +245,11 @@ public enum ObjectTypes {
         throw new IllegalArgumentException("Unsupported object type " + typeNameLocal);
     }
 
-    public static Class<? extends ObjectType> getObjectTypeClass(QName typeName) {
+    @NotNull
+    public static <O extends ObjectType> Class<O> getObjectTypeClass(QName typeName) {
         for (ObjectTypes type : values()) {
             if (QNameUtil.match(type.getTypeQName(), typeName)) {
-                return type.getClassDefinition();
+                return (Class<O>) type.getClassDefinition();
             }
         }
         throw new IllegalArgumentException("Unsupported object type " + typeName);
@@ -244,15 +257,15 @@ public enum ObjectTypes {
 
     @SuppressWarnings("unchecked")
     @NotNull
-    public static ObjectTypes getObjectType(Class<? extends ObjectType> objectType) {
-		ObjectTypes rv = getObjectTypeIfKnown(objectType);
-		if (rv == null) {
-			throw new IllegalArgumentException("Unsupported object type " + objectType);
-		}
-		return rv;
-	}
+    public static ObjectTypes getObjectType(@NotNull Class<? extends ObjectType> objectType) {
+        ObjectTypes rv = getObjectTypeIfKnown(objectType);
+        if (rv == null) {
+            throw new IllegalArgumentException("Unsupported object type " + objectType);
+        }
+        return rv;
+    }
 
-    public static ObjectTypes getObjectTypeIfKnown(Class<?> objectType) {
+    public static ObjectTypes getObjectTypeIfKnown(@NotNull Class<?> objectType) {
         for (ObjectTypes type : values()) {
             if (type.getClassDefinition().equals(objectType)) {
                 return type;
@@ -320,7 +333,7 @@ public enum ObjectTypes {
         return null;
     }
 
-    public static Class getClassFromRestType(String restType) {
+    public static Class<? extends ObjectType> getClassFromRestType(String restType) {
         Validate.notNull(restType, "Rest type must not be null.");
 
         for (ObjectTypes type : ObjectTypes.values()) {
@@ -332,6 +345,18 @@ public enum ObjectTypes {
         throw new IllegalArgumentException("Not suitable class found for rest type: " + restType);
     }
 
+    public static String getRestTypeFromClass(Class<?> clazz) {
+        Validate.notNull(clazz, "Class must not be null.");
+
+        for (ObjectTypes type : ObjectTypes.values()) {
+            if (type.getClassDefinition().equals(clazz)) {
+                return type.getRestType();
+            }
+        }
+
+        throw new IllegalArgumentException("Not suitable rest type found for class: " + clazz);
+    }
+
     public static List<Class<? extends ObjectType>> getAllObjectTypes() {
         List<Class<? extends ObjectType>> list = new ArrayList<>();
         for (ObjectTypes t : ObjectTypes.values()) {
@@ -341,20 +366,28 @@ public enum ObjectTypes {
         return list;
     }
 
-    // TODO move somewhere else?
-    public static String getDisplayNameForTypeName(@Nullable QName name, @Nullable Locale locale) {
-    	if (name == null) {
-    		return null;
-		}
-		ResourceBundle bundle = ResourceBundle.getBundle(
-				SchemaConstants.SCHEMA_LOCALIZATION_PROPERTIES_RESOURCE_BASE_PATH,
-				locale != null ? locale : Locale.getDefault());
-		String key = SchemaConstants.OBJECT_TYPE_KEY_PREFIX + name.getLocalPart();
-		if (bundle.containsKey(key)) {
-			return bundle.getString(key);
-		} else {
-			return null;
-		}
-	}
+    /**
+     * Makes sure the QNames are full representation of object types, e.g. that they include proper namespace.
+     */
+    public static List<QName> canonizeObjectTypes(List<QName> inputQNames) {
+        if (inputQNames == null) {
+            return null;
+        }
+        List<QName> outputQNames = new ArrayList<>(inputQNames.size());
+        for (QName inputQname : inputQNames) {
+            outputQNames.add(canonizeObjectType(inputQname));
+        }
+        return outputQNames;
+    }
+
+    /**
+     * Makes sure the QName is full representation of object types, e.g. that it includes proper namespace.
+     */
+    public static QName canonizeObjectType(QName inputQName) {
+        if (!StringUtils.isBlank(inputQName.getNamespaceURI())) {
+            return inputQName;
+        }
+        return new QName(SchemaConstants.NS_C, inputQName.getLocalPart());
+    }
 }
 

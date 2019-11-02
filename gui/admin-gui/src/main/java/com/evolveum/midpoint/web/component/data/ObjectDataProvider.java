@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.data;
@@ -65,17 +56,23 @@ public class ObjectDataProvider<W extends Serializable, T extends ObjectType>
     }
 
     public List<T> getSelectedData() {
-    	for (Serializable s : super.getAvailableData()){
-    		if (s instanceof SelectableBean) {
-    			SelectableBean<T> selectable = (SelectableBean<T>) s;
-    			if (selectable.isSelected() && selectable.getValue() != null) {
-    				selected.add(selectable.getValue());
-    			}
-    		}
-    	}
-    	List<T> allSelected = new ArrayList<>();
-    	allSelected.addAll(selected);
-    	return allSelected;
+        for (Serializable s : super.getAvailableData()){
+            if (s instanceof SelectableBean) {
+                SelectableBean<T> selectable = (SelectableBean<T>) s;
+                if (selectable.isSelected() && selectable.getValue() != null) {
+                    selected.add(selectable.getValue());
+                }
+            }
+        }
+        List<T> allSelected = new ArrayList<>();
+        allSelected.addAll(selected);
+        return allSelected;
+    }
+
+    // Here we apply the distinct option. It is easier and more reliable to apply it here than to do at all the places
+    // where options for this provider are defined.
+    private Collection<SelectorOptions<GetOperationOptions>> getOptionsToUse() {
+        return GetOperationOptions.merge(getPrismContext(), options, getDistinctRelatedOptions());
     }
 
 
@@ -84,23 +81,23 @@ public class ObjectDataProvider<W extends Serializable, T extends ObjectType>
         LOGGER.trace("begin::iterator() from {} count {}.", new Object[]{first, count});
 
         for (W available : getAvailableData()){
-        	if (available instanceof SelectableBean){
-        		SelectableBean<T> selectableBean = (SelectableBean<T>) available;
-        		if (selectableBean.isSelected() && selectableBean.getValue() != null) {
-        			selected.add(selectableBean.getValue());
-        		}
-        	}
+            if (available instanceof SelectableBean){
+                SelectableBean<T> selectableBean = (SelectableBean<T>) available;
+                if (selectableBean.isSelected() && selectableBean.getValue() != null) {
+                    selected.add(selectableBean.getValue());
+                }
+            }
         }
 
         for (W available : getAvailableData()) {
-        	if (available instanceof SelectableBean) {
-        		SelectableBean<T> selectableBean = (SelectableBean<T>) available;
-        		if (!selectableBean.isSelected()) {
-        			if (selected.contains(selectableBean.getValue())) {
-        				selected.remove(selectableBean.getValue());
-        			}
-        		}
-        	}
+            if (available instanceof SelectableBean) {
+                SelectableBean<T> selectableBean = (SelectableBean<T>) available;
+                if (!selectableBean.isSelected()) {
+                    if (selected.contains(selectableBean.getValue())) {
+                        selected.remove(selectableBean.getValue());
+                    }
+                }
+            }
         }
 
         getAvailableData().clear();
@@ -112,25 +109,25 @@ public class ObjectDataProvider<W extends Serializable, T extends ObjectType>
 
             ObjectQuery query = getQuery();
             if (query == null){
-            	query = new ObjectQuery();
+                query = getPrismContext().queryFactory().createQuery();
             }
             query.setPaging(paging);
 
             if (LOGGER.isTraceEnabled()) {
-            	LOGGER.trace("Query {} with {}", type.getSimpleName(), query.debugDump());
+                LOGGER.trace("Query {} with {}", type.getSimpleName(), query.debugDump());
             }
 
-            List<PrismObject<T>> list = getModel().searchObjects(type, query, options, task, result);
+            List<PrismObject<T>> list = getModel().searchObjects(type, query, getOptionsToUse(), task, result);
 
             if (LOGGER.isTraceEnabled()) {
-            	LOGGER.trace("Query {} resulted in {} objects", type.getSimpleName(), list.size());
+                LOGGER.trace("Query {} resulted in {} objects", type.getSimpleName(), list.size());
             }
 
             for (PrismObject<T> object : list) {
                 getAvailableData().add(createDataObjectWrapper(object));
             }
         } catch (Exception ex) {
-            result.recordFatalError("Couldn't list objects.", ex);
+            result.recordFatalError(getPage().createStringResource("ObjectDataProvider.message.listObjects.fatalError").getString(), ex);
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't list objects", ex);
         } finally {
             result.computeStatusIfUnknown();
@@ -144,16 +141,21 @@ public class ObjectDataProvider<W extends Serializable, T extends ObjectType>
         return getAvailableData().iterator();
     }
 
+    @Override
+    protected boolean checkOrderingSettings() {
+        return true;
+    }
+
     protected void handleNotSuccessOrHandledErrorInIterator(OperationResult result){
         getPage().showResult(result);
         throw new RestartResponseException(PageError.class);
     }
 
     public W createDataObjectWrapper(PrismObject<T> obj) {
-    	SelectableBean<T> selectable = new SelectableBean<T>(obj.asObjectable());
-    	if (selected.contains(obj.asObjectable())){
-    		selectable.setSelected(true);
-    	}
+        SelectableBean<T> selectable = new SelectableBean<>(obj.asObjectable());
+        if (selected.contains(obj.asObjectable())){
+            selectable.setSelected(true);
+        }
         return (W) selectable ;
     }
 
@@ -164,9 +166,9 @@ public class ObjectDataProvider<W extends Serializable, T extends ObjectType>
         OperationResult result = new OperationResult(OPERATION_COUNT_OBJECTS);
         try {
             Task task = getPage().createSimpleTask(OPERATION_COUNT_OBJECTS);
-            count = getModel().countObjects(type, getQuery(), options, task, result);
+            count = getModel().countObjects(type, getQuery(), getOptionsToUse(), task, result);
         } catch (Exception ex) {
-            result.recordFatalError("Couldn't count objects.", ex);
+            result.recordFatalError(getPage().createStringResource("ObjectDataProvider.message.countObjects.fatalError").getString(), ex);
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't count objects", ex);
         } finally {
             result.computeStatusIfUnknown();

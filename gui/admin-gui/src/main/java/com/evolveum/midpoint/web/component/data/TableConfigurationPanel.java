@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.data;
@@ -20,6 +11,9 @@ import com.evolveum.midpoint.gui.api.component.BasePanel;
 import com.evolveum.midpoint.web.component.AjaxSubmitButton;
 import com.evolveum.midpoint.web.session.UserProfileStorage;
 import com.evolveum.midpoint.web.util.SearchFormEnterBehavior;
+
+import org.apache.wicket.Component;
+import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
 import org.apache.wicket.feedback.ComponentFeedbackMessageFilter;
@@ -77,7 +71,7 @@ public class TableConfigurationPanel extends BasePanel {
         pageSize.setOutputMarkupId(true);
         cogButton.add(pageSize);
 
-        AjaxLink tableColumns = new AjaxLink(ID_TABLE_COLUMNS) {
+        AjaxLink<Void> tableColumns = new AjaxLink<Void>(ID_TABLE_COLUMNS) {
 
             @Override
             public void onClick(AjaxRequestTarget target) {
@@ -95,18 +89,18 @@ public class TableConfigurationPanel extends BasePanel {
         popover.setOutputMarkupId(true);
         add(popover);
 
-        Form form = new Form(ID_FORM);
+        Form form = new com.evolveum.midpoint.web.component.form.Form(ID_FORM);
         popover.add(form);
 
         AjaxSubmitButton button = new AjaxSubmitButton(ID_BUTTON) {
 
             @Override
-            protected void onError(AjaxRequestTarget target, Form<?> form) {
+            protected void onError(AjaxRequestTarget target) {
                 target.add(TableConfigurationPanel.this.get(createComponentPath(ID_POPOVER, ID_FORM, "inputFeedback")));
             }
 
             @Override
-            protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            protected void onSubmit(AjaxRequestTarget target) {
                 pageSizeChanged(target);
             }
         };
@@ -120,8 +114,8 @@ public class TableConfigurationPanel extends BasePanel {
         input.setOutputMarkupId(true);
 
         FeedbackPanel feedback = new FeedbackPanel("inputFeedback", new ComponentFeedbackMessageFilter(input));
-		feedback.setOutputMarkupId(true);
-		form.add(feedback);
+        feedback.setOutputMarkupId(true);
+        form.add(feedback);
         form.add(input);
     }
 

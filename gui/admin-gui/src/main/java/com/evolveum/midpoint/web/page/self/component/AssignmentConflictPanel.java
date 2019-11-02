@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2010-2019 Evolveum and contributors
+ *
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
+ */
 package com.evolveum.midpoint.web.page.self.component;
 
 import com.evolveum.midpoint.gui.api.GuiStyleConstants;
@@ -10,7 +16,6 @@ import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.behavior.AttributeAppender;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.Form;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 
 /**
@@ -41,7 +46,7 @@ public class AssignmentConflictPanel extends BasePanel<ConflictDto> {
         add(container);
 
         Label statusIconLabel = new Label(ID_STATUS_ICON);
-        statusIconLabel.add(new AttributeAppender("class", new AbstractReadOnlyModel<String>() {
+        statusIconLabel.add(new AttributeAppender("class", new IModel<String>() {
             private static final long serialVersionUID = 1L;
 
             @Override
@@ -54,7 +59,7 @@ public class AssignmentConflictPanel extends BasePanel<ConflictDto> {
         container.add(statusIconLabel);
 
         Label existingAssignment = new Label(ID_EXISTING_ASSIGNMENT,
-                new AbstractReadOnlyModel<String>() {
+                new IModel<String>() {
                     private static final long serialVersionUID = 1L;
 
                     @Override
@@ -69,7 +74,7 @@ public class AssignmentConflictPanel extends BasePanel<ConflictDto> {
                         return "";
                     }
                 });
-        existingAssignment.add(new AttributeAppender("style", new AbstractReadOnlyModel<String>() {
+        existingAssignment.add(new AttributeAppender("style", new IModel<String>() {
             private static final long serialVersionUID = 1L;
 
             @Override
@@ -80,7 +85,7 @@ public class AssignmentConflictPanel extends BasePanel<ConflictDto> {
         container.add(existingAssignment);
 
         Label addedAssignment = new Label(ID_ADDED_ASSIGNMENT,
-                new AbstractReadOnlyModel<String>() {
+                new IModel<String>() {
                     private static final long serialVersionUID = 1L;
 
                     @Override
@@ -95,7 +100,7 @@ public class AssignmentConflictPanel extends BasePanel<ConflictDto> {
                         return "";
                     }
                 });
-        addedAssignment.add(new AttributeAppender("style", new AbstractReadOnlyModel<String>() {
+        addedAssignment.add(new AttributeAppender("style", new IModel<String>() {
             private static final long serialVersionUID = 1L;
 
             @Override
@@ -105,7 +110,7 @@ public class AssignmentConflictPanel extends BasePanel<ConflictDto> {
         }));
         container.add(addedAssignment);
 
-        AbstractReadOnlyModel<String> removeButtonTitleModel = new AbstractReadOnlyModel<String>() {
+        IModel<String> removeButtonTitleModel = new IModel<String>() {
             private static final long serialVersionUID = 1L;
 
             @Override
@@ -117,7 +122,7 @@ public class AssignmentConflictPanel extends BasePanel<ConflictDto> {
         };
         AjaxSubmitButton removeButton = new AjaxSubmitButton(ID_REMOVE_BUTTON, removeButtonTitleModel) {
             @Override
-            public void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            public void onSubmit(AjaxRequestTarget target) {
                 AssignmentConflictPanel.this.removeAssignmentPerformed(getModelObject().getAssignment1(), target);
             }
         };
@@ -136,7 +141,7 @@ public class AssignmentConflictPanel extends BasePanel<ConflictDto> {
         });
         container.add(removeButton);
 
-        AbstractReadOnlyModel<String> unselectButtonTitleModel = new AbstractReadOnlyModel<String>() {
+        IModel<String> unselectButtonTitleModel = new IModel<String>() {
             private static final long serialVersionUID = 1L;
 
             @Override
@@ -149,7 +154,7 @@ public class AssignmentConflictPanel extends BasePanel<ConflictDto> {
         AjaxSubmitButton unselectButton = new AjaxSubmitButton(ID_UNSELECT_BUTTON,
                 unselectButtonTitleModel) {
             @Override
-            public void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            public void onSubmit(AjaxRequestTarget target) {
                 AssignmentConflictPanel.this.removeAssignmentPerformed(getModelObject().getAssignment2(), target);
             }
         };

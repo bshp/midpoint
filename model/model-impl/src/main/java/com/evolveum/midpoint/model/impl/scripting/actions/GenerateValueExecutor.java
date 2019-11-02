@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.model.impl.scripting.actions;
@@ -24,7 +15,6 @@ import com.evolveum.midpoint.model.impl.scripting.PipelineData;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.PrismObjectValue;
 import com.evolveum.midpoint.prism.PrismValue;
-import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
@@ -41,6 +31,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
+
+import static com.evolveum.midpoint.schema.constants.SchemaConstants.PATH_CREDENTIALS_PASSWORD_VALUE;
 
 /**
  * @author mederly
@@ -69,8 +61,7 @@ public class GenerateValueExecutor extends BaseActionExecutor {
         if (itemsDefinition == null) {
             itemsDefinition = new PolicyItemsDefinitionType().policyItemDefinition(
                     new PolicyItemDefinitionType()
-                        .target(new PolicyItemTargetType().path(new ItemPathType(new ItemPath(UserType.F_CREDENTIALS,
-                                CredentialsType.F_PASSWORD, PasswordType.F_VALUE))))
+                        .target(new PolicyItemTargetType().path(new ItemPathType(PATH_CREDENTIALS_PASSWORD_VALUE)))
                         .execute(false));
         }
 
@@ -89,12 +80,12 @@ public class GenerateValueExecutor extends BaseActionExecutor {
                     operationsHelper.recordEnd(context, objectBean, started, null);
                 } catch (Throwable e) {
                     operationsHelper.recordEnd(context, objectBean, started, e);
-					exception = processActionException(e, NAME, value, context);
+                    exception = processActionException(e, NAME, value, context);
                 }
                 context.println((exception != null ? "Attempted to generate value(s) for " : "Generated value(s) for ") + objectBean.toString() + exceptionSuffix(exception));
             } else {
-				//noinspection ThrowableNotThrown
-				processActionException(new ScriptExecutionException("Item is not a PrismObject"), NAME, value, context);
+                //noinspection ThrowableNotThrown
+                processActionException(new ScriptExecutionException("Item is not a PrismObject"), NAME, value, context);
             }
             operationsHelper.trimAndCloneResult(result, globalResult, context);
         }

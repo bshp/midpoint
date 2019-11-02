@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.notifications.api.events;
@@ -23,6 +14,7 @@ import com.evolveum.midpoint.prism.PrismContainerDefinition;
 import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.delta.ChangeType;
 import com.evolveum.midpoint.prism.delta.ObjectDelta;
+import com.evolveum.midpoint.prism.delta.ObjectDeltaCollectionsUtil;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.schema.ObjectDeltaOperation;
 import com.evolveum.midpoint.task.api.LightweightIdentifierGenerator;
@@ -50,7 +42,7 @@ public class ModelEvent extends BaseEvent {
     private static final Trace LOGGER = TraceManager.getTrace(ModelEvent.class);
 
     // we can expect that modelContext != null and focus context != null as well
-    private ModelContext modelContext;
+    private ModelContext<?> modelContext;
 
     public ModelEvent(LightweightIdentifierGenerator lightweightIdentifierGenerator, ModelContext modelContext) {
         super(lightweightIdentifierGenerator);
@@ -61,11 +53,11 @@ public class ModelEvent extends BaseEvent {
         return modelContext;
     }
 
-    public ModelElementContext getFocusContext() {
+    public ModelElementContext<?> getFocusContext() {
         return modelContext.getFocusContext();
     }
 
-    public Collection<ModelElementContext> getProjectionContexts() {
+    public Collection<? extends ModelProjectionContext> getProjectionContexts() {
         return modelContext.getProjectionContexts();
     }
 
@@ -74,7 +66,7 @@ public class ModelEvent extends BaseEvent {
     }
 
     public List<ObjectDeltaOperation> getAllExecutedDeltas() {
-        List<ObjectDeltaOperation> retval = new ArrayList<ObjectDeltaOperation>();
+        List<ObjectDeltaOperation> retval = new ArrayList<>();
         retval.addAll(getFocusContext().getExecutedDeltas());
         for (Object o : modelContext.getProjectionContexts()) {
             ModelProjectionContext modelProjectionContext = (ModelProjectionContext) o;
@@ -149,6 +141,14 @@ public class ModelEvent extends BaseEvent {
         return eventCategoryType == EventCategoryType.MODEL_EVENT;
     }
 
+    public ObjectDelta<?> getFocusPrimaryDelta() {
+        return getFocusContext() != null ? getFocusContext().getPrimaryDelta() : null;
+    }
+
+    public ObjectDelta<?> getFocusSecondaryDelta() {
+        return getFocusContext() != null ? getFocusContext().getSecondaryDelta() : null;
+    }
+
     public List<ObjectDelta<FocusType>> getFocusDeltas() {
         List<ObjectDelta<FocusType>> retval = new ArrayList<>();
         Class c = modelContext.getFocusClass();
@@ -162,7 +162,7 @@ public class ModelEvent extends BaseEvent {
     }
 
     public ObjectDelta<? extends FocusType> getSummarizedFocusDeltas() throws SchemaException {
-        return ObjectDelta.summarize(getFocusDeltas());
+        return ObjectDeltaCollectionsUtil.summarize(getFocusDeltas());
     }
 
     public boolean hasFocusOfType(Class<? extends FocusType> clazz) {
@@ -197,27 +197,31 @@ public class ModelEvent extends BaseEvent {
         return hasFocusOfType(UserType.class);
     }
 
-	public String getFocusTypeName() {
-		if (getFocusContext() == null || getFocusContext().getObjectTypeClass() == null) {
-			return null;
-		}
-		String simpleName = getFocusContext().getObjectTypeClass().getSimpleName();
-		return StringUtils.substringBeforeLast(simpleName, "Type");         // should usually work ;)
-	}
+    public String getFocusTypeName() {
+        if (getFocusContext() == null || getFocusContext().getObjectTypeClass() == null) {
+            return null;
+        }
+        String simpleName = getFocusContext().getObjectTypeClass().getSimpleName();
+        return StringUtils.substringBeforeLast(simpleName, "Type");         // should usually work ;)
+    }
 
-	public String getContentAsFormattedList() {
-		return getContentAsFormattedList(false, false);
-	}
+    public String getContentAsFormattedList() {
+        return getContentAsFormattedList(false, false);
+    }
 
-	public String getContentAsFormattedList(boolean showSynchronizationItems, boolean showAuxiliaryAttributes) {
-		return getNotificationFunctions().getContentAsFormattedList(this, showSynchronizationItems, showAuxiliaryAttributes);
-	}
+    public String getContentAsFormattedList(boolean showSynchronizationItems, boolean showAuxiliaryAttributes) {
+        return getNotificationFunctions().getContentAsFormattedList(this, showSynchronizationItems, showAuxiliaryAttributes);
+    }
 
-	@Override
-	public String debugDump(int indent) {
-		StringBuilder sb = DebugUtil.createTitleStringBuilderLn(this.getClass(), indent);
-		debugDumpCommon(sb, indent);
-		DebugUtil.debugDumpWithLabelToString(sb, "modelContext", modelContext, indent + 1);
-		return sb.toString();
-	}
+    public String getFocusPassword() {
+        return getNotificationFunctions().getFocusPasswordFromEvent(this);
+    }
+
+    @Override
+    public String debugDump(int indent) {
+        StringBuilder sb = DebugUtil.createTitleStringBuilderLn(this.getClass(), indent);
+        debugDumpCommon(sb, indent);
+        DebugUtil.debugDumpWithLabelToString(sb, "modelContext", modelContext, indent + 1);
+        return sb.toString();
+    }
 }

@@ -1,37 +1,28 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2014 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component;
 
-import com.evolveum.midpoint.web.component.util.SimplePanel;
-import com.evolveum.midpoint.web.util.SearchFormEnterBehavior;
+import java.io.Serializable;
+
 import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.markup.html.basic.Label;
-import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.TextField;
 import org.apache.wicket.model.IModel;
 
-import java.io.Serializable;
+import com.evolveum.midpoint.gui.api.component.BasePanel;
+import com.evolveum.midpoint.web.util.SearchFormEnterBehavior;
 
 /**
  * @author lazyman
  */
-public class BasicSearchPanel<T extends Serializable> extends SimplePanel<T> {
+public class BasicSearchPanel<T extends Serializable> extends BasePanel<T> {
 
     private static final String ID_SEARCH_TEXT = "searchText";
     private static final String ID_SEARCH = "search";
@@ -48,6 +39,11 @@ public class BasicSearchPanel<T extends Serializable> extends SimplePanel<T> {
     }
 
     @Override
+    protected void onInitialize() {
+        super.onInitialize();
+        initLayout();
+    }
+
     protected void initLayout() {
         Label label = new Label(ID_LABEL, createTextNameModel());
         add(label);
@@ -56,12 +52,12 @@ public class BasicSearchPanel<T extends Serializable> extends SimplePanel<T> {
                 createStringResource("BasicSearchPanel.search")) {
 
             @Override
-            protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            protected void onSubmit(AjaxRequestTarget target) {
                 searchPerformed(target);
             }
 
             @Override
-            protected void onError(AjaxRequestTarget target, Form<?> form) {
+            protected void onError(AjaxRequestTarget target) {
                 target.add(getFeedbackPanel());
             }
         };
@@ -70,12 +66,12 @@ public class BasicSearchPanel<T extends Serializable> extends SimplePanel<T> {
         AjaxSubmitButton clearButton = new AjaxSubmitButton(ID_CLEAR_SEARCH) {
 
             @Override
-            protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            protected void onSubmit(AjaxRequestTarget target) {
                 clearSearchPerformed(target);
             }
 
             @Override
-            protected void onError(AjaxRequestTarget target, Form<?> form) {
+            protected void onError(AjaxRequestTarget target) {
                 target.add(getFeedbackPanel());
             }
         };

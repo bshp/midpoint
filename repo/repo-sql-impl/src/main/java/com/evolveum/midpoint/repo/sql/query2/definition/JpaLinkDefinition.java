@@ -1,31 +1,18 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.query2.definition;
 
 import com.evolveum.midpoint.prism.Visitable;
 import com.evolveum.midpoint.prism.Visitor;
-import com.evolveum.midpoint.prism.path.ItemPath;
-import com.evolveum.midpoint.prism.path.ItemPathSegment;
-import com.evolveum.midpoint.prism.path.NameItemPathSegment;
+import com.evolveum.midpoint.prism.path.*;
 import com.evolveum.midpoint.util.DebugDumpable;
 import com.evolveum.midpoint.util.DebugUtil;
 import org.jetbrains.annotations.NotNull;
-
-import javax.xml.namespace.QName;
 
 /**
  * @author mederly
@@ -39,7 +26,7 @@ public class JpaLinkDefinition<D extends JpaDataNodeDefinition> implements Visit
     @NotNull private D targetDefinition;
 
     public JpaLinkDefinition(@NotNull ItemPath itemPath, String jpaName, CollectionSpecification collectionSpecification,
-			boolean embedded, @NotNull D targetDefinition) {
+            boolean embedded, @NotNull D targetDefinition) {
         this.itemPath = itemPath;
         this.jpaName = jpaName;
         this.collectionSpecification = collectionSpecification;
@@ -47,21 +34,19 @@ public class JpaLinkDefinition<D extends JpaDataNodeDefinition> implements Visit
         this.targetDefinition = targetDefinition;
     }
 
-    public JpaLinkDefinition(@NotNull ItemPathSegment itemPathSegment, String jpaName, CollectionSpecification collectionSpecification, boolean embedded, D targetDefinition) {
-        this(new ItemPath(itemPathSegment), jpaName, collectionSpecification, embedded, targetDefinition);
-    }
-
-    public JpaLinkDefinition(@NotNull QName jaxbName, String jpaName, CollectionSpecification collectionSpecification, boolean embedded, D targetDefinition) {
-        this(new NameItemPathSegment(jaxbName), jpaName, collectionSpecification, embedded, targetDefinition);
-
-    }
-
     @NotNull
     public ItemPath getItemPath() {
         return itemPath;
     }
 
-    ItemPathSegment getItemPathSegment() {
+    ItemName getItemName() {
+        if (itemPath.size() != 1) {
+            throw new IllegalStateException("Expected single-item path, found '" + itemPath + "' instead.");
+        }
+        return ItemPath.toName(itemPath.first());
+    }
+
+    Object getItemPathSegment() {
         if (itemPath.size() != 1) {
             throw new IllegalStateException("Expected single-item path, found '" + itemPath + "' instead.");
         }
@@ -90,7 +75,7 @@ public class JpaLinkDefinition<D extends JpaDataNodeDefinition> implements Visit
     }
 
     public boolean matchesStartOf(ItemPath itemPath) {
-        return itemPath.startsWith(this.itemPath);
+        return this.itemPath.isSubPathOrEquivalent(itemPath);
     }
 
     @SuppressWarnings("unchecked")
@@ -149,7 +134,7 @@ public class JpaLinkDefinition<D extends JpaDataNodeDefinition> implements Visit
         return sb.toString();
     }
 
-	@SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked")
     void resolveEntityPointer() {
         if (targetDefinition instanceof JpaEntityPointerDefinition) {
             // typing hack but we don't mind

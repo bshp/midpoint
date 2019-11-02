@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    This work is dual-licensed under the Apache License 2.0
+ *    and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component;
@@ -46,7 +37,8 @@ public class DateLabelComponent extends DateLabel {
     public static final String MEDIUM_FULL_STYLE = "MF";    //medium style for date, full style for time
     public static final String MEDIUM_NOTIME_STYLE = "M-";    //medium style for date, no time
     public static final String LONG_SHORT_STYLE = "LS";    //long style for date, short style for time
-    public static final String LONG_MEDIUM_STYLE = "LM";    //long style for date, medium style for time
+    public static final String LONG_MEDIUM_STYLE = "LM";    //long style for date, medium style for time TODO ? let it be default style
+                                                                                                         //if no other is specified
     public static final String LONG_FULL_STYLE = "LF";    //long style for date, full style for time
     public static final String LONG_NOTIME_STYLE = "L-";    //long style for date, no time
     public static final String FULL_SHORT_STYLE = "FS";    //full style for date, short style for time
@@ -58,31 +50,25 @@ public class DateLabelComponent extends DateLabel {
     public static final String NODATE_LONG_STYLE = "-L";    //no date, long style for time
     public static final String NODATE_FULL_STYLE = "-F";    //no date, full style for time
 
-    public DateLabelComponent(String id, IModel<Date> model){
-        this(id, model, (DateConverter) null);
-    }
+   public DateLabelComponent(String id, IModel<Date> model, String style){
+       super(id, model, new PatternDateConverter(WebComponentUtil.getLocalizedDatePattern(style == null ? LONG_MEDIUM_STYLE : style), true ));
 
-    public DateLabelComponent(String id, IModel<Date> model, DateConverter converter){
-        this(id, model, converter, null, "", "");
-    }
-
-    public DateLabelComponent(String id, IModel<Date> model, String style){
-        this(id, model, null, style, "", "");
-    }
-
-    public DateLabelComponent(String id, IModel<Date> model, DateConverter converter, String style,
-                              String beforeDateText, String afterDateText){
-        super(id, model, converter == null ?
-                new PatternDateConverter(WebComponentUtil.getLocalizedDatePattern(style == null ? LONG_LONG_STYLE : style), true ) : converter);
-
-        setBefore(beforeDateText);
-        setAfter(afterDateText);
+        setBefore(getBeforeDateText());
+        setAfter(getAfterDateText());
     }
 
     public void setBeforeTextOnDateNull(String nullDateText){
         if (getModel().getObject() == null){
             setBefore(nullDateText);
         }
+    }
+
+    protected String getBeforeDateText(){
+        return "";
+    }
+
+    protected String getAfterDateText(){
+        return "";
     }
 }
 

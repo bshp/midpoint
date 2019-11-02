@@ -1,28 +1,21 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.component.menu.cog;
 
 import com.evolveum.midpoint.gui.api.page.PageBase;
 import com.evolveum.midpoint.web.component.dialog.ConfirmationPanel;
 import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
+
+import org.apache.wicket.Component;
+import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.attributes.AjaxRequestAttributes;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
 import org.apache.wicket.ajax.markup.html.form.AjaxSubmitLink;
-import org.apache.wicket.extensions.ajax.markup.html.modal.ModalWindow;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.link.AbstractLink;
@@ -37,8 +30,8 @@ import static com.evolveum.midpoint.web.component.data.column.ColumnUtils.create
  */
 public class MenuLinkPanel extends Panel {
 
-    private static String ID_MENU_ITEM_LINK = "menuItemLink";
-    private static String ID_MENU_ITEM_LABEL = "menuItemLabel";
+    private static final String ID_MENU_ITEM_LINK = "menuItemLink";
+    private static final String ID_MENU_ITEM_LABEL = "menuItemLabel";
 
     public MenuLinkPanel(String id, IModel<InlineMenuItem> item) {
         super(id);
@@ -54,13 +47,13 @@ public class MenuLinkPanel extends Panel {
             a = new AjaxSubmitLink(ID_MENU_ITEM_LINK) {
 
                 @Override
-                protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
-                    MenuLinkPanel.this.onSubmit(target, form, dto.getAction(), item);
+                protected void onSubmit(AjaxRequestTarget target) {
+                    MenuLinkPanel.this.onSubmit(target, dto.getAction(), item);
                 }
 
                 @Override
-                protected void onError(AjaxRequestTarget target, Form<?> form) {
-                    MenuLinkPanel.this.onError(target, form, dto.getAction());
+                protected void onError(AjaxRequestTarget target) {
+                    MenuLinkPanel.this.onError(target, dto.getAction());
                 }
 
                 @Override
@@ -70,7 +63,7 @@ public class MenuLinkPanel extends Panel {
                 }
             };
         } else {
-            a = new AjaxLink(ID_MENU_ITEM_LINK) {
+            a = new AjaxLink<Void>(ID_MENU_ITEM_LINK) {
 
                 @Override
                 public void onClick(AjaxRequestTarget target) {
@@ -102,25 +95,25 @@ public class MenuLinkPanel extends Panel {
         a.add(span);
     }
 
-    protected void onSubmit(AjaxRequestTarget target, Form<?> form, InlineMenuItemAction action, IModel<InlineMenuItem> item) {
+    protected void onSubmit(AjaxRequestTarget target, InlineMenuItemAction action, IModel<InlineMenuItem> item) {
         if (action != null) {
-            if (item.getObject().isShowConfirmationDialog() && item.getObject().getConfirmationMessageModel() != null) {
+            if (item.getObject().showConfirmationDialog() && item.getObject().getConfirmationMessageModel() != null) {
                 showConfirmationPopup(item.getObject(), target);
             } else {
-                action.onSubmit(target, form);
+                action.onSubmit(target);
             }
         }
     }
 
-    protected void onError(AjaxRequestTarget target, Form<?> form, InlineMenuItemAction action) {
+    protected void onError(AjaxRequestTarget target, InlineMenuItemAction action) {
         if (action != null) {
-            action.onError(target, form);
+            action.onError(target);
         }
     }
 
     protected void onClick(AjaxRequestTarget target, InlineMenuItemAction action, IModel<InlineMenuItem> item) {
         if (action != null) {
-            if (item.getObject().isShowConfirmationDialog() && item.getObject().getConfirmationMessageModel() != null) {
+            if (item.getObject().showConfirmationDialog() && item.getObject().getConfirmationMessageModel() != null) {
                 showConfirmationPopup(item.getObject(), target);
             } else {
                 action.onClick(target);
@@ -140,11 +133,7 @@ public class MenuLinkPanel extends Panel {
 
             @Override
             public void yesPerformed(AjaxRequestTarget target) {
-                ModalWindow modalWindow = findParent(ModalWindow.class);
-                if (modalWindow != null) {
-                    modalWindow.close(target);
-                    menuItem.getAction().onClick(target);
-                }
+                menuItem.getAction().onClick(target);
             }
         };
         ((PageBase)getPage()).showMainPopup(dialog, target);

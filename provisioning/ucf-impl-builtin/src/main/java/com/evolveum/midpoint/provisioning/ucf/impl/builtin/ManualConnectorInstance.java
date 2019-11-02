@@ -1,268 +1,408 @@
-/**
- * Copyright (c) 2017 Evolveum
+/*
+ * Copyright (c) 2017-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.provisioning.ucf.impl.builtin;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 
+import com.evolveum.midpoint.common.Clock;
+import com.evolveum.midpoint.casemgmt.api.CaseEventDispatcher;
+import com.evolveum.midpoint.casemgmt.api.CaseEventDispatcherAware;
 import com.evolveum.midpoint.prism.PrismObject;
-import com.evolveum.midpoint.provisioning.ucf.api.GenericFrameworkException;
-import com.evolveum.midpoint.provisioning.ucf.api.ManagedConnector;
-import com.evolveum.midpoint.provisioning.ucf.api.ManagedConnectorConfiguration;
-import com.evolveum.midpoint.provisioning.ucf.api.Operation;
+import com.evolveum.midpoint.prism.delta.DeltaFactory;
+import com.evolveum.midpoint.prism.delta.ItemDelta;
+import com.evolveum.midpoint.prism.delta.ObjectDelta;
+import com.evolveum.midpoint.prism.path.ItemPath;
+import com.evolveum.midpoint.prism.query.ObjectQuery;
+import com.evolveum.midpoint.prism.util.CloneUtil;
+import com.evolveum.midpoint.provisioning.ucf.api.*;
 import com.evolveum.midpoint.provisioning.ucf.api.connectors.AbstractManualConnectorInstance;
 import com.evolveum.midpoint.repo.api.RepositoryAware;
 import com.evolveum.midpoint.repo.api.RepositoryService;
+import com.evolveum.midpoint.schema.DeltaConvertor;
 import com.evolveum.midpoint.schema.constants.ConnectorTestOperation;
+import com.evolveum.midpoint.schema.constants.ObjectTypes;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
+import com.evolveum.midpoint.schema.internals.InternalMonitor;
 import com.evolveum.midpoint.schema.internals.InternalsConfig;
 import com.evolveum.midpoint.schema.processor.ObjectClassComplexTypeDefinition;
 import com.evolveum.midpoint.schema.processor.ResourceAttribute;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.schema.result.OperationResultStatus;
+import com.evolveum.midpoint.schema.util.ObjectTypeUtil;
 import com.evolveum.midpoint.schema.util.OidUtil;
+import com.evolveum.midpoint.schema.util.ShadowUtil;
+import com.evolveum.midpoint.task.api.TaskManager;
+import com.evolveum.midpoint.task.api.TaskManagerAware;
 import com.evolveum.midpoint.util.DebugUtil;
 import com.evolveum.midpoint.util.MiscUtil;
 import com.evolveum.midpoint.util.QNameUtil;
-import com.evolveum.midpoint.util.exception.CommunicationException;
-import com.evolveum.midpoint.util.exception.ConfigurationException;
 import com.evolveum.midpoint.util.exception.ObjectAlreadyExistsException;
 import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
 import com.evolveum.midpoint.util.exception.SchemaException;
 import com.evolveum.midpoint.util.exception.SystemException;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.CaseType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.OperationResultStatusType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.ShadowType;
-import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectReferenceType;
+import com.evolveum.prism.xml.ns._public.types_3.*;
+
+import javax.xml.datatype.XMLGregorianCalendar;
 
 /**
  * @author Radovan Semancik
  *
  */
 @ManagedConnector(type="ManualConnector", version="1.0.0")
-public class ManualConnectorInstance extends AbstractManualConnectorInstance implements RepositoryAware {
+public class ManualConnectorInstance extends AbstractManualConnectorInstance implements RepositoryAware,
+        CaseEventDispatcherAware, TaskManagerAware {
 
-	public static final String OPERATION_QUERY_CASE = ".queryCase";
+    private static final String OPERATION_QUERY_CASE = ManualConnectorInstance.class.getName() + ".queryCase";
 
-	private static final Trace LOGGER = TraceManager.getTrace(ManualConnectorInstance.class);
+    private static final Trace LOGGER = TraceManager.getTrace(ManualConnectorInstance.class);
 
-	private ManualConnectorConfiguration configuration;
+    private ManualConnectorConfiguration configuration;
 
-	private RepositoryService repositoryService;
+    private RepositoryService repositoryService;
+    private CaseEventDispatcher caseEventDispatcher;
+    private TaskManager taskManager;
 
-	private boolean connected = false;
+    private boolean connected = false;
 
-	private static int randomDelayRange = 0;
+    private static int randomDelayRange = 0;
 
-	protected static final Random RND = new Random();
+    private static final String DEFAULT_OPERATOR_OID = SystemObjectsType.USER_ADMINISTRATOR.value();
 
-	@ManagedConnectorConfiguration
-	public ManualConnectorConfiguration getConfiguration() {
-		return configuration;
-	}
+    private static final Random RND = new Random();
 
-	public void setConfiguration(ManualConnectorConfiguration configuration) {
-		this.configuration = configuration;
-	}
+    private Clock clock = new Clock();
 
-	public boolean isConnected() {
-		return connected;
-	}
+    @ManagedConnectorConfiguration
+    public ManualConnectorConfiguration getConfiguration() {
+        return configuration;
+    }
 
-	@Override
-	public RepositoryService getRepositoryService() {
-		return repositoryService;
-	}
+    public void setConfiguration(ManualConnectorConfiguration configuration) {
+        this.configuration = configuration;
+    }
 
-	@Override
-	public void setRepositoryService(RepositoryService repositoryService) {
-		this.repositoryService = repositoryService;
-	}
+    public boolean isConnected() {
+        return connected;
+    }
 
+    @Override
+    public RepositoryService getRepositoryService() {
+        return repositoryService;
+    }
 
-	@Override
-	protected String createTicketAdd(PrismObject<? extends ShadowType> object,
-			Collection<Operation> additionalOperations, OperationResult result) throws CommunicationException,
-			GenericFrameworkException, SchemaException, ObjectAlreadyExistsException, ConfigurationException {
-		LOGGER.debug("Creating case to add account\n{}", object.debugDump(1));
-		String description = "Please create account "+object;
-		PrismObject<CaseType> acase = addCase(description, result);
-		return acase.getOid();
-	}
+    @Override
+    public void setRepositoryService(RepositoryService repositoryService) {
+        this.repositoryService = repositoryService;
+    }
 
-	@Override
-	protected String createTicketModify(ObjectClassComplexTypeDefinition objectClass,
-			Collection<? extends ResourceAttribute<?>> identifiers, Collection<Operation> changes,
-			OperationResult result) throws ObjectNotFoundException, CommunicationException,
-			GenericFrameworkException, SchemaException, ObjectAlreadyExistsException, ConfigurationException {
-		LOGGER.debug("Creating case to modify account {}:\n{}", identifiers, DebugUtil.debugDump(changes, 1));
-		if (InternalsConfig.isSanityChecks()) {
-			if (MiscUtil.hasDuplicates(changes)) {
-				throw new SchemaException("Duplicated changes: "+changes);
-			}
-		}
-		String description = "Please modify account "+identifiers+": "+changes;
-		PrismObject<CaseType> acase = addCase(description, result);
-		return acase.getOid();
-	}
+    @Override
+    public void setDispatcher(CaseEventDispatcher dispatcher) {
+        this.caseEventDispatcher = dispatcher;
+    }
 
-	@Override
-	protected String createTicketDelete(ObjectClassComplexTypeDefinition objectClass,
-			Collection<? extends ResourceAttribute<?>> identifiers, OperationResult result)
-			throws ObjectNotFoundException, CommunicationException, GenericFrameworkException,
-			SchemaException, ConfigurationException {
-		LOGGER.debug("Creating case to delete account {}", identifiers);
-		String description = "Please delete account "+identifiers;
-		PrismObject<CaseType> acase;
-		try {
-			acase = addCase(description, result);
-		} catch (ObjectAlreadyExistsException e) {
-			// should not happen
-			throw new SystemException(e.getMessage(), e);
-		}
-		return acase.getOid();
-	}
+    @Override
+    public CaseEventDispatcher getDispatcher() {
+        return caseEventDispatcher;
+    }
 
-	private PrismObject<CaseType> addCase(String description, OperationResult result) throws SchemaException, ObjectAlreadyExistsException {
-		PrismObject<CaseType> acase = getPrismContext().getSchemaRegistry().findObjectDefinitionByCompileTimeClass(CaseType.class).instantiate();
-		CaseType caseType = acase.asObjectable();
+    @Override
+    public void setTaskManager(TaskManager taskManager) {
+        this.taskManager = taskManager;
+    }
 
-		if (randomDelayRange != 0) {
-			int waitMillis = RND.nextInt(randomDelayRange);
-			LOGGER.info("Manual connector waiting {} ms before creating the case", waitMillis);
-			try {
-				Thread.sleep(waitMillis);
-			} catch (InterruptedException e) {
-				LOGGER.error("Manual connector wait is interrupted");
-			}
-			LOGGER.info("Manual connector wait is over");
-		}
+    @Override
+    public TaskManager getTaskManager() {
+        return taskManager;
+    }
 
-		String caseOid = OidUtil.generateOid();
+    @Override
+    protected String createTicketAdd(PrismObject<? extends ShadowType> object,
+            Collection<Operation> additionalOperations, OperationResult result) throws SchemaException,
+            ObjectAlreadyExistsException {
+        LOGGER.debug("Creating case to add account\n{}", object.debugDump(1));
+        ObjectDelta<? extends ShadowType> objectDelta = DeltaFactory.Object.createAddDelta(object);
+        ObjectDeltaType objectDeltaType = DeltaConvertor.toObjectDeltaType(objectDelta);
+        String shadowName;
+        if (object.getName() != null) {
+            shadowName = object.getName().toString();
+        } else {
+            shadowName = getShadowIdentifier(ShadowUtil.getPrimaryIdentifiers(object));
+        }
+        String description = "Please create resource account: "+shadowName;
+        PrismObject<CaseType> aCase = addCase("create", description, ShadowUtil.getResourceOid(object.asObjectable()),
+                shadowName, null, objectDeltaType, result);
+        return aCase.getOid();
+    }
 
-		caseType.setOid(caseOid);
-		// TODO: human-readable case ID
-		caseType.setName(new PolyStringType(caseOid));
+    @Override
+    protected String createTicketModify(ObjectClassComplexTypeDefinition objectClass,
+            PrismObject<ShadowType> shadow, Collection<? extends ResourceAttribute<?>> identifiers, String resourceOid, Collection<Operation> changes,
+            OperationResult result) throws SchemaException, ObjectAlreadyExistsException {
+        LOGGER.debug("Creating case to modify account {}:\n{}", identifiers, DebugUtil.debugDump(changes, 1));
+        if (InternalsConfig.isSanityChecks()) {
+            if (MiscUtil.hasDuplicates(changes)) {
+                throw new SchemaException("Duplicated changes: "+changes);
+            }
+        }
+        Collection<ItemDelta> changeDeltas = changes.stream()
+                .filter(change -> change != null)
+                .map(change -> ((PropertyModificationOperation)change).getPropertyDelta())
+                .collect(Collectors.toList());
+        ObjectDelta<? extends ShadowType> objectDelta = getPrismContext().deltaFactory().object()
+                .createModifyDelta("", changeDeltas, ShadowType.class);
+        ObjectDeltaType objectDeltaType = DeltaConvertor.toObjectDeltaType(objectDelta);
+        objectDeltaType.setOid(shadow.getOid());
+        String shadowName = shadow.getName().toString();
+        String description = "Please modify resource account: "+shadowName;
+        PrismObject<CaseType> aCase = addCase("modify", description, resourceOid, shadowName,
+                shadow.getOid(), objectDeltaType, result);
+        return aCase.getOid();
+    }
 
-		caseType.setDescription(description);
+    @Override
+    protected String createTicketDelete(ObjectClassComplexTypeDefinition objectClass,
+            PrismObject<ShadowType> shadow, Collection<? extends ResourceAttribute<?>> identifiers, String resourceOid, OperationResult result)
+            throws SchemaException {
+        LOGGER.debug("Creating case to delete account {}", identifiers);
+        String shadowName = shadow.getName().toString();
+        String description = "Please delete resource account: "+shadowName;
+        ObjectDeltaType objectDeltaType = new ObjectDeltaType();
+        objectDeltaType.setChangeType(ChangeTypeType.DELETE);
+        objectDeltaType.setObjectType(ShadowType.COMPLEX_TYPE);
+        ItemDeltaType itemDeltaType = new ItemDeltaType();
+        itemDeltaType.setPath(new ItemPathType(ItemPath.create("kind")));
+        itemDeltaType.setModificationType(ModificationTypeType.DELETE);
+        objectDeltaType.setOid(shadow.getOid());
 
-		// subtype
-		caseType.setState(SchemaConstants.CASE_STATE_OPEN);
+        objectDeltaType.getItemDelta().add(itemDeltaType);
+        PrismObject<CaseType> aCase;
+        try {
+            aCase = addCase("delete", description, resourceOid, shadowName, shadow.getOid(), objectDeltaType, result);
+        } catch (ObjectAlreadyExistsException e) {
+            // should not happen
+            throw new SystemException(e.getMessage(), e);
+        }
+        return aCase.getOid();
+    }
 
-		// TODO: case payload
-		// TODO: a lot of other things
+    private PrismObject<CaseType> addCase(String operation, String description, String resourceOid, String shadowName, String shadowOid,
+            ObjectDeltaType objectDelta, OperationResult result) throws SchemaException, ObjectAlreadyExistsException {
+        PrismObject<CaseType> aCase = getPrismContext().createObject(CaseType.class);
+        CaseType caseType = aCase.asObjectable();
 
-		// TODO: move to case-manager
+        if (randomDelayRange != 0) {
+            int waitMillis = RND.nextInt(randomDelayRange);
+            LOGGER.info("Manual connector waiting {} ms before creating the case", waitMillis);
+            try {
+                Thread.sleep(waitMillis);
+            } catch (InterruptedException e) {
+                LOGGER.error("Manual connector wait is interrupted");
+            }
+            LOGGER.info("Manual connector wait is over");
+        }
 
-		if (LOGGER.isTraceEnabled()) {
-			LOGGER.trace("CREATING CASE:\n{}", acase.debugDump(1));
-		}
+        PrismObject<ResourceType> resource;
+        try {
+            resource = repositoryService.getObject(ResourceType.class, resourceOid, null, result);
+        } catch (ObjectNotFoundException e) {
+            // We do not signal this as ObjectNotFoundException as it could be misinterpreted as "shadow
+            // object not found" with subsequent handling as such.
+            throw new SystemException("Resource " + resourceOid + " couldn't be found", e);
+        }
+        ResourceBusinessConfigurationType businessConfiguration = resource.asObjectable().getBusiness();
+        List<ObjectReferenceType> operators = new ArrayList<>();
+        if (businessConfiguration != null) {
+            operators.addAll(businessConfiguration.getOperatorRef());
+        }
+        if (operators.isEmpty() && configuration.getDefaultAssignee() != null) {
+            ObjectQuery query = getPrismContext().queryFor(UserType.class)
+                    .item(UserType.F_NAME).eq(configuration.getDefaultAssignee()).matchingOrig()
+                    .build();
+            List<PrismObject<UserType>> defaultAssignees = repositoryService
+                    .searchObjects(UserType.class, query, null, result);
+            if (defaultAssignees.isEmpty()) {
+                LOGGER.warn("Default assignee named '{}' was not found; using system-wide default instead.",
+                        configuration.getDefaultAssignee());
+            } else {
+                assert defaultAssignees.size() == 1;
+                operators.addAll(ObjectTypeUtil.objectListToReferences(defaultAssignees));
+            }
+        }
+        if (operators.isEmpty()) {
+            operators.add(new ObjectReferenceType().oid(DEFAULT_OPERATOR_OID).type(UserType.COMPLEX_TYPE));
+        }
 
-		repositoryService.addObject(acase, null, result);
-		return acase;
-	}
+        String caseOid = OidUtil.generateOid();
 
-	@Override
-	public OperationResultStatus queryOperationStatus(String asyncronousOperationReference, OperationResult parentResult) throws ObjectNotFoundException, SchemaException {
-		OperationResult result = parentResult.createMinorSubresult(OPERATION_QUERY_CASE);
+        caseType.setOid(caseOid);
+        String caseName = String.format("Request to %s '%s' on '%s'", operation, shadowName, resource.getName().getOrig());
+        caseType.setName(new PolyStringType(caseName));
 
-		PrismObject<CaseType> acase;
-		try {
-			acase = repositoryService.getObject(CaseType.class, asyncronousOperationReference, null, result);
-		} catch (ObjectNotFoundException | SchemaException e) {
-			result.recordFatalError(e);
-			throw e;
-		}
+        caseType.setDescription(description);
 
-		CaseType caseType = acase.asObjectable();
-		String state = caseType.getState();
+        caseType.setState(SchemaConstants.CASE_STATE_CREATED);  // Case opening process will be completed by WorkflowEngine
 
-		if (QNameUtil.matchWithUri(SchemaConstants.CASE_STATE_OPEN_QNAME, state)) {
-			result.recordSuccess();
-			return OperationResultStatus.IN_PROGRESS;
+        caseType.setObjectRef(new ObjectReferenceType().oid(resourceOid).type(ResourceType.COMPLEX_TYPE));
 
-		} else if (QNameUtil.matchWithUri(SchemaConstants.CASE_STATE_CLOSED_QNAME, state)) {
+        caseType.setTargetRef(new ObjectReferenceType().oid(shadowOid).targetName(shadowName).type(ShadowType.COMPLEX_TYPE));
 
-			String outcome = caseType.getOutcome();
-			OperationResultStatus status = translateOutcome(outcome);
-			result.recordSuccess();
-			return status;
+        // deprecated "objectChange" element was removed in midPoint 4.0.
+        // TODO: record operation as pending operation delta
 
-		} else {
-			SchemaException e = new SchemaException("Unknown case state "+state);
-			result.recordFatalError(e);
-			throw e;
-		}
+        ObjectReferenceType archetypeRef = ObjectTypeUtil
+                .createObjectRef(SystemObjectsType.ARCHETYPE_MANUAL_CASE.value(), ObjectTypes.ARCHETYPE);
+        caseType.getArchetypeRef().add(archetypeRef.clone());
+        caseType.beginAssignment().targetRef(archetypeRef).end();
 
-	}
+        XMLGregorianCalendar now = clock.currentTimeXMLGregorianCalendar();
+        caseType.beginMetadata().setCreateTimestamp(now);
 
-	private OperationResultStatus translateOutcome(String outcome) {
+        XMLGregorianCalendar deadline;
+        if (businessConfiguration != null && businessConfiguration.getOperatorActionMaxDuration() != null) {
+            deadline = CloneUtil.clone(now);
+            deadline.add(businessConfiguration.getOperatorActionMaxDuration());
+        } else {
+            deadline = null;
+        }
 
-		// TODO: better algorithm
-		if (outcome == null) {
-			return null;
-		} else if (outcome.equals(OperationResultStatusType.SUCCESS.value())) {
-			return OperationResultStatus.SUCCESS;
-		} else {
-			return OperationResultStatus.UNKNOWN;
-		}
-	}
+        for (ObjectReferenceType operator : operators) {
+            CaseWorkItemType workItem = new CaseWorkItemType(getPrismContext())
+                    .originalAssigneeRef(operator.clone())
+                    .assigneeRef(operator.clone())
+                    .name(caseType.getName().getOrig())
+                    .createTimestamp(now)
+                    .deadline(deadline);
+            caseType.getWorkItem().add(workItem);
+        }
 
-	@Override
-	protected void connect(OperationResult result) {
-		if (connected && InternalsConfig.isSanityChecks()) {
-			throw new IllegalStateException("Double connect in "+this);
-		}
-		connected = true;
-		// Nothing else to do
-	}
+        // TODO: case payload
+        // TODO: a lot of other things
 
-	@Override
-	public void test(OperationResult parentResult) {
-		OperationResult connectionResult = parentResult
-				.createSubresult(ConnectorTestOperation.CONNECTOR_CONNECTION.getOperation());
-		connectionResult.addContext(OperationResult.CONTEXT_IMPLEMENTATION_CLASS, ManualConnectorInstance.class);
-		connectionResult.addContext("connector", getConnectorObject().toString());
+        // TODO: move to case-manager
 
-		if (repositoryService == null) {
-			connectionResult.recordFatalError("No repository service");
-			return;
-		}
+        if (LOGGER.isTraceEnabled()) {
+            LOGGER.trace("CREATING CASE:\n{}", aCase.debugDump(1));
+        }
 
-		if (!connected && InternalsConfig.isSanityChecks()) {
-			throw new IllegalStateException("Attempt to test non-connected connector instance "+this);
-		}
+        repositoryService.addObject(aCase, null, result);
 
-		connectionResult.recordSuccess();
-	}
+        // notifications
+        caseEventDispatcher.dispatchCaseEvent(caseType, result);
+        return aCase;
+    }
 
-	@Override
-	public void dispose() {
-		// Nothing to dispose
-		connected = false;
-	}
+    @Override
+    public OperationResultStatus queryOperationStatus(String asynchronousOperationReference, OperationResult parentResult) throws ObjectNotFoundException, SchemaException {
+        OperationResult result = parentResult.createMinorSubresult(OPERATION_QUERY_CASE);
 
-	public static int getRandomDelayRange() {
-		return randomDelayRange;
-	}
+        InternalMonitor.recordConnectorOperation("queryOperationStatus");
 
-	public static void setRandomDelayRange(int randomDelayRange) {
-		ManualConnectorInstance.randomDelayRange = randomDelayRange;
-	}
+        PrismObject<CaseType> acase;
+        try {
+            acase = repositoryService.getObject(CaseType.class, asynchronousOperationReference, null, result);
+        } catch (ObjectNotFoundException | SchemaException e) {
+            result.recordFatalError(e);
+            throw e;
+        }
+
+        CaseType caseType = acase.asObjectable();
+        String state = caseType.getState();
+
+        // States "open" and "created" are the same from the factual point of view
+        // They differ only in level of processing carried out by workflow manager (audit, notifications, etc).
+        if (QNameUtil.matchWithUri(SchemaConstants.CASE_STATE_OPEN_QNAME, state)
+                || QNameUtil.matchWithUri(SchemaConstants.CASE_STATE_CREATED_QNAME, state)) {
+            result.recordSuccess();
+            return OperationResultStatus.IN_PROGRESS;
+        } else if (QNameUtil.matchWithUri(SchemaConstants.CASE_STATE_CLOSED_QNAME, state)
+                || QNameUtil.matchWithUri(SchemaConstants.CASE_STATE_CLOSING_QNAME, state)) {
+            String outcome = caseType.getOutcome();
+            OperationResultStatus status = translateOutcome(outcome);
+            result.recordSuccess();
+            return status;
+        } else {
+            SchemaException e = new SchemaException("Unknown case state "+state);
+            result.recordFatalError(e);
+            throw e;
+        }
+
+    }
+
+    // see CompleteWorkItemsAction.getOutcome(..) method
+    private OperationResultStatus translateOutcome(String outcome) {
+
+        // TODO: better algorithm
+        if (outcome == null) {
+            return null;
+        } else if (outcome.equals(OperationResultStatusType.SUCCESS.value())) {
+            return OperationResultStatus.SUCCESS;
+        } else {
+            return OperationResultStatus.UNKNOWN;
+        }
+    }
+
+    @Override
+    protected void connect(OperationResult result) {
+        if (connected && InternalsConfig.isSanityChecks()) {
+            throw new IllegalStateException("Double connect in "+this);
+        }
+        connected = true;
+        // Nothing else to do
+    }
+
+    private String getShadowIdentifier(Collection<? extends ResourceAttribute<?>> identifiers){
+        try {
+            Object[] shadowIdentifiers = identifiers.toArray();
+
+            return ((ResourceAttribute)shadowIdentifiers[0]).getValue().getValue().toString();
+        } catch (NullPointerException e){
+            return "";
+        }
+    }
+
+    @Override
+    public void test(OperationResult parentResult) {
+        OperationResult connectionResult = parentResult
+                .createSubresult(ConnectorTestOperation.CONNECTOR_CONNECTION.getOperation());
+        connectionResult.addContext(OperationResult.CONTEXT_IMPLEMENTATION_CLASS, ManualConnectorInstance.class);
+        connectionResult.addContext("connector", getConnectorObject().toString());
+
+        if (repositoryService == null) {
+            connectionResult.recordFatalError("No repository service");
+            return;
+        }
+
+        if (!connected && InternalsConfig.isSanityChecks()) {
+            throw new IllegalStateException("Attempt to test non-connected connector instance "+this);
+        }
+
+        connectionResult.recordSuccess();
+    }
+
+    @Override
+    public void disconnect(OperationResult parentResult) {
+        connected = false;
+    }
+
+    @SuppressWarnings("unused")
+    public static int getRandomDelayRange() {
+        return randomDelayRange;
+    }
+
+    public static void setRandomDelayRange(int randomDelayRange) {
+        ManualConnectorInstance.randomDelayRange = randomDelayRange;
+    }
 
 }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.query2.hqm;
@@ -20,7 +11,7 @@ import com.evolveum.midpoint.repo.sql.query2.definition.JpaEntityDefinition;
 import com.evolveum.midpoint.repo.sql.query2.hqm.condition.*;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
-import org.hibernate.Query;
+import org.hibernate.query.Query;
 import org.hibernate.Session;
 import org.hibernate.criterion.MatchMode;
 import org.hibernate.transform.ResultTransformer;
@@ -76,10 +67,10 @@ public class RootHibernateQuery extends HibernateQuery {
     }
 
     public Map<String, QueryParameterValue> getParameters() {
-		return parameters;
-	}
+        return parameters;
+    }
 
-	private String findFreeName(String prefix) {
+    private String findFreeName(String prefix) {
         int i = 1;
         for (;;) {
             String name = i == 1 ? prefix : prefix+i;
@@ -142,11 +133,15 @@ public class RootHibernateQuery extends HibernateQuery {
         this.resultTransformer = resultTransformer;
     }
 
-	public void setDistinct(boolean distinct) {
-		this.distinct = distinct;
-	}
+    public void setDistinct(boolean distinct) {
+        this.distinct = distinct;
+    }
 
-	public Condition createIsNull(String propertyPath) {
+    public boolean isDistinct() {
+        return distinct;
+    }
+
+    public Condition createIsNull(String propertyPath) {
         return new IsNullCondition(this, propertyPath);
     }
 
@@ -164,12 +159,12 @@ public class RootHibernateQuery extends HibernateQuery {
 
     public Condition createEqOrInOrNull(String propertyPath, Collection<?> values) {
         if (values.isEmpty()) {
-        	return createIsNull(propertyPath);
-		} else if (values.size() == 1) {
-			return createEq(propertyPath, values.iterator().next(), false);
-		} else {
-        	return createIn(propertyPath, values);
-		}
+            return createIsNull(propertyPath);
+        } else if (values.size() == 1) {
+            return createEq(propertyPath, values.iterator().next(), false);
+        } else {
+            return createIn(propertyPath, values);
+        }
     }
 
     public Condition createSimpleComparisonCondition(String propertyPath, Object value, String comparatorSymbol) {
@@ -220,5 +215,13 @@ public class RootHibernateQuery extends HibernateQuery {
 
     public Condition createCompareXY(String leftSidePropertyPath, String rightSidePropertyPath, String operator, boolean ignoreCase) {
         return new PropertyPropertyComparisonCondition(this, leftSidePropertyPath, rightSidePropertyPath, operator, ignoreCase);
+    }
+
+    public Condition createFalse() {
+        return new ConstantCondition(this, false);
+    }
+
+    public boolean isDistinctNotNecessary() {
+        return getPrimaryEntity().getJoins().isEmpty();
     }
 }

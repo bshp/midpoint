@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.task.quartzimpl;
@@ -29,7 +20,7 @@ import com.evolveum.midpoint.util.exception.SystemException;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 
-import com.evolveum.midpoint.xml.ns._public.common.common_3.TaskType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.TaskExecutionConstraintsType;
 import org.quartz.*;
 
 import com.evolveum.midpoint.task.api.Task;
@@ -45,47 +36,47 @@ public class TaskQuartzImplUtil {
 
     public static final long SINGLE_TASK_CHECK_INTERVAL = 10000;
 
-	public static JobKey createJobKeyForTask(Task t) {
-    	return new JobKey(t.getOid());
+    public static JobKey createJobKeyForTask(Task t) {
+        return new JobKey(t.getOid());
     }
 
-	public static JobKey createJobKeyForTaskOid(String oid) {
-    	return new JobKey(oid);
-	}
-	
-	public static TriggerKey createTriggerKeyForTask(Task t) {
-    	return new TriggerKey(t.getOid());
+    public static JobKey createJobKeyForTaskOid(String oid) {
+        return new JobKey(oid);
     }
 
-	public static TriggerKey createTriggerKeyForTaskOid(String oid) {
-    	return new TriggerKey(oid);
-	}
+    public static TriggerKey createTriggerKeyForTask(Task t) {
+        return new TriggerKey(t.getOid());
+    }
 
-	public static JobDetail createJobDetailForTask(Task task) {
-		
-		JobDetail job = JobBuilder.newJob(JobExecutor.class)
-	      .withIdentity(TaskQuartzImplUtil.createJobKeyForTask(task))
-	      .storeDurably()
+    public static TriggerKey createTriggerKeyForTaskOid(String oid) {
+        return new TriggerKey(oid);
+    }
+
+    public static JobDetail createJobDetailForTask(Task task) {
+
+        JobDetail job = JobBuilder.newJob(JobExecutor.class)
+          .withIdentity(TaskQuartzImplUtil.createJobKeyForTask(task))
+          .storeDurably()
           .requestRecovery()
-	      .build();
-		
-		return job;
-	}
-	
-	public static Trigger createTriggerForTask(Task task) throws ParseException {
-		
-		if (task.getExecutionStatus() != TaskExecutionStatus.RUNNABLE) {
-			return null;			// no triggers for such tasks
+          .build();
+
+        return job;
+    }
+
+    public static Trigger createTriggerForTask(Task task) throws ParseException {
+
+        if (task.getExecutionStatus() != TaskExecutionStatus.RUNNABLE) {
+            return null;            // no triggers for such tasks
         }
 
         // special case - recurrent task with no schedule (means "run on demand only")
-        if (task.isCycle() && (task.getSchedule() == null ||
+        if (task.isRecurring() && (task.getSchedule() == null ||
                 (task.getSchedule().getInterval() == null && task.getSchedule().getCronLikePattern() == null))) {
             return null;
         }
 
-		TriggerBuilder<Trigger> tb = createBasicTriggerBuilderForTask(task)
-		      .withIdentity(createTriggerKeyForTask(task));
+        TriggerBuilder<Trigger> tb = createBasicTriggerBuilderForTask(task)
+              .withIdentity(createTriggerKeyForTask(task));
 
         if (task.getSchedule() != null) {
 
@@ -123,21 +114,21 @@ public class TaskQuartzImplUtil {
 
         boolean looselyBoundRecurrent;
 
-        if (task.isCycle() && task.isLooselyBound()) {
+        if (task.isRecurring() && task.isLooselyBound()) {
 
             looselyBoundRecurrent = true;
 
-        	ScheduleType sch = task.getSchedule();
-        	if (sch == null) {
+            ScheduleType sch = task.getSchedule();
+            if (sch == null) {
                 return null;
-        		//throw new IllegalStateException("Recurrent task " + task + " does not have a schedule.");
+                //throw new IllegalStateException("Recurrent task " + task + " does not have a schedule.");
             }
 
             ScheduleBuilder sb;
-        	if (sch.getInterval() != null) {
-        		SimpleScheduleBuilder ssb = simpleSchedule()
-        				.withIntervalInSeconds(sch.getInterval().intValue())
-        				.repeatForever();
+            if (sch.getInterval() != null) {
+                SimpleScheduleBuilder ssb = simpleSchedule()
+                        .withIntervalInSeconds(sch.getInterval().intValue())
+                        .repeatForever();
                 if (sch.getMisfireAction() == null || sch.getMisfireAction() == MisfireActionType.EXECUTE_IMMEDIATELY) {
                     sb = ssb.withMisfireHandlingInstructionFireNow();
                 } else if (sch.getMisfireAction() == MisfireActionType.RESCHEDULE) {
@@ -147,7 +138,7 @@ public class TaskQuartzImplUtil {
                 }
 
             } else if (sch.getCronLikePattern() != null) {
-                CronScheduleBuilder csb = cronScheduleNonvalidatedExpression(sch.getCronLikePattern());			// may throw ParseException
+                CronScheduleBuilder csb = cronScheduleNonvalidatedExpression(sch.getCronLikePattern());            // may throw ParseException
                 if (sch.getMisfireAction() == null || sch.getMisfireAction() == MisfireActionType.EXECUTE_IMMEDIATELY) {
                     sb = csb.withMisfireHandlingInstructionFireAndProceed();
                 } else if (sch.getMisfireAction() == MisfireActionType.RESCHEDULE) {
@@ -155,9 +146,9 @@ public class TaskQuartzImplUtil {
                 } else {
                     throw new SystemException("Invalid value of misfireAction: " + sch.getMisfireAction() + " for task " + task);
                 }
-        	} else {
+            } else {
                 return null;
-        		//throw new IllegalStateException("The schedule for task " + task + " is neither fixed nor cron-like one.");
+                //throw new IllegalStateException("The schedule for task " + task + " is neither fixed nor cron-like one.");
             }
 
             tb.withSchedule(sb);
@@ -173,29 +164,29 @@ public class TaskQuartzImplUtil {
         tb.usingJobData("looselyBoundRecurrent", looselyBoundRecurrent);
         tb.usingJobData("handlerUri", task.getHandlerUri());
 
-		return tb.build();
-	}
+        return tb.build();
+    }
 
-	private static TriggerBuilder<Trigger> createBasicTriggerBuilderForTask(Task task) {
-		TaskType taskType = task.getTaskPrismObject().asObjectable();
-		String executionGroup = taskType.getExecutionConstraints() != null
-				? MiscUtil.nullIfEmpty(taskType.getExecutionConstraints().getGroup())
-				: null;
-		return TriggerBuilder.newTrigger()
-				.forJob(createJobKeyForTask(task))
-				.executionGroup(executionGroup);
-	}
+    private static TriggerBuilder<Trigger> createBasicTriggerBuilderForTask(Task task) {
+        TaskExecutionConstraintsType executionConstraints = task.getExecutionConstraints();
+        String executionGroup = executionConstraints != null
+                ? MiscUtil.nullIfEmpty(executionConstraints.getGroup())
+                : null;
+        return TriggerBuilder.newTrigger()
+                .forJob(createJobKeyForTask(task))
+                .executionGroup(executionGroup);
+    }
 
-	public static Trigger createTriggerNowForTask(Task task) {
+    public static Trigger createTriggerNowForTask(Task task) {
         return createBasicTriggerBuilderForTask(task)
-				.startNow()
-		        .build();
+                .startNow()
+                .build();
     }
 
     public static Trigger createTriggerForTask(Task task, long startAt) {
         return createBasicTriggerBuilderForTask(task)
-		        .startAt(new Date(startAt))
-		        .build();
+                .startAt(new Date(startAt))
+                .build();
     }
 
     public static long xmlGCtoMillis(XMLGregorianCalendar gc) {
@@ -217,11 +208,11 @@ public class TaskQuartzImplUtil {
     }
 
     public static boolean triggersDiffer(Trigger triggerAsIs, Trigger triggerToBe) {
-		return !Objects.equals(triggerAsIs.getExecutionGroup(), triggerToBe.getExecutionGroup())
-				|| triggerDataMapsDiffer(triggerAsIs, triggerToBe);
-	}
+        return !Objects.equals(triggerAsIs.getExecutionGroup(), triggerToBe.getExecutionGroup())
+                || triggerDataMapsDiffer(triggerAsIs, triggerToBe);
+    }
 
-	// compares scheduling-related data maps of triggers
+    // compares scheduling-related data maps of triggers
     private static boolean triggerDataMapsDiffer(Trigger triggerAsIs, Trigger triggerToBe) {
 
         JobDataMap asIs = triggerAsIs.getJobDataMap();
@@ -252,7 +243,7 @@ public class TaskQuartzImplUtil {
     public static ParseException validateCronExpression(String cron) {
 
         try {
-            cronScheduleNonvalidatedExpression(cron);			// may throw ParseException
+            cronScheduleNonvalidatedExpression(cron);            // may throw ParseException
             return null;
         } catch (ParseException pe) {
             return pe;

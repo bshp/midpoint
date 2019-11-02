@@ -1,118 +1,150 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2018 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.users.component;
 
 import com.evolveum.midpoint.gui.api.component.BasePanel;
-import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
+import com.evolveum.midpoint.gui.api.component.form.CheckBoxPanel;
+import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
+import com.evolveum.midpoint.gui.api.util.WebModelServiceUtils;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.TracingProfileType;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.wicket.markup.html.WebMarkupContainer;
-import org.apache.wicket.markup.html.form.CheckBox;
+import org.apache.wicket.markup.html.form.DropDownChoice;
+import org.apache.wicket.markup.html.form.IChoiceRenderer;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.PropertyModel;
+
+import java.util.List;
 
 /**
  * @author lazyman
  */
 public class ExecuteChangeOptionsPanel extends BasePanel<ExecuteChangeOptionsDto> {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private static final String ID_FORCE = "force";
+    private static final String ID_FORCE = "force";
+    private static final String ID_FORCE_CONTAINER = "forceContainer";
     private static final String ID_RECONCILE = "reconcile";
-    private static final String ID_RECONCILE_LABEL = "reconcileLabel";
+    private static final String ID_RECONCILE_CONTAINER = "reconcileContainer";
     private static final String ID_RECONCILE_AFFECTED = "reconcileAffected";
-    private static final String ID_RECONCILE_AFFECTED_LABEL = "reconcileAffectedLabel";
+    private static final String ID_RECONCILE_AFFECTED_CONTAINER = "reconcileAffectedContainer";
     private static final String ID_EXECUTE_AFTER_ALL_APPROVALS = "executeAfterAllApprovals";
+    private static final String ID_EXECUTE_AFTER_ALL_APPROVALS_CONTAINER = "executeAfterAllApprovalsContainer";
     private static final String ID_KEEP_DISPLAYING_RESULTS = "keepDisplayingResults";
-    private static final String ID_KEEP_DISPLAYING_RESULTS_LABEL = "keepDisplayingResultsLabel";
+    private static final String ID_KEEP_DISPLAYING_RESULTS_CONTAINER = "keepDisplayingResultsContainer";
+    private static final String ID_TRACING = "tracing";
+    private static final String ID_TRACING_CONTAINER = "tracingContainer";
 
-    private boolean showReconcile;
-    private boolean showReconcileAffected;
-    private boolean showKeepDisplayingResults;
+    private static final String FORCE_LABEL = "ExecuteChangeOptionsPanel.label.force";
+    private static final String FORCE_HELP = "ExecuteChangeOptionsPanel.label.force.help";
+    private static final String RECONCILE_LABEL = "ExecuteChangeOptionsPanel.label.reconcile";
+    private static final String RECONCILE_HELP = "ExecuteChangeOptionsPanel.label.reconcile.help";
+    private static final String RECONCILE_AFFECTED_LABEL = "ExecuteChangeOptionsPanel.label.reconcileAffected";
+    private static final String RECONCILE_AFFECTED_HELP = "ExecuteChangeOptionsPanel.label.reconcileAffected.help";
+    private static final String EXECUTE_AFTER_ALL_APPROVALS_LABEL = "ExecuteChangeOptionsPanel.label.executeAfterAllApprovals";
+    private static final String EXECUTE_AFTER_ALL_APPROVALS_HELP = "ExecuteChangeOptionsPanel.label.executeAfterAllApprovals.help";
+    private static final String KEEP_DISPLAYING_RESULTS_LABEL = "ExecuteChangeOptionsPanel.label.keepDisplayingResults";
+    private static final String KEEP_DISPLAYING_RESULTS_HELP = "ExecuteChangeOptionsPanel.label.keepDisplayingResults.help";
 
-    public ExecuteChangeOptionsPanel(String id, IModel<ExecuteChangeOptionsDto> model, boolean showReconcile, boolean showReconcileAffected) {
+    private final boolean showReconcile;
+    private final boolean showReconcileAffected;
+    private final boolean showKeepDisplayingResults;
+
+    public ExecuteChangeOptionsPanel(String id, IModel<ExecuteChangeOptionsDto> model,
+            boolean showReconcile, boolean showReconcileAffected) {
         super(id, model);
         this.showReconcile = showReconcile;
         this.showReconcileAffected = showReconcileAffected;
         showKeepDisplayingResults = getWebApplicationConfiguration().isProgressReportingEnabled();
-        initLayout();
     }
 
-    public ExecuteChangeOptionsPanel(String id, IModel<ExecuteChangeOptionsDto> model, boolean showReconcile, boolean showReconcileAffected, boolean showKeepDisplayingResults) {
+    public ExecuteChangeOptionsPanel(String id, IModel<ExecuteChangeOptionsDto> model,
+            boolean showReconcile, boolean showReconcileAffected, boolean showKeepDisplayingResults) {
         super(id, model);
         this.showReconcile = showReconcile;
         this.showReconcileAffected = showReconcileAffected;
         this.showKeepDisplayingResults = showKeepDisplayingResults;
+    }
+
+    @Override
+    protected void onInitialize(){
+        super.onInitialize();
         initLayout();
     }
 
     private void initLayout() {
-        CheckBox force = new CheckBox(ID_FORCE,
-                new PropertyModel<Boolean>(getModel(), ExecuteChangeOptionsDto.F_FORCE));
-        add(force);
+        createContainer(ID_FORCE_CONTAINER,
+                new PropertyModel<>(getModel(), ExecuteChangeOptionsDto.F_FORCE),
+                FORCE_LABEL,
+                FORCE_HELP,
+                true);
 
-        WebMarkupContainer reconcileLabel = new WebMarkupContainer(ID_RECONCILE_LABEL);
-        reconcileLabel.add(new VisibleEnableBehaviour() {
-        	private static final long serialVersionUID = 1L;
+        createContainer(ID_RECONCILE_CONTAINER,
+                new PropertyModel<>(getModel(), ExecuteChangeOptionsDto.F_RECONCILE),
+                RECONCILE_LABEL,
+                RECONCILE_HELP,
+                showReconcile);
 
+        createContainer(ID_RECONCILE_AFFECTED_CONTAINER,
+                new PropertyModel<>(getModel(), ExecuteChangeOptionsDto.F_RECONCILE_AFFECTED),
+                RECONCILE_AFFECTED_LABEL,
+                RECONCILE_AFFECTED_HELP,
+                showReconcileAffected);
+
+        createContainer(ID_EXECUTE_AFTER_ALL_APPROVALS_CONTAINER,
+                new PropertyModel<>(getModel(), ExecuteChangeOptionsDto.F_EXECUTE_AFTER_ALL_APPROVALS),
+                EXECUTE_AFTER_ALL_APPROVALS_LABEL,
+                EXECUTE_AFTER_ALL_APPROVALS_HELP,
+                true);
+
+        createContainer(ID_KEEP_DISPLAYING_RESULTS_CONTAINER,
+                new PropertyModel<>(getModel(), ExecuteChangeOptionsDto.F_KEEP_DISPLAYING_RESULTS),
+                KEEP_DISPLAYING_RESULTS_LABEL,
+                KEEP_DISPLAYING_RESULTS_HELP,
+                showKeepDisplayingResults);
+
+        WebMarkupContainer tracingContainer = new WebMarkupContainer(ID_TRACING_CONTAINER);
+        tracingContainer.setVisible(WebModelServiceUtils.isEnableExperimentalFeature(getPageBase()));
+        add(tracingContainer);
+
+        DropDownChoice tracing = new DropDownChoice<>(ID_TRACING, PropertyModel.of(getModel(), ExecuteChangeOptionsDto.F_TRACING),
+                PropertyModel.of(getModel(), ExecuteChangeOptionsDto.F_TRACING_CHOICES), new IChoiceRenderer<TracingProfileType>() {
             @Override
-            public boolean isVisible() {
-                return showReconcile;
+            public Object getDisplayValue(TracingProfileType profile) {
+                if (profile == null) {
+                    return "(none)";
+                } else if (profile.getDisplayName() != null) {
+                    return profile.getDisplayName();
+                } else if (profile.getName() != null) {
+                    return profile.getName();
+                } else {
+                    return "(unnamed profile)";
+                }
             }
 
-        });
-        add(reconcileLabel);
-
-        CheckBox reconcile = new CheckBox(ID_RECONCILE,
-                new PropertyModel<Boolean>(getModel(), ExecuteChangeOptionsDto.F_RECONCILE));
-        reconcileLabel.add(reconcile);
-
-        WebMarkupContainer reconcileAffectedLabel = new WebMarkupContainer(ID_RECONCILE_AFFECTED_LABEL);
-        reconcileAffectedLabel.add(new VisibleEnableBehaviour() {
-        	private static final long serialVersionUID = 1L;
-
             @Override
-            public boolean isVisible() {
-                return showReconcileAffected;
+            public String getIdValue(TracingProfileType object, int index) {
+                return String.valueOf(index);
             }
 
-        });
-        add(reconcileAffectedLabel);
-
-        CheckBox reconcileAffected = new CheckBox(ID_RECONCILE_AFFECTED,
-                new PropertyModel<Boolean>(getModel(), ExecuteChangeOptionsDto.F_RECONCILE_AFFECTED));
-        reconcileAffectedLabel.add(reconcileAffected);
-
-        CheckBox executeAfterAllApprovals = new CheckBox(ID_EXECUTE_AFTER_ALL_APPROVALS,
-                new PropertyModel<Boolean>(getModel(), ExecuteChangeOptionsDto.F_EXECUTE_AFTER_ALL_APPROVALS));
-        add(executeAfterAllApprovals);
-
-        WebMarkupContainer keepDisplayingResultsLabel = new WebMarkupContainer(ID_KEEP_DISPLAYING_RESULTS_LABEL);
-        keepDisplayingResultsLabel.add(new VisibleEnableBehaviour() {
-        	private static final long serialVersionUID = 1L;
-
             @Override
-            public boolean isVisible() {
-                return showKeepDisplayingResults;
+            public TracingProfileType getObject(String id, IModel<? extends List<? extends TracingProfileType>> choices) {
+                return StringUtils.isNotBlank(id) ? choices.getObject().get(Integer.parseInt(id)) : null;
             }
-
         });
-        add(keepDisplayingResultsLabel);
+        tracing.setNullValid(true);
+        tracingContainer.add(tracing);
+    }
 
-        CheckBox keepDisplayingResults = new CheckBox(ID_KEEP_DISPLAYING_RESULTS,
-                new PropertyModel<Boolean>(getModel(), ExecuteChangeOptionsDto.F_KEEP_DISPLAYING_RESULTS));
-        keepDisplayingResultsLabel.add(keepDisplayingResults);
+    private void createContainer(String containerId, IModel<Boolean> checkboxModel, String labelKey, String helpKey, boolean show) {
+        CheckBoxPanel panel = new CheckBoxPanel(containerId, checkboxModel, null, createStringResource(labelKey),
+                createStringResource(helpKey, WebComponentUtil.getMidpointCustomSystemName(getPageBase(), "midPoint")));
+        panel.setVisible(show);
+        add(panel);
     }
 }

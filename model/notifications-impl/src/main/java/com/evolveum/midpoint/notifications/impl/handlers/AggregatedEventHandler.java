@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2014 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.notifications.impl.handlers;
@@ -27,20 +18,12 @@ import com.evolveum.midpoint.notifications.impl.helpers.ForkHelper;
 import com.evolveum.midpoint.notifications.impl.helpers.KindIntentFilterHelper;
 import com.evolveum.midpoint.notifications.impl.helpers.OperationFilterHelper;
 import com.evolveum.midpoint.notifications.impl.helpers.StatusFilterHelper;
-import com.evolveum.midpoint.notifications.impl.notifiers.AccountPasswordNotifier;
-import com.evolveum.midpoint.notifications.impl.notifiers.GeneralNotifier;
-import com.evolveum.midpoint.notifications.impl.notifiers.SimpleResourceObjectNotifier;
-import com.evolveum.midpoint.notifications.impl.notifiers.SimpleFocalObjectNotifier;
-import com.evolveum.midpoint.notifications.impl.notifiers.SimpleUserNotifier;
-import com.evolveum.midpoint.notifications.impl.notifiers.SimpleWorkflowNotifier;
-import com.evolveum.midpoint.notifications.impl.notifiers.UserPasswordNotifier;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.util.exception.SchemaException;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.EventHandlerType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.GeneralNotifierType;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -61,50 +44,14 @@ public class AggregatedEventHandler extends BaseHandler {
 
     private static final Trace LOGGER = TraceManager.getTrace(AggregatedEventHandler.class);
 
-    @Autowired
-    private CategoryFilterHelper categoryFilter;
-
-    @Autowired
-    private OperationFilterHelper operationFilter;
-
-    @Autowired
-    private StatusFilterHelper statusFilter;
-
-    @Autowired
-    private KindIntentFilterHelper kindIntentFilter;
-
-    @Autowired
-    private FocusTypeFilterHelper focusTypeFilterHelper;
-
-    @Autowired
-    private ExpressionFilterHelper expressionFilter;
-
-    @Autowired
-    private ChainHelper chainHelper;
-
-    @Autowired
-    private ForkHelper forkHelper;
-
-    @Autowired
-    protected SimpleFocalObjectNotifier simpleFocalObjectNotifier;
-
-    @Autowired
-    protected SimpleUserNotifier simpleUserNotifier;
-
-    @Autowired
-    protected SimpleResourceObjectNotifier simpleResourceObjectNotifier;
-
-    @Autowired
-    protected SimpleWorkflowNotifier simpleWorkflowNotifier;
-
-    @Autowired
-    protected UserPasswordNotifier userPasswordNotifier;
-
-    @Autowired
-    protected AccountPasswordNotifier accountPasswordNotifier;
-
-    @Autowired
-    protected GeneralNotifier generalNotifier;
+    @Autowired private CategoryFilterHelper categoryFilter;
+    @Autowired private OperationFilterHelper operationFilter;
+    @Autowired private StatusFilterHelper statusFilter;
+    @Autowired private KindIntentFilterHelper kindIntentFilter;
+    @Autowired private FocusTypeFilterHelper focusTypeFilterHelper;
+    @Autowired private ExpressionFilterHelper expressionFilter;
+    @Autowired private ChainHelper chainHelper;
+    @Autowired private ForkHelper forkHelper;
 
     @PostConstruct
     public void init() {
@@ -113,17 +60,17 @@ public class AggregatedEventHandler extends BaseHandler {
 
     @Override
     public boolean processEvent(Event event, EventHandlerType eventHandlerType, NotificationManager notificationManager,
-    		Task task, OperationResult result) throws SchemaException {
+            Task task, OperationResult result) throws SchemaException {
 
         logStart(LOGGER, event, eventHandlerType);
 
         boolean shouldContinue =
-                categoryFilter.processEvent(event, eventHandlerType, notificationManager, task, result) &&
-                operationFilter.processEvent(event, eventHandlerType, notificationManager, task, result) &&
-                statusFilter.processEvent(event, eventHandlerType, notificationManager, task, result) &&
-                kindIntentFilter.processEvent(event, eventHandlerType, notificationManager, task, result) &&
-                focusTypeFilterHelper.processEvent(event, eventHandlerType, notificationManager, task, result) &&
-                expressionFilter.processEvent(event, eventHandlerType, notificationManager, task, result) &&
+                categoryFilter.processEvent(event, eventHandlerType) &&
+                operationFilter.processEvent(event, eventHandlerType) &&
+                statusFilter.processEvent(event, eventHandlerType) &&
+                kindIntentFilter.processEvent(event, eventHandlerType) &&
+                focusTypeFilterHelper.processEvent(event, eventHandlerType) &&
+                expressionFilter.processEvent(event, eventHandlerType, task, result) &&
                 chainHelper.processEvent(event, eventHandlerType, notificationManager, task, result) &&
                 forkHelper.processEvent(event, eventHandlerType, notificationManager, task, result);
 
@@ -131,6 +78,7 @@ public class AggregatedEventHandler extends BaseHandler {
         shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getSimpleFocalObjectNotifier(), notificationManager, task, result);
         shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getSimpleResourceObjectNotifier(), notificationManager, task, result);
         shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getSimpleWorkflowNotifier(), notificationManager, task, result);
+        shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getSimpleCaseManagementNotifier(), notificationManager, task, result);
         shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getUserPasswordNotifier(), notificationManager, task, result);
         shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getUserRegistrationNotifier(), notificationManager, task, result);
         shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getPasswordResetNotifier(), notificationManager, task, result);
@@ -142,6 +90,7 @@ public class AggregatedEventHandler extends BaseHandler {
         shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getSimpleCampaignStageNotifier(), notificationManager, task, result);
         shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getSimpleReviewerNotifier(), notificationManager, task, result);
         shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getSimpleTaskNotifier(), notificationManager, task, result);
+        shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getSimpleReportNotifier(), notificationManager, task, result);
         shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getSimplePolicyRuleNotifier(), notificationManager, task, result);
         shouldContinue = shouldContinue && processNotifiers(event, eventHandlerType.getTimeValidityNotifier(), notificationManager, task, result);
 

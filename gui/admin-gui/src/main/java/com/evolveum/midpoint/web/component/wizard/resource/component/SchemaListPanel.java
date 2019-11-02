@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.wizard.resource.component;
@@ -57,7 +48,6 @@ import org.apache.wicket.markup.html.form.CheckBox;
 import org.apache.wicket.markup.html.form.TextField;
 import org.apache.wicket.markup.repeater.Item;
 import org.apache.wicket.markup.repeater.data.DataView;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
@@ -84,8 +74,8 @@ public class SchemaListPanel extends BasePanel<PrismObject<ResourceType>> {
     private static final String ID_CLEAR_SEARCH = "clearSearch";
     private static final String ID_ATTRIBUTE_TABLE = "attributeTable";
     private static final String ID_NAVIGATOR = "objectClassNavigator";
-	private static final String ID_OBJECT_CLASS_INFO_CONTAINER = "objectClassInfoContainer";
-	private static final String ID_OBJECT_CLASS_INFO_COLUMN = "objectClassInfoColumn";
+    private static final String ID_OBJECT_CLASS_INFO_CONTAINER = "objectClassInfoContainer";
+    private static final String ID_OBJECT_CLASS_INFO_COLUMN = "objectClassInfoColumn";
     private static final String ID_DETAILS_PANEL = "detailsPanel";
     private static final String ID_DETAILS_DISPLAY_NAME = "displayName";
     private static final String ID_DETAILS_DESCRIPTION = "description";
@@ -99,37 +89,37 @@ public class SchemaListPanel extends BasePanel<PrismObject<ResourceType>> {
     private static final String ID_T_DEFAULT = "isDefaultTooltip";
 
     @NotNull private final NonEmptyLoadableModel<List<ObjectClassDto>> allClasses;
-	@NotNull private final NonEmptyLoadableModel<ObjectClassDetailsDto> detailsModel;
-	@NotNull private final NonEmptyLoadableModel<List<AttributeDto>> attributeModel;
+    @NotNull private final NonEmptyLoadableModel<ObjectClassDetailsDto> detailsModel;
+    @NotNull private final NonEmptyLoadableModel<List<AttributeDto>> attributeModel;
 
     public SchemaListPanel(String id, IModel<PrismObject<ResourceType>> model, PageResourceWizard parentPage) {
         super(id, model);
 
-		allClasses = new NonEmptyLoadableModel<List<ObjectClassDto>>(false) {
-			@Override @NotNull
-			protected List<ObjectClassDto> load() {
-				return loadAllClasses();
-			}
-		};
-		parentPage.registerDependentModel(allClasses);
+        allClasses = new NonEmptyLoadableModel<List<ObjectClassDto>>(false) {
+            @Override @NotNull
+            protected List<ObjectClassDto> load() {
+                return loadAllClasses();
+            }
+        };
+        parentPage.registerDependentModel(allClasses);
 
-		attributeModel = new NonEmptyLoadableModel<List<AttributeDto>>(false) {
-			@Override @NotNull
-			protected List<AttributeDto> load() {
-				return loadAttributes();
-			}
-		};
-		parentPage.registerDependentModel(attributeModel);
+        attributeModel = new NonEmptyLoadableModel<List<AttributeDto>>(false) {
+            @Override @NotNull
+            protected List<AttributeDto> load() {
+                return loadAttributes();
+            }
+        };
+        parentPage.registerDependentModel(attributeModel);
 
-		detailsModel = new NonEmptyLoadableModel<ObjectClassDetailsDto>(true) {
-			@Override @NotNull
-			protected ObjectClassDetailsDto load() {
-				return loadDetails();
-			}
-		};
-		parentPage.registerDependentModel(detailsModel);
+        detailsModel = new NonEmptyLoadableModel<ObjectClassDetailsDto>(true) {
+            @Override @NotNull
+            protected ObjectClassDetailsDto load() {
+                return loadDetails();
+            }
+        };
+        parentPage.registerDependentModel(detailsModel);
 
-		initLayout();
+        initLayout();
     }
 
     protected void initLayout() {
@@ -165,8 +155,8 @@ public class SchemaListPanel extends BasePanel<PrismObject<ResourceType>> {
 
             @Override
             protected void populateItem(final Item<ObjectClassDto> item) {
-                AjaxLink link = new AjaxLink(ID_CLASS_LINK) {
-
+                AjaxLink<Void> link = new AjaxLink<Void>(ID_CLASS_LINK) {
+                    private static final long serialVersionUID = 1L;
                     @Override
                     public void onClick(AjaxRequestTarget target) {
                         objectClassClickPerformed(target, item.getModelObject());
@@ -177,7 +167,7 @@ public class SchemaListPanel extends BasePanel<PrismObject<ResourceType>> {
                 Label label = new Label(ID_LABEL, new PropertyModel<>(item.getModel(), ObjectClassDto.F_DISPLAY_NAME));
                 link.add(label);
 
-                item.add(AttributeModifier.replace("class", new AbstractReadOnlyModel<Object>() {
+                item.add(AttributeModifier.replace("class", new IModel<Object>() {
                     @Override
                     public Object getObject() {
                         return item.getModelObject().isSelected() ? "success" : null;
@@ -187,28 +177,28 @@ public class SchemaListPanel extends BasePanel<PrismObject<ResourceType>> {
         };
         tableBody.add(objectClassDataView);
 
-		NavigatorPanel objectClassNavigator = new NavigatorPanel(ID_NAVIGATOR, objectClassDataView, true);
-		objectClassNavigator.setOutputMarkupId(true);
-		objectClassNavigator.setOutputMarkupPlaceholderTag(true);
-		add(objectClassNavigator);
+        NavigatorPanel objectClassNavigator = new NavigatorPanel(ID_NAVIGATOR, objectClassDataView, true);
+        objectClassNavigator.setOutputMarkupId(true);
+        objectClassNavigator.setOutputMarkupPlaceholderTag(true);
+        add(objectClassNavigator);
 
-		WebMarkupContainer objectClassInfoContainer = new WebMarkupContainer(ID_OBJECT_CLASS_INFO_CONTAINER);
-		objectClassInfoContainer.setOutputMarkupId(true);
-		add(objectClassInfoContainer);
+        WebMarkupContainer objectClassInfoContainer = new WebMarkupContainer(ID_OBJECT_CLASS_INFO_CONTAINER);
+        objectClassInfoContainer.setOutputMarkupId(true);
+        add(objectClassInfoContainer);
 
-		WebMarkupContainer objectClassInfoColumn = new WebMarkupContainer(ID_OBJECT_CLASS_INFO_COLUMN);
-		objectClassInfoColumn.add(new VisibleEnableBehaviour() {
-			@Override
-			public boolean isVisible() {
-				return getSelectedObjectClass() != null;
-			}
-		});
-		objectClassInfoContainer.add(objectClassInfoColumn);
+        WebMarkupContainer objectClassInfoColumn = new WebMarkupContainer(ID_OBJECT_CLASS_INFO_COLUMN);
+        objectClassInfoColumn.add(new VisibleEnableBehaviour() {
+            @Override
+            public boolean isVisible() {
+                return getSelectedObjectClass() != null;
+            }
+        });
+        objectClassInfoContainer.add(objectClassInfoColumn);
 
-		initDetailsPanel(objectClassInfoColumn);
+        initDetailsPanel(objectClassInfoColumn);
 
-		ListDataProvider<AttributeDto> attributeProvider = new ListDataProvider<>(this, attributeModel, true);
-		attributeProvider.setSort(AttributeDto.F_DISPLAY_ORDER, SortOrder.ASCENDING);
+        ListDataProvider<AttributeDto> attributeProvider = new ListDataProvider<>(this, attributeModel, true);
+        attributeProvider.setSort(AttributeDto.F_DISPLAY_ORDER, SortOrder.ASCENDING);
         BoxedTablePanel<AttributeDto> attributeTable = new BoxedTablePanel<>(ID_ATTRIBUTE_TABLE, attributeProvider, initColumns());
         attributeTable.setOutputMarkupId(true);
         attributeTable.setItemsPerPage(UserProfileStorage.DEFAULT_PAGING_SIZE);
@@ -237,7 +227,7 @@ public class SchemaListPanel extends BasePanel<PrismObject<ResourceType>> {
         Label nativeObjectClass = new Label(ID_DETAILS_NATIVE_OBJECT_CLASS, new PropertyModel<String>(detailsModel, ObjectClassDetailsDto.F_NATIVE_OBJECT_CLASS));
         detailsContainer.add(nativeObjectClass);
 
-        CheckBox isDefault = new CheckBox(ID_DETAILS_DEFAULT, new PropertyModel<Boolean>(detailsModel, ObjectClassDetailsDto.F_IS_DEFAULT));
+        CheckBox isDefault = new CheckBox(ID_DETAILS_DEFAULT, new PropertyModel<>(detailsModel, ObjectClassDetailsDto.F_IS_DEFAULT));
         isDefault.setEnabled(false);
         detailsContainer.add(isDefault);
 
@@ -261,11 +251,11 @@ public class SchemaListPanel extends BasePanel<PrismObject<ResourceType>> {
     private List<IColumn<AttributeDto, String>> initColumns() {
         List<IColumn<AttributeDto, String>> columns = new ArrayList<>();
 
-        columns.add(new PropertyColumn<AttributeDto, String>(createStringResource("SchemaListPanel.name"), AttributeDto.F_NAME, AttributeDto.F_NAME));
-        columns.add(new PropertyColumn<AttributeDto, String>(createStringResource("SchemaListPanel.displayName"), AttributeDto.F_DISPLAY_NAME));
-        columns.add(new PropertyColumn<AttributeDto, String>(createStringResource("SchemaListPanel.nativeAttributeName"), AttributeDto.F_NATIVE_ATTRIBUTE_NAME, AttributeDto.F_NATIVE_ATTRIBUTE_NAME));
-        columns.add(new PropertyColumn<AttributeDto, String>(createStringResource("SchemaListPanel.minMax"), AttributeDto.F_MIN_MAX_OCCURS));
-        columns.add(new PropertyColumn<AttributeDto, String>(createStringResource("SchemaListPanel.displayOrder"), AttributeDto.F_DISPLAY_ORDER, AttributeDto.F_DISPLAY_ORDER));
+        columns.add(new PropertyColumn<>(createStringResource("SchemaListPanel.name"), AttributeDto.F_NAME, AttributeDto.F_NAME));
+        columns.add(new PropertyColumn<>(createStringResource("SchemaListPanel.displayName"), AttributeDto.F_DISPLAY_NAME));
+        columns.add(new PropertyColumn<>(createStringResource("SchemaListPanel.nativeAttributeName"), AttributeDto.F_NATIVE_ATTRIBUTE_NAME, AttributeDto.F_NATIVE_ATTRIBUTE_NAME));
+        columns.add(new PropertyColumn<>(createStringResource("SchemaListPanel.minMax"), AttributeDto.F_MIN_MAX_OCCURS));
+        columns.add(new PropertyColumn<>(createStringResource("SchemaListPanel.displayOrder"), AttributeDto.F_DISPLAY_ORDER, AttributeDto.F_DISPLAY_ORDER));
 
         CheckBoxColumn<AttributeDto> check = new CheckBoxColumn<>(createStringResource("SchemaListPanel.returnedByDefault"), AttributeDto.F_RETURNED_BY_DEFAULT);
         check.setEnabled(false);
@@ -274,7 +264,7 @@ public class SchemaListPanel extends BasePanel<PrismObject<ResourceType>> {
         return columns;
     }
 
-	@SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked")
     private TextField<String> getObjectClassText() {
         return (TextField<String>) get(ID_OBJECT_CLASS);
     }
@@ -293,9 +283,9 @@ public class SchemaListPanel extends BasePanel<PrismObject<ResourceType>> {
 
     private void objectClassClickPerformed(AjaxRequestTarget target, ObjectClassDto dto) {
         for (ObjectClassDto o : allClasses.getObject()) {
-			o.setSelected(false);
+            o.setSelected(false);
         }
-		dto.setSelected(true);
+        dto.setSelected(true);
         attributeModel.reset();
         detailsModel.reset();
         target.add(get(ID_TABLE_BODY), get(ID_OBJECT_CLASS_INFO_CONTAINER));
@@ -304,7 +294,7 @@ public class SchemaListPanel extends BasePanel<PrismObject<ResourceType>> {
     private List<AttributeDto> loadAttributes() {
         List<AttributeDto> list = new ArrayList<>();
 
-		ObjectClassDto selected = getSelectedObjectClass();
+        ObjectClassDto selected = getSelectedObjectClass();
         if (selected == null) {
             return list;
         }
@@ -315,17 +305,17 @@ public class SchemaListPanel extends BasePanel<PrismObject<ResourceType>> {
         return list;
     }
 
-	@Nullable
-	private ObjectClassDto getSelectedObjectClass() {
-		for (ObjectClassDto o : allClasses.getObject()) {
-			if (o.isSelected()) {
-				return o;
-			}
-		}
-		return null;
-	}
+    @Nullable
+    private ObjectClassDto getSelectedObjectClass() {
+        for (ObjectClassDto o : allClasses.getObject()) {
+            if (o.isSelected()) {
+                return o;
+            }
+        }
+        return null;
+    }
 
-	private ObjectClassDetailsDto loadDetails() {
+    private ObjectClassDetailsDto loadDetails() {
         ObjectClassDto selected = getSelectedObjectClass();
         if (selected == null){
             return new ObjectClassDetailsDto(null);

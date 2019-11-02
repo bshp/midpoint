@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2010-2019 Evolveum and contributors
+ *
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
+ */
 package com.evolveum.midpoint.repo.sql.data.factory;
 
 import com.evolveum.midpoint.prism.PrismContext;
@@ -9,6 +15,7 @@ import com.evolveum.midpoint.repo.sql.data.common.other.RCReferenceOwner;
 import com.evolveum.midpoint.repo.sql.data.common.other.RReferenceOwner;
 import com.evolveum.midpoint.repo.sql.util.DtoTranslationException;
 import com.evolveum.midpoint.repo.sql.util.RUtil;
+import com.evolveum.midpoint.schema.RelationRegistry;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.MetadataType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectReferenceType;
 
@@ -52,8 +59,6 @@ public class MetadataFactory {
             if (!refs.isEmpty()) {
                 jaxb.getModifyApproverRef().addAll(refs);
             }
-        } else {
-
         }
 
         return jaxb;
@@ -70,9 +75,22 @@ public class MetadataFactory {
                 && repo.getModifierRef() == null;
     }
 
-    public static void fromJAXB(MetadataType jaxb, Metadata repo, PrismContext prismContext)
+    public static void fromJAXB(MetadataType jaxb, Metadata repo, PrismContext prismContext,
+            RelationRegistry relationRegistry)
             throws DtoTranslationException {
         if (jaxb == null) {
+            repo.setCreateChannel(null);
+            repo.setCreateTimestamp(null);
+
+            repo.setModifyChannel(null);
+            repo.setModifyTimestamp(null);
+
+            repo.setCreatorRef(null);
+            repo.setModifierRef(null);
+
+            repo.getCreateApproverRef().clear();
+            repo.getModifyApproverRef().clear();
+
             return;
         }
 
@@ -81,19 +99,23 @@ public class MetadataFactory {
         repo.setModifyChannel(jaxb.getModifyChannel());
         repo.setModifyTimestamp(jaxb.getModifyTimestamp());
 
-        repo.setCreatorRef(RUtil.jaxbRefToEmbeddedRepoRef(jaxb.getCreatorRef(), prismContext));
-        repo.setModifierRef(RUtil.jaxbRefToEmbeddedRepoRef(jaxb.getModifierRef(), prismContext));
+        repo.setCreatorRef(RUtil.jaxbRefToEmbeddedRepoRef(jaxb.getCreatorRef(), relationRegistry));
+        repo.setModifierRef(RUtil.jaxbRefToEmbeddedRepoRef(jaxb.getModifierRef(), relationRegistry));
 
         if (repo instanceof RObject) {
-            repo.getCreateApproverRef().addAll(RUtil.safeListReferenceToSet(jaxb.getCreateApproverRef(), prismContext,
-                    (RObject) repo, RReferenceOwner.CREATE_APPROVER));
-            repo.getModifyApproverRef().addAll(RUtil.safeListReferenceToSet(jaxb.getModifyApproverRef(), prismContext,
-                    (RObject) repo, RReferenceOwner.MODIFY_APPROVER));
+            repo.getCreateApproverRef().clear();
+            repo.getCreateApproverRef().addAll(RUtil.safeListReferenceToSet(jaxb.getCreateApproverRef(),
+                    (RObject) repo, RReferenceOwner.CREATE_APPROVER, relationRegistry));
+            repo.getModifyApproverRef().clear();
+            repo.getModifyApproverRef().addAll(RUtil.safeListReferenceToSet(jaxb.getModifyApproverRef(),
+                    (RObject) repo, RReferenceOwner.MODIFY_APPROVER, relationRegistry));
         } else {
-            repo.getCreateApproverRef().addAll(safeListReferenceToSet(jaxb.getCreateApproverRef(), prismContext,
-                    (RAssignment) repo, RCReferenceOwner.CREATE_APPROVER));
-            repo.getModifyApproverRef().addAll(safeListReferenceToSet(jaxb.getModifyApproverRef(), prismContext,
-                    (RAssignment) repo, RCReferenceOwner.MODIFY_APPROVER));
+            repo.getCreateApproverRef().clear();
+            repo.getCreateApproverRef().addAll(safeListReferenceToSet(jaxb.getCreateApproverRef(),
+                    (RAssignment) repo, RCReferenceOwner.CREATE_APPROVER, relationRegistry));
+            repo.getModifyApproverRef().clear();
+            repo.getModifyApproverRef().addAll(safeListReferenceToSet(jaxb.getModifyApproverRef(),
+                    (RAssignment) repo, RCReferenceOwner.MODIFY_APPROVER, relationRegistry));
         }
     }
 
@@ -120,15 +142,15 @@ public class MetadataFactory {
         return true;
     }
 
-    public static Set<RAssignmentReference> safeListReferenceToSet(List<ObjectReferenceType> list, PrismContext prismContext,
-                                                                   RAssignment owner, RCReferenceOwner refOwner) {
+    public static Set<RAssignmentReference> safeListReferenceToSet(List<ObjectReferenceType> list,
+            RAssignment owner, RCReferenceOwner refOwner, RelationRegistry relationRegistry) {
         Set<RAssignmentReference> set = new HashSet<>();
         if (list == null || list.isEmpty()) {
             return set;
         }
 
         for (ObjectReferenceType ref : list) {
-            RAssignmentReference rRef = jaxbRefToRepo(ref, prismContext, owner, refOwner);
+            RAssignmentReference rRef = jaxbRefToRepo(ref, owner, refOwner, relationRegistry);
             if (rRef != null) {
                 set.add(rRef);
             }
@@ -136,8 +158,8 @@ public class MetadataFactory {
         return set;
     }
 
-    public static RAssignmentReference jaxbRefToRepo(ObjectReferenceType reference, PrismContext prismContext,
-                                                     RAssignment owner, RCReferenceOwner refOwner) {
+    public static RAssignmentReference jaxbRefToRepo(ObjectReferenceType reference,
+            RAssignment owner, RCReferenceOwner refOwner, RelationRegistry relationRegistry) {
         if (reference == null) {
             return null;
         }
@@ -148,7 +170,7 @@ public class MetadataFactory {
         RAssignmentReference repoRef = new RAssignmentReference();
         repoRef.setReferenceType(refOwner);
         repoRef.setOwner(owner);
-        RAssignmentReference.copyFromJAXB(reference, repoRef);
+        RAssignmentReference.fromJaxb(reference, repoRef, relationRegistry);
 
         return repoRef;
     }

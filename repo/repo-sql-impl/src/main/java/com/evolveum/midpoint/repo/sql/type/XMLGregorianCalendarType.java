@@ -1,23 +1,14 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.type;
 
 import org.hibernate.HibernateException;
-import org.hibernate.engine.spi.SessionImplementor;
+import org.hibernate.engine.spi.SharedSessionContractImplementor;
 import org.hibernate.type.AbstractSingleColumnStandardBasicType;
 import org.hibernate.type.TimestampType;
 import org.hibernate.usertype.UserType;
@@ -85,8 +76,8 @@ public class XMLGregorianCalendarType implements UserType {
     }
 
     @Override
-    public Object nullSafeGet(ResultSet rs, String[] names, SessionImplementor session, Object owner) throws
-            HibernateException, SQLException {
+    public Object nullSafeGet(ResultSet rs, String[] names, SharedSessionContractImplementor session, Object owner)
+            throws HibernateException, SQLException {
         Date date = (Date) HIBERNATE_TYPE.nullSafeGet(rs, names[0], session);
         if (date == null) {
             return null;
@@ -95,8 +86,8 @@ public class XMLGregorianCalendarType implements UserType {
     }
 
     @Override
-    public void nullSafeSet(PreparedStatement st, Object value, int index, SessionImplementor session) throws
-            HibernateException, SQLException {
+    public void nullSafeSet(PreparedStatement st, Object value, int index, SharedSessionContractImplementor session)
+            throws HibernateException, SQLException {
         XMLGregorianCalendar calendar = (XMLGregorianCalendar) value;
         Date date = null;
         if (calendar != null) {
@@ -141,8 +132,8 @@ public class XMLGregorianCalendarType implements UserType {
      *
      * @param date Instance of java.util.Date or a null reference
      * @return XMLGregorianCalendar instance whose value is based upon the
-     *         value in the date parameter. If the date parameter is null then
-     *         this method will simply return null.
+     * value in the date parameter. If the date parameter is null then
+     * this method will simply return null.
      */
     public static XMLGregorianCalendar asXMLGregorianCalendar(java.util.Date date) {
         if (date == null) {
@@ -159,8 +150,8 @@ public class XMLGregorianCalendarType implements UserType {
      *
      * @param xgc Instance of XMLGregorianCalendar or a null reference
      * @return java.util.Date instance whose value is based upon the
-     *         value in the xgc parameter. If the xgc parameter is null then
-     *         this method will simply return null.
+     * value in the xgc parameter. If the xgc parameter is null then
+     * this method will simply return null.
      */
     public static java.util.Date asDate(XMLGregorianCalendar xgc) {
         if (xgc == null) {

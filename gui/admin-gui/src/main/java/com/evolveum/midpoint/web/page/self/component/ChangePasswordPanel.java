@@ -1,23 +1,17 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.page.self.component;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
+import com.evolveum.midpoint.web.page.admin.home.dto.AssignmentItemDto;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.DisplayType;
 import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.ajax.AjaxEventBehavior;
 import org.apache.wicket.ajax.AjaxRequestTarget;
@@ -30,7 +24,6 @@ import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.PasswordTextField;
 import org.apache.wicket.markup.repeater.Item;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
@@ -55,9 +48,9 @@ import com.evolveum.prism.xml.ns._public.types_3.ProtectedStringType;
  * @author Kate Honchar
  */
 public class ChangePasswordPanel extends BasePanel<MyPasswordsDto> {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private static final String ID_PASSWORD_PANEL = "passwordPanel";
+    private static final String ID_PASSWORD_PANEL = "passwordPanel";
     private static final String ID_OLD_PASSWORD_FIELD = "oldPassword";
     private static final String ID_PASSWORD_LABEL = "passwordLabel";
     private static final String ID_OLD_PASSWORD_LABEL = "oldPasswordLabel";
@@ -73,58 +66,64 @@ public class ChangePasswordPanel extends BasePanel<MyPasswordsDto> {
 
     private LoadableModel<MyPasswordsDto> model;
     private boolean midpointAccountSelected = true;
+    private boolean oldPasswordVisible = false;
 
     public ChangePasswordPanel(String id, boolean oldPasswordVisible) {
         super(id);
-        initLayout(oldPasswordVisible);
+        this.oldPasswordVisible = oldPasswordVisible;
     }
 
     public ChangePasswordPanel(String id, boolean oldPasswordVisible, LoadableModel<MyPasswordsDto> model, MyPasswordsDto myPasswordsDto) {
         super(id, model);
-        initLayout(oldPasswordVisible);
+        this.oldPasswordVisible = oldPasswordVisible;
     }
 
-    private void initLayout(final boolean oldPasswordVisible) {
+    @Override
+    protected void onInitialize(){
+        super.onInitialize();
+        initLayout();
+    }
+
+    private void initLayout() {
         model = (LoadableModel<MyPasswordsDto>) getModel();
 
         Label oldPasswordLabel = new Label(ID_OLD_PASSWORD_LABEL, createStringResource("PageSelfCredentials.oldPasswordLabel"));
         add(oldPasswordLabel);
         oldPasswordLabel.add(new VisibleEnableBehaviour() {
 
-        	private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
-			@Override
-        	public boolean isVisible() {
-        		return oldPasswordVisible;
-        	}
+            @Override
+            public boolean isVisible() {
+                return oldPasswordVisible;
+            }
         });
 
         Label passwordLabel = new Label(ID_PASSWORD_LABEL, createStringResource("PageSelfCredentials.passwordLabel1"));
         add(passwordLabel);
 
         PasswordTextField oldPasswordField =
-                new PasswordTextField(ID_OLD_PASSWORD_FIELD, new PropertyModel<String>(model, MyPasswordsDto.F_OLD_PASSWORD));
+                new PasswordTextField(ID_OLD_PASSWORD_FIELD, new PropertyModel<>(model, MyPasswordsDto.F_OLD_PASSWORD));
         oldPasswordField.setRequired(false);
-        oldPasswordField.setResetPassword(false);
         add(oldPasswordField);
         oldPasswordField.add(new VisibleEnableBehaviour() {
 
-        	private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
-        	public boolean isVisible() {
-        		return oldPasswordVisible;
-        	};
+            public boolean isVisible() {
+                return oldPasswordVisible;
+            };
         });
 
-        PasswordPanel passwordPanel = new PasswordPanel(ID_PASSWORD_PANEL, new PropertyModel<ProtectedStringType>(model, MyPasswordsDto.F_PASSWORD));
+        PasswordPanel passwordPanel = new PasswordPanel(ID_PASSWORD_PANEL, new PropertyModel<>(model, MyPasswordsDto.F_PASSWORD));
         passwordPanel.getBaseFormComponent().add(new AttributeModifier("autofocus", ""));
         add(passwordPanel);
 
         WebMarkupContainer accountContainer = new WebMarkupContainer(ID_ACCOUNTS_CONTAINER);
 
         List<IColumn<PasswordAccountDto, String>> columns = initColumns();
-        ListDataProvider<PasswordAccountDto> provider = new ListDataProvider<PasswordAccountDto>(this,
-                new PropertyModel<List<PasswordAccountDto>>(model, MyPasswordsDto.F_ACCOUNTS));
+        ListDataProvider<PasswordAccountDto> provider = new ListDataProvider<>(this,
+            new PropertyModel<>(model, MyPasswordsDto.F_ACCOUNTS));
         TablePanel accounts = new TablePanel(ID_ACCOUNTS_TABLE, provider, columns);
         accounts.setItemsPerPage(30);
         accounts.setShowPaging(false);
@@ -134,59 +133,57 @@ public class ChangePasswordPanel extends BasePanel<MyPasswordsDto> {
         }
         accountContainer.add(accounts);
 
-        AjaxLink help = new AjaxLink(ID_BUTTON_HELP) {
-        	private static final long serialVersionUID = 1L;
+        AjaxLink<Void> help = new AjaxLink<Void>(ID_BUTTON_HELP) {
+
+            private static final long serialVersionUID = 1L;
 
             @Override
             public void onClick(AjaxRequestTarget target) {
                 showHelpPerformed(target);
             }
+
+
         };
+
         accountContainer.add(help);
 
         add(accountContainer);
     }
 
     private List<IColumn<PasswordAccountDto, String>> initColumns() {
-        List<IColumn<PasswordAccountDto, String>> columns = new ArrayList<IColumn<PasswordAccountDto, String>>();
+        List<IColumn<PasswordAccountDto, String>> columns = new ArrayList<>();
 
-        IColumn column = new IconColumn<PasswordAccountDto>(new Model<String>()) {
-        	private static final long serialVersionUID = 1L;
+        IColumn column = new IconColumn<PasswordAccountDto>(new Model<>()) {
+            private static final long serialVersionUID = 1L;
 
             @Override
-            protected IModel<String> createIconModel(final IModel<PasswordAccountDto> rowModel) {
-                return new AbstractReadOnlyModel<String>() {
-                	private static final long serialVersionUID = 1L;
-
-                    @Override
-                    public String getObject() {
-                        PasswordAccountDto item = rowModel.getObject();
-                        if (item.getCssClass() == null || item.getCssClass().trim().equals("")) {
-                            if (item.isMidpoint()) {
-                                item.setCssClass(SELECTED_ACCOUNT_ICON_CSS);
-                            } else if (!item.isPasswordCapabilityEnabled()){
-                            	item.setCssClass(NO_CAPABILITY_ICON_CSS);
-                            } else if (item.isPasswordOutbound()) {
-                                item.setCssClass(PROPAGATED_ACCOUNT_ICON_CSS);
-                            } else {
-                                item.setCssClass(DESELECTED_ACCOUNT_ICON_CSS);
-                            }
-                        }
-                        return item.getCssClass();
+            protected DisplayType getIconDisplayType(IModel<PasswordAccountDto> rowModel) {
+                PasswordAccountDto item = rowModel.getObject();
+                if (item.getCssClass() == null || item.getCssClass().trim().equals("")) {
+                    if (item.isMidpoint()) {
+                        item.setCssClass(SELECTED_ACCOUNT_ICON_CSS);
+                    } else if (!item.isPasswordCapabilityEnabled()){
+                        item.setCssClass(NO_CAPABILITY_ICON_CSS);
+                    } else if (item.isPasswordOutbound()) {
+                        item.setCssClass(PROPAGATED_ACCOUNT_ICON_CSS);
+                    } else {
+                        item.setCssClass(DESELECTED_ACCOUNT_ICON_CSS);
                     }
-                };
+                }
+                return WebComponentUtil.createDisplayType(item.getCssClass());
+
             }
 
             @Override
             public void populateItem(Item<ICellPopulator<PasswordAccountDto>> item, String componentId,
                                      final IModel<PasswordAccountDto> rowModel) {
                 super.populateItem(item, componentId, rowModel);
-                final ImagePanel imagePanel = (ImagePanel) item.get(0);
+                final ImagePanel imagePanel = (ImagePanel) item.get(componentId);
 
                 final PasswordAccountDto passwordAccountDto = rowModel.getObject();
 
                 imagePanel.add(new AjaxEventBehavior("click") {
-                	private static final long serialVersionUID = 1L;
+                    private static final long serialVersionUID = 1L;
 
                                    protected void onEvent(final AjaxRequestTarget target) {
                                        if (!passwordAccountDto.isMidpoint()) {
@@ -201,7 +198,7 @@ public class ChangePasswordPanel extends BasePanel<MyPasswordsDto> {
                                            } else if (passwordAccountDto.getCssClass().equals(DESELECTED_ACCOUNT_ICON_CSS)) {
                                                passwordAccountDto.setCssClass(SELECTED_ACCOUNT_ICON_CSS);
                                            }
-                                           target.add(imagePanel);
+                                           target.add(imagePanel.findParent(SelectableDataTable.class));
                                        } else {
                                            midpointAccountSelected = !midpointAccountSelected;
                                            if (passwordAccountDto.getCssClass().equals(SELECTED_ACCOUNT_ICON_CSS)) {
@@ -220,25 +217,25 @@ public class ChangePasswordPanel extends BasePanel<MyPasswordsDto> {
 
                 imagePanel.add(new VisibleEnableBehaviour() {
 
-                	private static final long serialVersionUID = 1L;
+                    private static final long serialVersionUID = 1L;
 
-					@Override
-                	public boolean isEnabled() {
-                		return passwordAccountDto.getCssClass() != NO_CAPABILITY_ICON_CSS;
-                	}
+                    @Override
+                    public boolean isEnabled() {
+                        return !passwordAccountDto.getCssClass().equals(NO_CAPABILITY_ICON_CSS);
+                    }
                 });
             }
         };
         columns.add(column);
 
         columns.add(new AbstractColumn<PasswordAccountDto, String>(createStringResource("ChangePasswordPanel.name")) {
-        	private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
             @Override
             public void populateItem(Item<ICellPopulator<PasswordAccountDto>> item, String componentId,
                                      final IModel<PasswordAccountDto> rowModel) {
-                item.add(new Label(componentId, new AbstractReadOnlyModel<Object>() {
-                	private static final long serialVersionUID = 1L;
+                item.add(new Label(componentId, new IModel<Object>() {
+                    private static final long serialVersionUID = 1L;
 
                     @Override
                     public Object getObject() {
@@ -271,7 +268,9 @@ public class ChangePasswordPanel extends BasePanel<MyPasswordsDto> {
     }
 
     private void showHelpPerformed(AjaxRequestTarget target){
-        getPageBase().showMainPopup(new HelpInfoPanel(getPageBase().getMainPopupBodyId(), "ChangePasswordPanel.helpInfo") {
+        getPageBase().showMainPopup(new HelpInfoPanel(getPageBase().getMainPopupBodyId(),
+                createStringResource("ChangePasswordPanel.helpInfo",
+                        WebComponentUtil.getMidpointCustomSystemName(getPageBase(), "midpoint.default.system.name"))) {
             @Override
             protected void closePerformed(AjaxRequestTarget target) {
                 getPageBase().hideMainPopup(target);

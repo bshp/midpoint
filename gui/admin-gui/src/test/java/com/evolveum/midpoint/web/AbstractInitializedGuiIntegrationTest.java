@@ -1,24 +1,16 @@
 /**
- * Copyright (c) 2016 Evolveum
+ * Copyright (c) 2016 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web;
 
 import static org.testng.AssertJUnit.assertNotNull;
-import static com.evolveum.midpoint.test.IntegrationTestTools.display;
+
 import static com.evolveum.midpoint.web.AdminGuiTestConstants.*;
 
+import com.evolveum.midpoint.prism.path.ItemName;
 import org.testng.annotations.Test;
 
 import com.evolveum.icf.dummy.resource.DummyResource;
@@ -26,10 +18,10 @@ import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.test.DummyResourceContoller;
-import com.evolveum.midpoint.test.IntegrationTestTools;
 import com.evolveum.midpoint.test.util.TestUtil;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.OrgType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ResourceType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 
@@ -39,67 +31,70 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
  */
 public abstract class AbstractInitializedGuiIntegrationTest extends AbstractGuiIntegrationTest {
 
-	private static final Trace LOGGER = TraceManager.getTrace(AbstractInitializedGuiIntegrationTest.class);
+    private static final Trace LOGGER = TraceManager.getTrace(AbstractInitializedGuiIntegrationTest.class);
 
-	protected DummyResource dummyResource;
-	protected DummyResourceContoller dummyResourceCtl;
-	protected ResourceType resourceDummyType;
-	protected PrismObject<ResourceType> resourceDummy;
+//    protected final static String PIRACY_NS = "http://midpoint.evolveum.com/xml/ns/samples/piracy";
+//    protected final static ItemName PIRACY_WEAPON = new ItemName(PIRACY_NS, "weapon");
 
-	protected PrismObject<UserType> userAdministrator;
-	protected String accountJackOid;
 
-	/* (non-Javadoc)
-	 * @see com.evolveum.midpoint.test.AbstractIntegrationTest#initSystem(com.evolveum.midpoint.task.api.Task, com.evolveum.midpoint.schema.result.OperationResult)
-	 */
-	@Override
-	public void initSystem(Task initTask, OperationResult initResult) throws Exception {
-		LOGGER.trace("initSystem");
-		super.initSystem(initTask, initResult);
+    protected DummyResource dummyResource;
+    protected DummyResourceContoller dummyResourceCtl;
+    protected ResourceType resourceDummyType;
+    protected PrismObject<ResourceType> resourceDummy;
 
-		modelService.postInit(initResult);
-		userAdministrator = repositoryService.getObject(UserType.class, USER_ADMINISTRATOR_OID, null, initResult);
-		login(userAdministrator);
+    protected PrismObject<UserType> userAdministrator;
+    protected String accountJackOid;
 
-		dummyResourceCtl = DummyResourceContoller.create(null);
-		dummyResourceCtl.extendSchemaPirate();
-		dummyResource = dummyResourceCtl.getDummyResource();
-		resourceDummy = importAndGetObjectFromFile(ResourceType.class, RESOURCE_DUMMY_FILE, RESOURCE_DUMMY_OID, initTask, initResult);
-		resourceDummyType = resourceDummy.asObjectable();
-		dummyResourceCtl.setResource(resourceDummy);
+    @Override
+    public void initSystem(Task initTask, OperationResult initResult) throws Exception {
+        LOGGER.trace("initSystem");
+        super.initSystem(initTask, initResult);
 
-		repoAddObjectFromFile(USER_JACK_FILE, true, initResult);
-		repoAddObjectFromFile(USER_EMPTY_FILE, true, initResult);
+        modelService.postInit(initResult);
+        userAdministrator = repositoryService.getObject(UserType.class, USER_ADMINISTRATOR_OID, null, initResult);
+        login(userAdministrator);
 
-		importObjectFromFile(ROLE_MAPMAKER_FILE);
-	}
+        dummyResourceCtl = DummyResourceContoller.create(null);
+        dummyResourceCtl.extendSchemaPirate();
+        dummyResource = dummyResourceCtl.getDummyResource();
+        resourceDummy = importAndGetObjectFromFile(ResourceType.class, RESOURCE_DUMMY_FILE, RESOURCE_DUMMY_OID, initTask, initResult);
+        resourceDummyType = resourceDummy.asObjectable();
+        dummyResourceCtl.setResource(resourceDummy);
 
-	@Test
-	public void test000PreparationAndSanity() throws Exception {
-		final String TEST_NAME = "test100GetResourceDummy";
-        TestUtil.displayTestTitle(this, TEST_NAME);
+        repoAddObjectFromFile(USER_JACK_FILE, true, initResult);
+        repoAddObjectFromFile(USER_EMPTY_FILE, true, initResult);
+
+        importObjectFromFile(ROLE_MAPMAKER_FILE);
+
+        repoAddObjectsFromFile(ORG_MONKEY_ISLAND_FILE, OrgType.class, initResult);
+    }
+
+    @Test
+    public void test000PreparationAndSanity() throws Exception {
+        final String TEST_NAME = "test000PreparationAndSanity";
+        displayTestTitle(TEST_NAME);
 
         // GIVEN
-        Task task = taskManager.createTaskInstance(AbstractInitializedGuiIntegrationTest.class.getName() + "." + TEST_NAME);
+        Task task = createTask(TEST_NAME);
         OperationResult result = task.getResult();
 
         assertNotNull("No model service", modelService);
 
         // WHEN
         TestUtil.displayWhen(TEST_NAME);
-		assignAccount(USER_JACK_OID, RESOURCE_DUMMY_OID, null, task, result);
+        assignAccountToUser(USER_JACK_OID, RESOURCE_DUMMY_OID, null, task, result);
 
-		// THEN
-		TestUtil.displayThen(TEST_NAME);
-		result.computeStatus();
-		IntegrationTestTools.display(result);
-		TestUtil.assertSuccess(result);
+        // THEN
+        TestUtil.displayThen(TEST_NAME);
+        result.computeStatus();
+        display(result);
+        TestUtil.assertSuccess(result);
 
-		PrismObject<UserType> userJack = getUser(USER_JACK_OID);
-		display("User after change execution", userJack);
-		assertUserJack(userJack);
+        PrismObject<UserType> userJack = getUser(USER_JACK_OID);
+        display("User after change execution", userJack);
+        assertUserJack(userJack);
         accountJackOid = getSingleLinkOid(userJack);
 
-	}
+    }
 
 }

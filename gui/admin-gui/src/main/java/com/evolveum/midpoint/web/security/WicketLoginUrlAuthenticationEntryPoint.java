@@ -1,22 +1,12 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.security;
 
-import org.apache.wicket.request.http.WebRequest;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 
@@ -38,7 +28,7 @@ public class WicketLoginUrlAuthenticationEntryPoint extends LoginUrlAuthenticati
     public void commence(HttpServletRequest request, HttpServletResponse response,
                          AuthenticationException authException) throws IOException, ServletException {
 
-        if (!isWicketAjaxRequest(request)) {
+        if (!WicketRedirectStrategy.isWicketAjaxRequest(request)) {
             super.commence(request, response, authException);
 
             return;
@@ -48,19 +38,5 @@ public class WicketLoginUrlAuthenticationEntryPoint extends LoginUrlAuthenticati
 
         WicketRedirectStrategy strategy = new WicketRedirectStrategy();
         strategy.sendRedirect(request, response, url);
-    }
-
-    private boolean isWicketAjaxRequest(HttpServletRequest request) {
-        String value = request.getParameter(WebRequest.PARAM_AJAX);
-        if (value != null && "true".equals(value)) {
-            return true;
-        }
-
-        value = request.getHeader(WebRequest.HEADER_AJAX);
-        if (value != null && "true".equals(value)) {
-            return true;
-        }
-
-        return false;
     }
 }

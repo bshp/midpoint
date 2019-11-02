@@ -1,94 +1,64 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.roles;
 
-import com.evolveum.midpoint.gui.api.GuiStyleConstants;
-import com.evolveum.midpoint.gui.api.component.MainObjectListPanel;
 import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
-import com.evolveum.midpoint.gui.api.util.WebModelServiceUtils;
-import com.evolveum.midpoint.prism.PrismObject;
-import com.evolveum.midpoint.prism.query.ObjectQuery;
-import com.evolveum.midpoint.prism.query.builder.QueryBuilder;
-import com.evolveum.midpoint.schema.result.OperationResult;
-import com.evolveum.midpoint.schema.util.ObjectTypeUtil;
+import com.evolveum.midpoint.model.api.authentication.CompiledObjectCollectionView;
 import com.evolveum.midpoint.security.api.AuthorizationConstants;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.application.AuthorizationAction;
 import com.evolveum.midpoint.web.application.PageDescriptor;
 import com.evolveum.midpoint.web.component.data.column.ColumnMenuAction;
-import com.evolveum.midpoint.web.component.data.column.InlineMenuButtonColumn;
-import com.evolveum.midpoint.web.component.data.column.InlineMenuHeaderColumn;
+import com.evolveum.midpoint.web.component.data.column.ColumnUtils;
 import com.evolveum.midpoint.web.component.menu.cog.InlineMenuItem;
 import com.evolveum.midpoint.web.component.search.Search;
-import com.evolveum.midpoint.web.component.util.FocusListComponent;
 import com.evolveum.midpoint.web.component.util.FocusListInlineMenuHelper;
 import com.evolveum.midpoint.web.component.util.SelectableBean;
-import com.evolveum.midpoint.web.session.UserProfileStorage.TableId;
+import com.evolveum.midpoint.web.page.admin.PageAdminObjectList;
+import com.evolveum.midpoint.web.session.UserProfileStorage;
 import com.evolveum.midpoint.web.util.OnePageParameterEncoder;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
-import org.apache.wicket.behavior.AttributeAppender;
-import org.apache.wicket.extensions.markup.html.repeater.data.grid.ICellPopulator;
 import org.apache.wicket.extensions.markup.html.repeater.data.table.IColumn;
-import org.apache.wicket.extensions.markup.html.repeater.data.table.PropertyColumn;
-import org.apache.wicket.markup.html.basic.Label;
-import org.apache.wicket.markup.html.form.Form;
-import org.apache.wicket.markup.repeater.Item;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.request.mapper.parameter.PageParameters;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
  * @author lazyman
  */
 @PageDescriptor(url = "/admin/roles", action = {
-        @AuthorizationAction(actionUri = PageAdminRoles.AUTH_ROLE_ALL,
-                label = PageAdminRoles.AUTH_ROLE_ALL_LABEL,
-                description = PageAdminRoles.AUTH_ROLE_ALL_DESCRIPTION),
+        @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_ROLES_ALL_URL,
+                label = "PageAdminRoles.auth.roleAll.label",
+                description = "PageAdminRoles.auth.roleAll.description"),
         @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_ROLES_URL,
                 label = "PageRoles.auth.roles.label",
-                description = "PageRoles.auth.roles.description")})
-public class PageRoles extends PageAdminRoles implements FocusListComponent {
+                description = "PageRoles.auth.roles.description"),
+        @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_ROLES_VIEW_URL,
+                label = "PageRoles.auth.roles.view.label",
+                description = "PageRoles.auth.roles.view.description")})
+public class PageRoles extends PageAdminObjectList<RoleType> {
 
     private static final Trace LOGGER = TraceManager.getTrace(PageRoles.class);
     private static final String DOT_CLASS = PageRoles.class.getName() + ".";
-
-    private static final String ID_TABLE = "table";
-    private static final String ID_MAIN_FORM = "mainForm";
 
     private static final String OPERATION_SEARCH_MEMBERS = DOT_CLASS + "searchMembers";
 
     private IModel<Search> searchModel;
 
     public PageRoles() {
-        this(false);
+        super();
     }
 
-    public PageRoles(boolean clearPagingInSession) {
-        initLayout();
-    }
-
-	private final FocusListInlineMenuHelper<RoleType> listInlineMenuHelper = new FocusListInlineMenuHelper<RoleType>(RoleType.class, this, this){
+    private final FocusListInlineMenuHelper<RoleType> listInlineMenuHelper = new FocusListInlineMenuHelper<RoleType>(RoleType.class, this, this){
         private static final long serialVersionUID = 1L;
 
         protected boolean isShowConfirmationDialog(ColumnMenuAction action){
@@ -101,79 +71,24 @@ public class PageRoles extends PageAdminRoles implements FocusListComponent {
 
     };
 
-    private void initLayout() {
-        Form mainForm = new Form(ID_MAIN_FORM);
-        add(mainForm);
-
-        MainObjectListPanel<RoleType> roleListPanel = new MainObjectListPanel<RoleType>(ID_TABLE, RoleType.class, TableId.TABLE_ROLES, null, this) {
-            private static final long serialVersionUID = 1L;
-
-			@Override
-			protected List<InlineMenuItem> createInlineMenu() {
-				return listInlineMenuHelper.createRowActions(false);
-			}
-
-			@Override
-			protected List<IColumn<SelectableBean<RoleType>, String>> createColumns() {
-				return PageRoles.this.initColumns();
-			}
-
-            @Override
-            protected PrismObject<RoleType> getNewObjectListObject(){
-                return (new RoleType()).asPrismObject();
-            }
-
-            @Override
-            protected IColumn<SelectableBean<RoleType>, String> createActionsColumn() {
-                return PageRoles.this.createActionsColumn();
-            }
-
-            @Override
-            protected void objectDetailsPerformed(AjaxRequestTarget target, RoleType object) {
-                PageRoles.this.roleDetailsPerformed(target, object.getOid());
-                ;
-            }
-
-            @Override
-			protected void newObjectPerformed(AjaxRequestTarget target) {
-				navigateToNext(PageRole.class);
-			}
-		};
-		roleListPanel.setOutputMarkupId(true);
-		roleListPanel.setAdditionalBoxCssClasses(GuiStyleConstants.CLASS_OBJECT_ROLE_BOX_CSS_CLASSES);
-		mainForm.add(roleListPanel);
+    @Override
+    protected List<InlineMenuItem> createRowActions() {
+        return listInlineMenuHelper.createRowActions();
     }
 
-    private List<IColumn<SelectableBean<RoleType>, String>> initColumns() {
-        List<IColumn<SelectableBean<RoleType>, String>> columns = new ArrayList<>();
-
-        IColumn column = new PropertyColumn<SelectableBean<RoleType>, String>(createStringResource("OrgType.displayName"), "value.displayName");        columns.add(column);
-
-        column = new PropertyColumn(createStringResource("OrgType.identifier"), "value.identifier");
-        columns.add(column);
-
-        column = new PropertyColumn(createStringResource("ObjectType.description"), "value.description");
-        columns.add(column);
-
-        return columns;
+    @Override
+    protected List<IColumn<SelectableBean<RoleType>, String>> initColumns() {
+        return ColumnUtils.getDefaultRoleColumns();
     }
 
-    private IColumn<SelectableBean<RoleType>, String> createActionsColumn() {
-        return new InlineMenuButtonColumn<SelectableBean<RoleType>>(listInlineMenuHelper.createRowActions(false), 3, PageRoles.this){
-            @Override
-            protected int getHeaderNumberOfButtons() {
-                return 2;
-            }
-
-            @Override
-            protected List<InlineMenuItem> getHeaderMenuItems() {
-                return listInlineMenuHelper.createRowActions(true);
-            }
-        };
+    @Override
+    protected void objectDetailsPerformed(AjaxRequestTarget target, RoleType object) {
+        PageRoles.this.roleDetailsPerformed(target, object.getOid());
     }
 
-        private MainObjectListPanel<RoleType> getRoleTable() {
-        return (MainObjectListPanel<RoleType>) get(createComponentPath(ID_MAIN_FORM, ID_TABLE));
+    @Override
+    protected Class<RoleType> getType(){
+        return RoleType.class;
     }
 
     private void roleDetailsPerformed(AjaxRequestTarget target, String oid) {
@@ -182,21 +97,18 @@ public class PageRoles extends PageAdminRoles implements FocusListComponent {
         navigateToNext(PageRole.class, parameters);
     }
 
-	@Override
-	public MainObjectListPanel<RoleType> getObjectListPanel() {
-		return (MainObjectListPanel<RoleType>) get(createComponentPath(ID_MAIN_FORM, ID_TABLE));
-	}
-
+    @Override
+    protected UserProfileStorage.TableId getTableId(){
+        return UserProfileStorage.TableId.TABLE_ROLES;
+    }
 
     private IModel<String> getConfirmationMessageModel(ColumnMenuAction action, String actionName){
-    	return WebComponentUtil.createAbstractRoleConfirmationMessage(actionName, action, getRoleTable(), this);
+        return WebComponentUtil.createAbstractRoleConfirmationMessage(actionName, action, getObjectListPanel(), this);
 
     }
 
-
-
     private boolean isShowConfirmationDialog(ColumnMenuAction action){
         return action.getRowModel() != null ||
-                getRoleTable().getSelectedObjectsCount() > 0;
+                getObjectListPanel().getSelectedObjectsCount() > 0;
     }
 }

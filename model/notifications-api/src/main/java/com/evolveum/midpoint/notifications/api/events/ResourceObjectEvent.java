@@ -1,24 +1,13 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.notifications.api.events;
 
 import com.evolveum.midpoint.notifications.api.OperationStatus;
-import com.evolveum.midpoint.prism.PrismContainer;
-import com.evolveum.midpoint.prism.PrismContainerValue;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.delta.ChangeType;
 import com.evolveum.midpoint.prism.delta.ObjectDelta;
@@ -110,9 +99,9 @@ public class ResourceObjectEvent extends BaseEvent {
     }
 
     public ShadowType getShadow() {
-		PrismObject<? extends ShadowType> shadow = accountOperationDescription.getCurrentShadow();
-		return shadow != null ? shadow.asObjectable() : null;
-	}
+        PrismObject<? extends ShadowType> shadow = accountOperationDescription.getCurrentShadow();
+        return shadow != null ? shadow.asObjectable() : null;
+    }
 
     public boolean isShadowIntent(String intent) {
         if (StringUtils.isNotEmpty(intent)) {
@@ -153,40 +142,40 @@ public class ResourceObjectEvent extends BaseEvent {
                 '}';
     }
 
-	public String getShadowName() {
-		return getNotificationFunctions().getShadowName(getAccountOperationDescription().getCurrentShadow());
-	}
+    public String getShadowName() {
+        return getNotificationFunctions().getShadowName(getAccountOperationDescription().getCurrentShadow());
+    }
 
-	public PolyStringType getResourceName() {
-		return getAccountOperationDescription().getResource().asObjectable().getName();
-	}
+    public PolyStringType getResourceName() {
+        return getAccountOperationDescription().getResource().asObjectable().getName();
+    }
 
-	public String getResourceOid() {
-		return getAccountOperationDescription().getResource().getOid();
-	}
+    public String getResourceOid() {
+        return getAccountOperationDescription().getResource().getOid();
+    }
 
-	public String getPlaintextPassword() {
-		ObjectDelta delta = getAccountOperationDescription().getObjectDelta();
-		return delta != null ? getNotificationFunctions().getPlaintextPasswordFromDelta(delta) : null;
-	}
+    public String getPlaintextPassword() {
+        ObjectDelta delta = getAccountOperationDescription().getObjectDelta();
+        return delta != null ? getNotificationFunctions().getPlaintextPasswordFromDelta(delta) : null;
+    }
 
-	public String getContentAsFormattedList() {
-		return getContentAsFormattedList(false, false);
-	}
+    public String getContentAsFormattedList() {
+        return getContentAsFormattedList(false, false);
+    }
 
-	public String getContentAsFormattedList(boolean showSynchronizationItems, boolean showAuxiliaryAttributes) {
-		return getNotificationFunctions().getContentAsFormattedList(this, showSynchronizationItems, showAuxiliaryAttributes);
-	}
+    public String getContentAsFormattedList(boolean showSynchronizationItems, boolean showAuxiliaryAttributes) {
+        return getNotificationFunctions().getContentAsFormattedList(this, showSynchronizationItems, showAuxiliaryAttributes);
+    }
 
-	@Override
-	public String debugDump(int indent) {
-		StringBuilder sb = DebugUtil.createTitleStringBuilderLn(this.getClass(), indent);
-		debugDumpCommon(sb, indent);
-		DebugUtil.debugDumpWithLabelToStringLn(sb, "operationStatus", operationStatus, indent + 1);
-		DebugUtil.debugDumpWithLabelLn(sb, "accountOperationDescription", accountOperationDescription, indent + 1);
-		DebugUtil.debugDumpWithLabelToStringLn(sb, "changeType", changeType, indent + 1);
-		DebugUtil.debugDumpWithLabelLn(sb, "activationRequested", activationRequested, indent + 1);
-		DebugUtil.debugDumpWithLabelLn(sb, "deactivationRequested", deactivationRequested, indent + 1);
-		return sb.toString();
-	}
+    @Override
+    public String debugDump(int indent) {
+        StringBuilder sb = DebugUtil.createTitleStringBuilderLn(this.getClass(), indent);
+        debugDumpCommon(sb, indent);
+        DebugUtil.debugDumpWithLabelToStringLn(sb, "operationStatus", operationStatus, indent + 1);
+        DebugUtil.debugDumpWithLabelLn(sb, "accountOperationDescription", accountOperationDescription, indent + 1);
+        DebugUtil.debugDumpWithLabelToStringLn(sb, "changeType", changeType, indent + 1);
+        DebugUtil.debugDumpWithLabelLn(sb, "activationRequested", activationRequested, indent + 1);
+        DebugUtil.debugDumpWithLabelLn(sb, "deactivationRequested", deactivationRequested, indent + 1);
+        return sb.toString();
+    }
 }

@@ -48,6 +48,7 @@ body.custom-hold-transition {
 		float:left;
 		padding-left: 10px;
 		vertical-align: middle;
+		max-height: 50px;
 	}
   }
 
@@ -92,6 +93,8 @@ div.form-inline > div.form-group {
 li.dropdown.user.user-menu {
   & > ul.dropdown-menu {
     border-color: #367fa9;
+    right: 0;
+    left: auto;
 
     & > li.user-footer {
       border-color: #367fa9;
@@ -117,16 +120,26 @@ th.cog, td.cog {
 }
 
 .sidebar-menu .treeview-menu > li > span > .fa,
+.sidebar-menu .treeview-menu > li > span > .fe,
 .sidebar-menu .treeview-menu > li > span > .glyphicon,
 .sidebar-menu .treeview-menu > li > span > .ion {
   width: 20px;
+}
+
+.sidebar-menu > .header {
+	// white-space: wrap is problematic in firefox, it wraps expand/collapse icon on next line
+	white-space: normal !important;
+}
+
+.sidebar-menu > li > a > .fe {
+	width: 20px;
 }
 
 .sidebar-form, .sidebar-menu > li.header {
 	padding: 10px 20px 10px 15px;
 	text-transform: uppercase;
 
-	& i.fa {
+	& i.fa, & i.fe {
 		margin-top: 2px;
 	}
 }
@@ -279,6 +292,11 @@ body .treeview-menu > li > span:hover {
 	color: #fff !important;
 }
 
+.object-task-bg-gray {
+	background-color: #646464 !important;
+	color: #fff !important;
+}
+
 .object-shadow-bg {
 	background-color: @object-shadow-color !important;
 	color: #fff !important;
@@ -287,6 +305,24 @@ body .treeview-menu > li > span:hover {
 .object-disabled-bg {
 	background-color: @object-disabled-color !important;
 	color: #fff !important;
+}
+
+.object-access-bg {
+	background-color: @object-access-color !important;
+	color: #fff !important;
+}
+
+.object-failed-bg {
+	background-color: @object-failed-color !important;
+	color: #fff !important;
+}
+
+.object-access-only-bg {
+	background-color: @object-access-color !important;
+}
+
+.object-failed-only-bg {
+	background-color: @object-failed-color !important;
 }
 
 // Colored boxes for each object type
@@ -431,6 +467,32 @@ body .treeview-menu > li > span:hover {
 	#info-box-icon-summary-panel(@object-shadow-color);
 }
 
+// other info box enhancements (e.g. role assignment)
+
+.info-box-ethereal {
+	// "lighter" info box, without the border or any heavy decorations
+    box-shadow: none;
+    border: none;
+}
+
+.info-box-icon-ethereal {
+	background-color: transparent;
+}
+
+.info-box-icon-ethereal-image {
+	font-size: 56px;
+}
+
+.info-box-description {
+    display: block;
+    font-weight: normal;
+    font-size: 14px;
+}
+
+.relation-label {
+	
+}
+
 // End-user home (PageSelfDashboard)
 
 .quicksearch-panel {
@@ -470,7 +532,13 @@ body .treeview-menu > li > span:hover {
 	&.without-box-header-top-border {
 		border-top: 0px;
 	}
+	
+	table {
+		// prohibit overflow of the table beyond the bounding box
+		table-layout: fixed;
+	}
 }
+
 
 .boxed-table-footer-button-toolbar {
 	display: inline-block;
@@ -605,6 +673,10 @@ body .treeview-menu > li > span:hover {
 	& .box-header .box-title {
 		font-size: 14px;
 	}
+
+	& .box-header {
+		border-radius: 0 3px 3px 0;
+	}
 }
 
 .summary-panel-display-name {
@@ -614,6 +686,18 @@ body .treeview-menu > li > span:hover {
     display: inline;
     max-width: 800px;
   }
+
+.summary-panel-navigation-button {
+	display: inline;
+	margin-left: 10px;
+	color: @text-dimmed-color;
+}
+
+.summary-panel-navigation-button:hover {
+	display: inline;
+	margin-left: 10px;
+	color: @text-dark-dimmed-color;
+}
 
 .summary-panel-identifier {
 	white-space: pre-wrap;
@@ -688,7 +772,7 @@ body .treeview-menu > li > span:hover {
 }
 
 .navbar-ajax {
-	display: inline-block;
+	float: left;
 
 	& #ajax_busy {
 		margin-top: 12px;
@@ -718,7 +802,7 @@ body .treeview-menu > li > span:hover {
     text-decoration: none;
     display: inline-block;
 
-    > .fa, > .glyphicon, > .ion {
+    > .fa, > .glyphicon, > .ion, > .fe {
       margin-right: 5px;
     }
   }
@@ -753,16 +837,56 @@ body .treeview-menu > li > span:hover {
 	}
 }
 
+.prism-multivalue-container {
+    margin-left: 15px; // aligning multivalue container with superior container
+}
+
+.top-level-prism-container {
+	border-top: 1px solid #ddd;
+	padding-top: 5px;
+}
+
+.multivalue-container > .container-wrapper > div {
+	padding-left: 40px;
+}
+
+//top-level-prism-container is class for first showed container
+.top-level-prism-container > .container-wrapper > div > div > 
+.prism-properties > .prism-containers {
+  	padding-left: 0px; //align one-level containers
+}
+
+//top-level-prism-container is class for first showed container
+.top-level-prism-container > .container-wrapper > div > div > 
+.prism-properties > .prism-containers > .prism-property {
+  	border-top: 1px solid #ddd;	// line over area of container
+}
+
+.top-level-prism-container .row {
+	margin-right: 0px; 
+    margin-left: 0px;
+}
+
+.top-level-prism-container .prism-header {
+  margin-bottom: 0px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
 .prism-container {
-	border-bottom: 1px solid @table-divider-color;
+//	border-bottom: 1px solid @table-divider-color;
 	margin-bottom: 15px;
 	padding-bottom: 15px;
+}
+
+.multivalue-container > .container-wrapper > div > .new-value-background {
+	background-color: #dff0d8; // green background for new value of multivalue container
 }
 
 .prism-properties {
 	
 	& > div {
-		padding-left: 30px;
+		padding-left: 40px;
 	}
 	
 	.stripe {
@@ -780,11 +904,19 @@ body .treeview-menu > li > span:hover {
 	font-weight: 600;
 	color: @text-label-color;
 	margin-right: 15px;
+	float: left;
+	padding-top: 3px;
 }
 
 .prism-property {
 	padding-top: 5px;
 	padding-bottom: 5px;
+}
+
+.prism-property-label { //padding because expand collapse button, which have 37px
+	padding-left: 20px;
+	word-wrap:break-word;
+	padding-top: 5px;
 }
 
 .prism-value { // DEPRECATED: rework the prism-value vs prism-property-value later
@@ -938,6 +1070,10 @@ body .treeview-menu > li > span:hover {
 	}
 }
 
+.check-table-header-pending-operation {
+	margin-left: 10px;
+}
+
 // Assignments tab (focus pages)
 
 .assignments {
@@ -957,9 +1093,35 @@ body .treeview-menu > li > span:hover {
 
 // Orgtree (OrgMemberPanel)
 
+span.tree-content > table {
+  width: 100%;
+  max-width: 100%;
+}
+
+span.tree-content > table tr td:last-child {
+  width: 1%;
+  vertical-align: top;
+}
+
+span.tree-content > table tr td:first-child {
+  width: 1%;
+  vertical-align: top;
+}
+
+.tree-theme-windows > div > .tree-branch > .tree-node.success, .tree-subtree > .tree-branch > .tree-node.success{
+  background-color: #dff0d8;
+}
+
+.tree-subtree > .tree-branch:nth-of-type(odd) {
+  background-color: #f9f9f9;
+}
+
+.tree-subtree > .tree-branch > .tree-node:hover, .tree-theme-windows > div > .tree-branch > .tree-node:hover {
+  background-color: #eee;
+}
+
 .org-tree-container {
   overflow-y: auto;
-  margin-bottom: 20px;
 }
 
 .org-members-additional-search {
@@ -1072,7 +1234,6 @@ body .treeview-menu > li > span:hover {
 // Password change dialog (ChangePasswordPanel, PasswordPanel)
 
 .password-panel {
-	margin-left: -15px; // Compensate for 15px padding in col classes
 }
 
 .password-propagation {
@@ -1130,6 +1291,12 @@ dd.stacktrace::before {
 	min-height: 460px;
 }
 
+.shopping-cart-icon {
+	color: #f4f4f4;
+	margin-top: 10px;
+	margin-right: 5px;
+}
+
 .shopping-cart-item-box {
 	
 	.inner {
@@ -1171,10 +1338,21 @@ dd.stacktrace::before {
 	.shopping-cart-item-button-details {
 		cursor: pointer;
 	}
-	
+
+	.shopping-cart-item-button-details-disabled {
+		cursor: default;
+		color: darkgrey;
+	}
+
 	.shopping-cart-item-button-add {
 		cursor: pointer;
 		float: right;
+	}
+
+	.shopping-cart-item-button-add-disabled {
+		cursor: default;
+		float: right;
+		color: darkgrey;
 	}
 }
 
@@ -1209,4 +1387,211 @@ dd.stacktrace::before {
 	width: 80px;
 	padding-left: 10px;
 	padding-top: 7px;
+}
+
+// Process (workflow) diagrams
+
+.process-box {
+	border: 1px solid; 
+	border-radius: 5px;
+	padding: 0px;
+	margin: 10px;
+	
+	.box-label {
+		border-bottom: 1px solid;
+		padding-top: 3px;
+    	padding-bottom: 3px;
+    	font-weight: bold;
+    	
+    	.process-label {
+    		
+    	}
+    	
+    	.process-outcome {
+    		float: right;
+    	}
+
+	}
+	
+	.box-content {
+		padding: 15px;
+	}
+}
+
+// Tables where the first column is the name of the property/attribute
+// (e.g. audit log item details)
+// see MID-4300
+
+td.prop-name {
+	min-width: 90px;
+	font-weight: bold;
+}
+
+th.icon {
+	// The content of this column is just a single icon.
+	// WARNING: this means both the header and the table data
+	//          have just a single icon. No text.
+	// See com.evolveum.midpoint.web.component.data.column.IconColumn
+	width: 30px;
+}
+
+th.check, td.check {
+	// The content of this column is just a single checkbox.
+	// WARNING: this means both the header and the table data
+	//          have just a single checkbox. Nothing else.
+	// See com.evolveum.midpoint.web.component.data.column.CheckBoxHeaderColumn
+	width: 34px;
+}
+
+th.shrink {
+	// We want this column to fit as tightly as possible.
+	// E.g. for columns that have textual label but
+	// the content is just an icon or something much smaller
+	// than the header.
+	width: -moz-min-content;
+}
+
+th.countLabel{
+	// The content of this column is just some integer value.
+	// WARNING: this means both the header and the table data
+	//          have just some integer value.
+	// See com.evolveum.midpoint.web.page.admin.certification.PageCertDecisions
+	width: 70px;
+}
+
+.expand-collapse-button, .expand-collapse-button:hover, .expand-collapse-button:focus { //class for expand-collapse button next to title
+	color: @text-label-color;
+	width: 22px;
+	text-align: center;
+	cursor: pointer;
+}
+
+.show-empty-button, .show-empty-button:hover .show-empty-button:focus{ //class for show-empty fields button under properties
+	color: @text-label-color;
+	font-size: 12px;
+	padding-bottom: 5px;
+}
+
+.labelContainer > .text-info { // aligning i button to one row with title of container
+	float: left;
+}
+
+// This will make the tooltip respect new lines.
+// Lines will still wrap if they are longer than the default max-width of the container.
+.tooltip-inner {
+	white-space:pre-wrap;
+}
+
+.table-striped {
+	table-layout: fixed; // fix for text in cells
+}
+
+.shopping-cart-icon > .badge {
+    margin-left: -10px !important;
+}
+
+@media (max-width: 767px) {
+  .content-wrapper {
+    width: 100%;
+  }
+}
+
+.role-catalog > .object-org-box > .org-tree-container{
+	max-height: 50vh;
+}
+
+.skin-red > .wrapper > .main-header > .navbar-static-top > .navbar-custom-menu > .shopping-cart-icon > .badge,
+.skin-red-light > .wrapper > .main-header > .navbar-static-top > .navbar-custom-menu > .shopping-cart-icon > .badge{
+	border-style: solid;
+	padding: 2px 5px;
+	border-color: #f4f4f4;
+}
+
+.small-box-footer>div{
+	display: inline-block;
+}
+
+.small-box{
+	cursor: default;
+}
+
+.cursor-pointer{
+	cursor: pointer;
+}
+
+.buttons-panel-marging{
+	margin: 10px;
+}
+
+.position-relative{
+	position: relative;
+}
+
+.small-box h3{
+	white-space: normal;
+	font-size: 28px;
+}
+
+.tbody-nth-of-type-even>tr:nth-of-type(even) {
+  background-color: #f9f9f9 !important;
+}
+.tbody-nth-of-type-even>tr:nth-of-type(odd) {
+  background-color: inherit !important;
+}    
+
+@media (min-width: 1550px){
+	.small-box h3 {
+		font-size: 35px;
+	}
+}
+
+.dashboard-widgets{
+	display: flex;
+	flex-flow: row wrap;
+}
+
+.dashboard-info-box > .small-box {
+	height:100%;
+}
+
+.dashboard-info-box > .small-box > .small-box-footer {
+	position: absolute;
+    bottom: 0px;
+    width: 100%;
+}
+
+.dashboard-info-box{
+	height: 100%;
+}
+
+.padding-bottom-20 {
+	padding-bottom: 20px;
+}
+.checkbox-without-margin-bottom .checkbox{
+	margin-bottom: 0px !important;
+	margin-top: 5px !important;
+}
+
+th > div > .sortableLabel .row {
+	margin: 0px;
+}
+
+td .prism-property-value {
+	width: 100% !important;
+}
+
+th.composited-icon {
+  width: 30px;
+}
+
+.small-box > .small-box-footer {
+	color: inherit !important;
+}
+
+.pagination-xs>li>a {
+    padding: 0px 5px !important;
+}
+
+.cog-xs {
+	width: 38px;
 }

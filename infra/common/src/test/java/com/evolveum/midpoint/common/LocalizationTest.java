@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.common;
@@ -63,6 +54,18 @@ public class LocalizationTest {
         assertTranslation(service, "ObjectType.name", "Nameee");
         assertTranslation(service, "customSchemaKey", "customSchemaValue");
         assertTranslation(service, "ObjectType.description", "Popis");
+    }
+
+    @Test
+    public void localizationParams2() throws Exception {
+        Object[] params = new Object[2];
+        params[0] = "John";
+        params[1] = "Couldn't find user with name 'John'";
+
+        String real = service.translate("UserProfileServiceImpl.unknownUser", params, new Locale("sk"));
+        String expected = "Couldn't find user with name '" + params[0] + "', reason: " + params[1] + ".";
+
+        AssertJUnit.assertEquals(expected, real);
     }
 
     @Test

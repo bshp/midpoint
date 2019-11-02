@@ -1,36 +1,22 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.schema.util;
 
 import com.evolveum.midpoint.prism.PrismPropertyValue;
 import com.evolveum.midpoint.prism.PrismReferenceValue;
+import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.polystring.PolyString;
-import com.evolveum.midpoint.prism.xnode.PrimitiveXNode;
-import com.evolveum.midpoint.prism.xnode.XNode;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
+import com.evolveum.midpoint.util.DebugUtil;
 import com.evolveum.midpoint.util.PrettyPrinter;
 import com.evolveum.midpoint.util.QNameUtil;
 import com.evolveum.midpoint.util.exception.SchemaException;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.ApprovalSchemaType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.ConstructionType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.LoginEventType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.MappingType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.ResourceAttributeDefinitionType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.ScheduleType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import com.evolveum.prism.xml.ns._public.types_3.ItemPathType;
 import com.evolveum.prism.xml.ns._public.types_3.ProtectedStringType;
 import com.evolveum.prism.xml.ns._public.types_3.RawType;
@@ -49,6 +35,7 @@ import java.util.Date;
 public class ValueDisplayUtil {
     public static String toStringValue(PrismPropertyValue propertyValue) {
         Object value = propertyValue.getValue();
+        String defaultStr = "(a value of type " + value.getClass().getSimpleName() + ")";  // todo i18n
         if (value == null) {
             return null;
         } else if (value instanceof String) {
@@ -71,13 +58,13 @@ public class ValueDisplayUtil {
                 return "";
             }
         } else if (value instanceof ScheduleType) {
-        	return SchemaDebugUtil.prettyPrint((ScheduleType) value);
+            return SchemaDebugUtil.prettyPrint((ScheduleType) value);
         } else if (value instanceof ApprovalSchemaType) {
             ApprovalSchemaType approvalSchemaType = (ApprovalSchemaType) value;
             return approvalSchemaType.getName() + (approvalSchemaType.getDescription() != null ? (": " + approvalSchemaType.getDescription()) : "") + " (...)";
         } else if (value instanceof ConstructionType) {
             ConstructionType ct = (ConstructionType) value;
-            Object resource = (ct.getResource() != null ? ct.getResource().getName() : (ct.getResourceRef() != null ? ct.getResourceRef().getOid() : null));
+            Object resource = (ct.getResourceRef() != null ? ct.getResourceRef().getOid() : null);
             return "resource object" + (resource != null ? " on " + resource : "") + (ct.getDescription() != null ? ": " + ct.getDescription() : "");
         } else if (value instanceof Enum) {
             return value.toString();
@@ -107,13 +94,8 @@ public class ValueDisplayUtil {
                         if (QNameUtil.match(SchemaConstants.C_VALUE, evaluator.getName()) && evaluator.getValue() instanceof RawType) {
                             RawType raw = (RawType) evaluator.getValue();
                             try {
-                                XNode xnode = raw.serializeToXNode();
-                                if (xnode instanceof PrimitiveXNode) {
-                                    sb.append(((PrimitiveXNode) xnode).getStringValue());
-                                } else {
-                                    sb.append("(a complex value)");
-                                }
-                            } catch (SchemaException e) {
+                                sb.append(raw.extractString("(a complex value)"));
+                            } catch (RuntimeException e) {
                                 sb.append("(an invalid value)");
                             }
                         } else {
@@ -137,22 +119,61 @@ public class ValueDisplayUtil {
 //                return qname.getLocalPart();
 //            }
         } else if (value instanceof Number) {
-			return String.valueOf(value);
+            return String.valueOf(value);
         } else if (value instanceof byte[]) {
             return "(binary data)";
         } else if (value instanceof RawType) {
             return PrettyPrinter.prettyPrint(value);
+        } else if (value instanceof ItemPathType) {
+            ItemPath itemPath = ((ItemPathType) value).getItemPath();
+            StringBuilder sb = new StringBuilder();
+            itemPath.getSegments().forEach(segment -> {
+                if (ItemPath.isName(segment)) {
+                    sb.append(PrettyPrinter.prettyPrint(ItemPath.toName(segment)));
+                } else if (ItemPath.isVariable(segment)) {
+                    sb.append(PrettyPrinter.prettyPrint(ItemPath.toVariableName(segment)));
+                } else {
+                    sb.append(segment.toString());
+                }
+                sb.append("; ");
+            });
+            return sb.toString();
+        } else if (value instanceof ExpressionType) {
+            StringBuilder expressionString = new StringBuilder();
+            if (((ExpressionType)value).getExpressionEvaluator() != null && ((ExpressionType) value).getExpressionEvaluator().size() > 0){
+                ((ExpressionType) value).getExpressionEvaluator().forEach(evaluator -> {
+                    if (evaluator.getValue() instanceof RawType){
+                        expressionString.append(PrettyPrinter.prettyPrint(evaluator.getValue()));
+                        expressionString.append("; ");
+                    } else if (evaluator.getValue() instanceof SearchObjectExpressionEvaluatorType){
+                        SearchObjectExpressionEvaluatorType evaluatorValue = (SearchObjectExpressionEvaluatorType)evaluator.getValue();
+                        if (evaluatorValue.getFilter() != null) {
+                            DebugUtil.debugDumpMapMultiLine(expressionString, evaluatorValue.getFilter().getFilterClauseXNode().asMap(),
+                                    0, false, null);
+
+                            //TODO temporary hack: removing namespace part of the QName
+                            while (expressionString.indexOf("}") >= 0 && expressionString.indexOf("{") >= 0 &&
+                                    expressionString.indexOf("}") - expressionString.indexOf("{") > 0){
+                                expressionString.replace(expressionString.indexOf("{"), expressionString.indexOf("}") + 1, "");
+                            }
+                        }
+                    } else {
+                        expressionString.append(defaultStr);
+                    }
+                });
+            }
+            return expressionString.toString();
         } else {
-            return "(a value of type " + value.getClass().getSimpleName() + ")";  // todo i18n
+            return defaultStr;
         }
     }
 
     public static String toStringValue(PrismReferenceValue ref) {
         String rv = getReferredObjectInformation(ref);
         if (ref.getRelation() != null) {
-        	rv += " [" + ref.getRelation().getLocalPart() + "]";
-		}
-		return rv;
+            rv += " [" + ref.getRelation().getLocalPart() + "]";
+        }
+        return rv;
     }
 
     private static String getReferredObjectInformation(PrismReferenceValue ref) {
@@ -160,7 +181,7 @@ public class ValueDisplayUtil {
             return ref.getObject().toString();
         } else {
             return (ref.getTargetType() != null ? ref.getTargetType().getLocalPart()+":" : "")
-					+ (ref.getTargetName() != null ? ref.getTargetName() : ref.getOid());
+                    + (ref.getTargetName() != null ? ref.getTargetName() : ref.getOid());
         }
     }
 }

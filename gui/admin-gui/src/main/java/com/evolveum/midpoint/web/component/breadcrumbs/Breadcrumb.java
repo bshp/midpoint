@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.breadcrumbs;
@@ -20,10 +11,8 @@ import com.evolveum.midpoint.util.DebugDumpable;
 import com.evolveum.midpoint.util.DebugUtil;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
-import org.apache.wicket.Component;
 import org.apache.wicket.RestartResponseException;
 import org.apache.wicket.markup.html.WebPage;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.request.mapper.parameter.PageParameters;
 
@@ -43,9 +32,9 @@ import java.util.Arrays;
  * @author semancik
  */
 public class Breadcrumb implements Serializable, DebugDumpable {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private static final Trace LOG = TraceManager.getTrace(Breadcrumb.class);
+    private static final Trace LOG = TraceManager.getTrace(Breadcrumb.class);
 
     transient private IModel<String> labelModel;
     private String label;
@@ -71,28 +60,28 @@ public class Breadcrumb implements Serializable, DebugDumpable {
     }
 
     public IModel<String> getLabel() {
-    	if (labelModel == null && label != null) {
-    		labelModel = new AbstractReadOnlyModel<String>() {
-    			private static final long serialVersionUID = 1L;
-    			@Override
+        if (labelModel == null && label != null) {
+            labelModel = new IModel<String>() {
+                private static final long serialVersionUID = 1L;
+                @Override
                 public String getObject() {
-    				return label;
-    			}
-    		};
-    	}
-    	return labelModel;
+                    return label;
+                }
+            };
+        }
+        return labelModel;
     }
 
     public void setLabel(final IModel<String> label) {
-    	if (label == null) {
-    		this.labelModel = null;
+        if (label == null) {
+            this.labelModel = null;
             return;
         }
 
-    	this.labelModel = new AbstractReadOnlyModel<String>() {
-			private static final long serialVersionUID = 1L;
+        this.labelModel = new IModel<String>() {
+            private static final long serialVersionUID = 1L;
 
-			@Override
+            @Override
             public String getObject() {
                 try {
                     return label.getObject();
@@ -102,39 +91,38 @@ public class Breadcrumb implements Serializable, DebugDumpable {
                 }
             }
 
-			@Override
-			public void detach() {
-				super.detach();
-				Breadcrumb.this.label = label.getObject();
-				Breadcrumb.this.labelModel = null;
-			}
+            @Override
+            public void detach() {
+                Breadcrumb.this.label = label.getObject();
+                Breadcrumb.this.labelModel = null;
+            }
 
         };
     }
 
     public IModel<String> getIcon() {
-    	if (iconModel == null && icon != null) {
-    		iconModel = new AbstractReadOnlyModel<String>() {
-    			private static final long serialVersionUID = 1L;
-    			@Override
+        if (iconModel == null && icon != null) {
+            iconModel = new IModel<String>() {
+                private static final long serialVersionUID = 1L;
+                @Override
                 public String getObject() {
-    				return icon;
-    			}
-    		};
-    	}
-    	return iconModel;
+                    return icon;
+                }
+            };
+        }
+        return iconModel;
     }
 
     public void setIcon(final IModel<String> icon) {
-    	if (icon == null) {
-    		this.iconModel = null;
+        if (icon == null) {
+            this.iconModel = null;
             return;
         }
 
-    	this.iconModel = new AbstractReadOnlyModel<String>() {
-			private static final long serialVersionUID = 1L;
+        this.iconModel = new IModel<String>() {
+            private static final long serialVersionUID = 1L;
 
-			@Override
+            @Override
             public String getObject() {
                 try {
                     return icon.getObject();
@@ -144,12 +132,11 @@ public class Breadcrumb implements Serializable, DebugDumpable {
                 }
             }
 
-			@Override
-			public void detach() {
-				super.detach();
-				Breadcrumb.this.icon = icon.getObject();
-				Breadcrumb.this.iconModel = null;
-			}
+            @Override
+            public void detach() {
+                Breadcrumb.this.icon = icon.getObject();
+                Breadcrumb.this.iconModel = null;
+            }
 
         };
     }
@@ -174,16 +161,16 @@ public class Breadcrumb implements Serializable, DebugDumpable {
         throw new UnsupportedOperationException("Should be implemented in a subclass");
     }
 
-	public RestartResponseException getRestartResponseException() {
-		throw new UnsupportedOperationException("Should be implemented in a subclass");
-	}
+    public RestartResponseException getRestartResponseException() {
+        throw new UnsupportedOperationException("Should be implemented in a subclass");
+    }
 
-	private <T extends Serializable> IModel<T> wrapModel(final IModel<T> model) {
+    private <T extends Serializable> IModel<T> wrapModel(final IModel<T> model) {
         if (model == null) {
             return null;
         }
 
-        return new AbstractReadOnlyModel<T>() {
+        return new IModel<T>() {
 
             @Override
             public T getObject() {
@@ -195,11 +182,10 @@ public class Breadcrumb implements Serializable, DebugDumpable {
                 }
             }
 
-			@Override
-			public void detach() {
-				super.detach();
-				model.getObject();
-			}
+            @Override
+            public void detach() {
+                model.getObject();
+            }
 
         };
     }
@@ -218,28 +204,28 @@ public class Breadcrumb implements Serializable, DebugDumpable {
         return Arrays.hashCode(new Object[]{labelModel, iconModel});
     }
 
-	@Override
-	public String debugDump() {
-		return debugDump(0);
-	}
+    @Override
+    public String debugDump() {
+        return debugDump(0);
+    }
 
-	@Override
-	public String debugDump(int indent) {
-		StringBuilder sb = new StringBuilder();
-		DebugUtil.indentDebugDump(sb, indent);
-		sb.append(this.getClass().getSimpleName());
-		sb.append("\n");
-		DebugUtil.debugDumpWithLabelLn(sb, "labelModel", labelModel==null?"":labelModel.toString(), indent+1);
-		DebugUtil.debugDumpWithLabelLn(sb, "label", label, indent+1);
-		DebugUtil.debugDumpWithLabelLn(sb, "iconModel", iconModel==null?"":iconModel.toString(), indent+1);
-		DebugUtil.debugDumpWithLabelLn(sb, "icon", icon, indent+1);
-		DebugUtil.debugDumpWithLabelLn(sb, "useLink", useLink, indent+1);
-		DebugUtil.debugDumpWithLabel(sb, "visible", visible, indent+1);
-		extendsDebugDump(sb, indent);
-		return sb.toString();
-	}
+    @Override
+    public String debugDump(int indent) {
+        StringBuilder sb = new StringBuilder();
+        DebugUtil.indentDebugDump(sb, indent);
+        sb.append(this.getClass().getSimpleName());
+        sb.append("\n");
+        DebugUtil.debugDumpWithLabelLn(sb, "labelModel", labelModel==null?"":labelModel.toString(), indent+1);
+        DebugUtil.debugDumpWithLabelLn(sb, "label", label, indent+1);
+        DebugUtil.debugDumpWithLabelLn(sb, "iconModel", iconModel==null?"":iconModel.toString(), indent+1);
+        DebugUtil.debugDumpWithLabelLn(sb, "icon", icon, indent+1);
+        DebugUtil.debugDumpWithLabelLn(sb, "useLink", useLink, indent+1);
+        DebugUtil.debugDumpWithLabel(sb, "visible", visible, indent+1);
+        extendsDebugDump(sb, indent);
+        return sb.toString();
+    }
 
-	protected void extendsDebugDump(StringBuilder sb, int indent) {
+    protected void extendsDebugDump(StringBuilder sb, int indent) {
 
-	}
+    }
 }

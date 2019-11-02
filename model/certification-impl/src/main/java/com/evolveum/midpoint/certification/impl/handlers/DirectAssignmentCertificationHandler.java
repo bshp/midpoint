@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.certification.impl.handlers;
@@ -20,7 +11,6 @@ import com.evolveum.midpoint.certification.api.AccessCertificationApiConstants;
 import com.evolveum.midpoint.repo.common.expression.ExpressionVariables;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.schema.constants.ExpressionConstants;
-import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.schema.util.ActivationUtil;
 import com.evolveum.midpoint.schema.util.ObjectTypeUtil;
@@ -33,8 +23,6 @@ import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
 import com.evolveum.midpoint.util.exception.PolicyViolationException;
 import com.evolveum.midpoint.util.exception.SchemaException;
 import com.evolveum.midpoint.util.exception.SecurityViolationException;
-import com.evolveum.midpoint.util.logging.Trace;
-import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import org.springframework.stereotype.Component;
 
@@ -53,7 +41,7 @@ public class DirectAssignmentCertificationHandler extends BaseCertificationHandl
 
     public static final String URI = AccessCertificationApiConstants.DIRECT_ASSIGNMENT_HANDLER_URI;
 
-    private static final transient Trace LOGGER = TraceManager.getTrace(DirectAssignmentCertificationHandler.class);
+    //private static final transient Trace LOGGER = TraceManager.getTrace(DirectAssignmentCertificationHandler.class);
 
     @PostConstruct
     public void init() {
@@ -96,7 +84,7 @@ public class DirectAssignmentCertificationHandler extends BaseCertificationHandl
         AccessCertificationAssignmentCaseType assignmentCase = new AccessCertificationAssignmentCaseType(prismContext);
         assignmentCase.setAssignment(assignment.clone());
         assignmentCase.setIsInducement(isInducement);
-        assignmentCase.setObjectRef(ObjectTypeUtil.createObjectRef(object));
+        assignmentCase.setObjectRef(ObjectTypeUtil.createObjectRef(object, prismContext));
         assignmentCase.setTenantRef(assignment.getTenantRef());
         assignmentCase.setOrgRef(assignment.getOrgRef());
         assignmentCase.setActivation(assignment.getActivation());
@@ -111,6 +99,9 @@ public class DirectAssignmentCertificationHandler extends BaseCertificationHandl
                 valid = isIncludeServices(scope);
             } else if (UserType.COMPLEX_TYPE.equals(assignment.getTargetRef().getType())) {
                 valid = isIncludeUsers(scope);
+            } else if (ArchetypeType.COMPLEX_TYPE.equals(assignment.getTargetRef().getType())) {
+                // archetype assignment management is not fully supported for now, therefore ignoring
+                valid = false;
             } else {
                 throw new IllegalStateException("Unexpected targetRef type: " + assignment.getTargetRef().getType() + " in " + ObjectTypeUtil.toShortString(assignment));
             }
@@ -129,11 +120,14 @@ public class DirectAssignmentCertificationHandler extends BaseCertificationHandl
     }
 
     private boolean relationMatches(QName assignmentRelation, List<QName> scopeRelations) {
-        return (!scopeRelations.isEmpty() ? scopeRelations : Collections.singletonList(SchemaConstants.ORG_DEFAULT))
-                .stream().anyMatch(r -> ObjectTypeUtil.relationMatches(r, assignmentRelation));
+        return (!scopeRelations.isEmpty() ? scopeRelations : Collections.singletonList(prismContext.getDefaultRelation()))
+                .stream().anyMatch(r -> prismContext.relationMatches(r, assignmentRelation));
     }
 
-    private boolean itemSelectionExpressionAccepts(AssignmentType assignment, boolean isInducement, ObjectType object, AccessCertificationCampaignType campaign, Task task, OperationResult result) throws ExpressionEvaluationException, ObjectNotFoundException, SchemaException, CommunicationException, ConfigurationException, SecurityViolationException {
+    @SuppressWarnings("unused")
+    private boolean itemSelectionExpressionAccepts(AssignmentType assignment, boolean isInducement, ObjectType object,
+            AccessCertificationCampaignType campaign, Task task, OperationResult result) throws ExpressionEvaluationException,
+            ObjectNotFoundException, SchemaException, CommunicationException, ConfigurationException, SecurityViolationException {
         AccessCertificationObjectBasedScopeType scope = null;
         if (campaign.getScopeDefinition() instanceof AccessCertificationObjectBasedScopeType) {
             scope = (AccessCertificationObjectBasedScopeType) (campaign.getScopeDefinition());
@@ -143,12 +137,12 @@ public class DirectAssignmentCertificationHandler extends BaseCertificationHandl
         }
         ExpressionType selectionExpression = scope.getItemSelectionExpression();
         ExpressionVariables variables = new ExpressionVariables();
-        variables.addVariableDefinition(ExpressionConstants.VAR_ASSIGNMENT, assignment);
+        variables.put(ExpressionConstants.VAR_ASSIGNMENT, assignment, AssignmentType.class);
         if (object instanceof FocusType) {
-            variables.addVariableDefinition(ExpressionConstants.VAR_FOCUS, object);
+            variables.putObject(ExpressionConstants.VAR_FOCUS, (FocusType)object, FocusType.class);
         }
         if (object instanceof UserType) {
-            variables.addVariableDefinition(ExpressionConstants.VAR_USER, object);
+            variables.putObject(ExpressionConstants.VAR_USER, (UserType)object, UserType.class);
         }
         return expressionHelper.evaluateBooleanExpression(selectionExpression, variables,
                 "item selection for assignment " + ObjectTypeUtil.toShortString(assignment), task, result);

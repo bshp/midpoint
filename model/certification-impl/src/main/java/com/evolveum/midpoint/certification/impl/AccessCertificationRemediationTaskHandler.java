@@ -1,33 +1,23 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.certification.impl;
 
+import com.evolveum.midpoint.certification.api.OutcomeUtils;
 import com.evolveum.midpoint.certification.impl.handlers.CertificationHandler;
+import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.repo.api.RepositoryService;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.schema.result.OperationResultStatus;
 import com.evolveum.midpoint.schema.util.CertCampaignTypeUtil;
 import com.evolveum.midpoint.schema.util.ObjectTypeUtil;
-import com.evolveum.midpoint.task.api.Task;
-import com.evolveum.midpoint.task.api.TaskCategory;
-import com.evolveum.midpoint.task.api.TaskHandler;
-import com.evolveum.midpoint.task.api.TaskManager;
-import com.evolveum.midpoint.task.api.TaskRunResult;
+import com.evolveum.midpoint.task.api.*;
 import com.evolveum.midpoint.task.api.TaskRunResult.TaskRunResultStatus;
+import com.evolveum.midpoint.util.exception.CommonException;
 import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
 import com.evolveum.midpoint.util.exception.SchemaException;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
@@ -36,8 +26,10 @@ import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AccessCertificationCampaignType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AccessCertificationCaseType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.SystemObjectsType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.TaskPartitionDefinitionType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -45,45 +37,55 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.util.List;
 
+import static com.evolveum.midpoint.schema.util.CertCampaignTypeUtil.norm;
+
 /**
- * The task hander for automatic remediation.
+ * The task handler for automatic remediation.
  *
  * @author mederly
  */
 @Component
 public class AccessCertificationRemediationTaskHandler implements TaskHandler {
 
-	public static final String HANDLER_URI = AccessCertificationConstants.NS_CERTIFICATION_TASK_PREFIX + "/remediation/handler-3";
+    private static final String HANDLER_URI = AccessCertificationConstants.NS_CERTIFICATION_TASK_PREFIX + "/remediation/handler-3";
 
-    public static final String CLASS_DOT = AccessCertificationRemediationTaskHandler.class.getName() + ".";
+    private static final String CLASS_DOT = AccessCertificationRemediationTaskHandler.class.getName() + ".";
 
     @Autowired private TaskManager taskManager;
     @Autowired private CertificationManagerImpl certificationManager;
     @Autowired private AccCertGeneralHelper helper;
     @Autowired private AccCertCaseOperationsHelper caseHelper;
     @Autowired private AccCertQueryHelper queryHelper;
+    @Autowired private PrismContext prismContext;
     @Autowired @Qualifier("cacheRepositoryService") private RepositoryService repositoryService;
 
     private static final transient Trace LOGGER = TraceManager.getTrace(AccessCertificationRemediationTaskHandler.class);
 
-	@PostConstruct
-	private void initialize() {
-		taskManager.registerHandler(HANDLER_URI, this);
-	}
+    @PostConstruct
+    private void initialize() {
+        taskManager.registerHandler(HANDLER_URI, this);
+    }
 
-	@Override
-	public TaskRunResult run(Task task) {
-		LOGGER.trace("Task run starting");
+    @NotNull
+    @Override
+    public StatisticsCollectionStrategy getStatisticsCollectionStrategy() {
+        return new StatisticsCollectionStrategy()
+                .fromZero();
+        // implement iteration stats when needed
+    }
 
-		long progress = task.getProgress();
-		OperationResult opResult = new OperationResult(CLASS_DOT+"run");
+    @Override
+    public TaskRunResult run(RunningTask task, TaskPartitionDefinitionType partition) {
+        LOGGER.trace("Task run starting");
+
+        OperationResult opResult = new OperationResult(CLASS_DOT+"run");
         opResult.setSummarizeSuccesses(true);
-		TaskRunResult runResult = new TaskRunResult();
-		runResult.setOperationResult(opResult);
+        TaskRunResult runResult = new TaskRunResult();
+        runResult.setOperationResult(opResult);
 
-		if (task.getChannel() == null) {
-			task.setChannel(SchemaConstants.CHANNEL_REMEDIATION_URI);
-		}
+        if (task.getChannel() == null) {
+            task.setChannel(SchemaConstants.CHANNEL_REMEDIATION_URI);
+        }
 
         String campaignOid = task.getObjectOid();
         if (campaignOid == null) {
@@ -109,19 +111,19 @@ public class AccessCertificationRemediationTaskHandler implements TaskHandler {
             int revokedOk = 0;
             int revokedError = 0;
 
-            List<AccessCertificationCaseType> caseList = queryHelper.searchCases(campaignOid, null, null, opResult);
-            for (AccessCertificationCaseType _case : caseList) {
-                if (helper.isRevoke(_case, campaign)) {
+            List<AccessCertificationCaseType> caseList = queryHelper.getAllCurrentIterationCases(campaignOid, norm(campaign.getIteration()), null, opResult);
+            for (AccessCertificationCaseType acase : caseList) {
+                if (OutcomeUtils.isRevoke(acase, campaign)) {
                     OperationResult caseResult = opResult.createMinorSubresult(opResult.getOperation()+".revoke");
-                    final Long caseId = _case.asPrismContainerValue().getId();
+                    final Long caseId = acase.asPrismContainerValue().getId();
                     caseResult.addContext("caseId", caseId);
                     try {
-                        handler.doRevoke(_case, campaign, task, caseResult);
+                        handler.doRevoke(acase, campaign, task, caseResult);
                         caseHelper.markCaseAsRemedied(campaignOid, caseId, task, caseResult);
                         caseResult.computeStatus();
                         revokedOk++;
-						progress++;
-                    } catch (Exception e) {     // TODO
+                        task.incrementProgressAndStoreStatsIfNeeded();
+                    } catch (CommonException | RuntimeException e) {
                         String message = "Couldn't revoke case " + caseId + ": " + e.getMessage();
                         LoggingUtils.logUnexpectedException(LOGGER, message, e);
                         caseResult.recordPartialError(message, e);
@@ -137,7 +139,6 @@ public class AccessCertificationRemediationTaskHandler implements TaskHandler {
             certificationManager.closeCampaign(campaignOid, task, opResult);
 
             runResult.setRunResultStatus(TaskRunResultStatus.FINISHED);
-            runResult.setProgress(progress);
             LOGGER.trace("Task run stopping (campaign {})", ObjectTypeUtil.toShortString(campaign));
             return runResult;
 
@@ -145,32 +146,26 @@ public class AccessCertificationRemediationTaskHandler implements TaskHandler {
             LoggingUtils.logException(LOGGER, "Error while executing remediation task handler", e);
             opResult.recordFatalError("Error while executing remediation task handler: "+e.getMessage(), e);
             runResult.setRunResultStatus(TaskRunResultStatus.PERMANENT_ERROR);
-            runResult.setProgress(progress);
             return runResult;
         }
-	}
+    }
 
-	@Override
-	public Long heartbeat(Task task) {
-		return null;	// not to reset progress information
-	}
+    @Override
+    public Long heartbeat(Task task) {
+        return null;    // not to reset progress information
+    }
 
-	@Override
-	public void refreshStatus(Task task) {
-		// Do nothing. Everything is fresh already.
-	}
+    @Override
+    public void refreshStatus(Task task) {
+        // Do nothing. Everything is fresh already.
+    }
 
     @Override
     public String getCategoryName(Task task) {
         return TaskCategory.ACCESS_CERTIFICATION;
     }
 
-    @Override
-    public List<String> getCategoryNames() {
-        return null;
-    }
-
-    public void launch(AccessCertificationCampaignType campaign, Task callingTask, OperationResult parentResult) throws SchemaException, ObjectNotFoundException {
+    public void launch(AccessCertificationCampaignType campaign, OperationResult parentResult) throws SchemaException, ObjectNotFoundException {
 
         LOGGER.info("Launching remediation task handler for campaign {} as asynchronous task", ObjectTypeUtil.toShortString(campaign));
 
@@ -187,12 +182,12 @@ public class AccessCertificationRemediationTaskHandler implements TaskHandler {
         task.setName(polyString);
 
         // Set reference to the resource
-        task.setObjectRef(ObjectTypeUtil.createObjectRef(campaign));
+        task.setObjectRef(ObjectTypeUtil.createObjectRef(campaign, prismContext));
 
         task.setOwner(repositoryService.getObject(UserType.class, SystemObjectsType.USER_ADMINISTRATOR.value(), null, result));
 
         taskManager.switchToBackground(task, result);
-		result.setBackgroundTaskOid(task.getOid());
+        result.setBackgroundTaskOid(task.getOid());
         if (result.isInProgress()) {
             result.recordStatus(OperationResultStatus.IN_PROGRESS, "Remediation task "+task+" was successfully started, please use Server Tasks to see its status.");
         }

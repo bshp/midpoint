@@ -1,21 +1,13 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.model.impl.lens;
 
+import com.evolveum.midpoint.model.api.context.AssignmentPath;
 import com.evolveum.midpoint.model.api.context.EvaluatedConstruction;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.schema.result.OperationResult;
@@ -23,7 +15,7 @@ import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.util.DebugUtil;
 import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
 import com.evolveum.midpoint.util.exception.SchemaException;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.FocusType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.AssignmentHolderType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ResourceType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ShadowKindType;
 
@@ -32,10 +24,21 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.ShadowKindType;
  */
 public class EvaluatedConstructionImpl implements EvaluatedConstruction {
 
-    private PrismObject<ResourceType> resource;
-    private ShadowKindType kind;
-    private String intent;
-    private boolean directlyAssigned;
+    final private PrismObject<ResourceType> resource;
+    final private ShadowKindType kind;
+    final private String intent;
+    final private boolean directlyAssigned;
+    final private AssignmentPath assignmentPath;
+    final private boolean weak;
+
+    public <AH extends AssignmentHolderType> EvaluatedConstructionImpl(Construction<AH> construction, Task task, OperationResult result) throws SchemaException, ObjectNotFoundException {
+        resource = construction.getResource(task, result).asPrismObject();
+        kind = construction.getKind();
+        intent = construction.getIntent();
+        assignmentPath = construction.getAssignmentPath();
+        directlyAssigned = assignmentPath == null || assignmentPath.size() == 1;
+        weak = construction.isWeak();
+    }
 
     @Override
     public PrismObject<ResourceType> getResource() {
@@ -57,43 +60,34 @@ public class EvaluatedConstructionImpl implements EvaluatedConstruction {
         return directlyAssigned;
     }
 
-    public void setDirectlyAssigned(boolean directlyAssigned) {
-        this.directlyAssigned = directlyAssigned;
-    }
-
-    public <F extends FocusType> EvaluatedConstructionImpl(Construction<F> construction, Task task, OperationResult result) throws SchemaException, ObjectNotFoundException {
-        resource = construction.getResource(task, result).asPrismObject();
-        kind = construction.getKind();
-        intent = construction.getIntent();
-        directlyAssigned = construction.getAssignmentPath() == null || construction.getAssignmentPath().size() == 1;
+    @Override
+    public AssignmentPath getAssignmentPath() {
+        return assignmentPath;
     }
 
     @Override
-    public String debugDump() {
-        return debugDump(0);
+    public boolean isWeak() {
+        return weak;
     }
 
-    // TODO polish
     @Override
     public String debugDump(int indent) {
         StringBuilder sb = new StringBuilder();
-        DebugUtil.debugDumpLabel(sb, "EvaluatedConstruction", indent);
-        sb.append("\n");
-        DebugUtil.debugDumpWithLabel(sb, "Resource", resource, indent + 1);
-        sb.append("\n");
-        DebugUtil.debugDumpWithLabel(sb, "Kind", kind.value(), indent + 1);
-        sb.append("\n");
-        DebugUtil.debugDumpWithLabel(sb, "Intent", intent, indent + 1);
+        DebugUtil.debugDumpLabelLn(sb, "EvaluatedConstruction", indent);
+        DebugUtil.debugDumpWithLabelLn(sb, "resource", resource, indent + 1);
+        DebugUtil.debugDumpWithLabelLn(sb, "kind", kind.value(), indent + 1);
+        DebugUtil.debugDumpWithLabelLn(sb, "intent", intent, indent + 1);
+        DebugUtil.debugDumpWithLabelLn(sb, "directlyAssigned", directlyAssigned, indent + 1);
+        DebugUtil.debugDumpWithLabel(sb, "weak", weak, indent + 1);
         return sb.toString();
     }
 
-    // TODO polish
     @Override
     public String toString() {
-        return "EvaluatedConstruction{" +
+        return "EvaluatedConstruction(" +
                 "resource=" + resource +
                 ", kind=" + kind +
-                ", intent='" + intent + '\'' +
-                '}';
+                ", intent='" + intent +
+                ')';
     }
 }

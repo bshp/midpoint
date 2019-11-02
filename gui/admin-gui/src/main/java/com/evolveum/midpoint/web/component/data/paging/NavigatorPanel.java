@@ -1,22 +1,12 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.data.paging;
 
-import com.evolveum.midpoint.web.component.AjaxButton;
 import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
 import org.apache.commons.lang.BooleanUtils;
 import org.apache.wicket.AttributeModifier;
@@ -31,7 +21,6 @@ import org.apache.wicket.markup.html.list.LoopItem;
 import org.apache.wicket.markup.html.navigation.paging.IPageable;
 import org.apache.wicket.markup.html.panel.Panel;
 import org.apache.wicket.markup.repeater.AbstractRepeater;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 
 /**
@@ -39,7 +28,7 @@ import org.apache.wicket.model.IModel;
  */
 public class NavigatorPanel extends Panel {
 
-    private int PAGING_SIZE = 5;
+    private static final int PAGING_SIZE = 5;
 
     private static final String ID_PREVIOUS = "previous";
     private static final String ID_PREVIOUS_LINK = "previousLink";
@@ -57,7 +46,7 @@ public class NavigatorPanel extends Panel {
     private final IModel<Boolean> showPageListingModel;
 
     public NavigatorPanel(String id, IPageable pageable, final boolean showPageListing) {
-        this(id, pageable, new AbstractReadOnlyModel<Boolean>() {
+        this(id, pageable, new IModel<Boolean>() {
             @Override
             public Boolean getObject() {
                 return showPageListing;
@@ -92,7 +81,7 @@ public class NavigatorPanel extends Panel {
 
     private void initPrevious() {
         WebMarkupContainer previous = new WebMarkupContainer(ID_PREVIOUS);
-        previous.add(new AttributeModifier("class", new AbstractReadOnlyModel<String>() {
+        previous.add(new AttributeModifier("class", new IModel<String>() {
 
             @Override
             public String getObject() {
@@ -100,7 +89,7 @@ public class NavigatorPanel extends Panel {
             }
         }));
         add(previous);
-        AjaxLink previousLink = new AjaxLink(ID_PREVIOUS_LINK) {
+        AjaxLink<Void> previousLink = new AjaxLink<Void>(ID_PREVIOUS_LINK) {
 
             @Override
             protected void updateAjaxAttributes(AjaxRequestAttributes attributes) {
@@ -124,7 +113,7 @@ public class NavigatorPanel extends Panel {
 
     private void initFirst() {
         WebMarkupContainer first = new WebMarkupContainer(ID_FIRST);
-        first.add(new AttributeModifier("class", new AbstractReadOnlyModel<String>() {
+        first.add(new AttributeModifier("class", new IModel<String>() {
 
             @Override
             public String getObject() {
@@ -132,7 +121,7 @@ public class NavigatorPanel extends Panel {
             }
         }));
         add(first);
-        AjaxLink firstLink = new AjaxLink(ID_FIRST_LINK) {
+        AjaxLink<Void> firstLink = new AjaxLink<Void>(ID_FIRST_LINK) {
 
             @Override
             protected void updateAjaxAttributes(AjaxRequestAttributes attributes) {
@@ -155,7 +144,7 @@ public class NavigatorPanel extends Panel {
     }
 
     private void initNavigation() {
-        IModel<Integer> model = new AbstractReadOnlyModel<Integer>() {
+        IModel<Integer> model = new IModel<Integer>() {
 
             @Override
             public Integer getObject() {
@@ -182,7 +171,7 @@ public class NavigatorPanel extends Panel {
                 };
                 item.add(pageLink);
 
-                item.add(new AttributeModifier("class", new AbstractReadOnlyModel<String>() {
+                item.add(new AttributeModifier("class", new IModel<String>() {
 
                     @Override
                     public String getObject() {
@@ -226,7 +215,7 @@ public class NavigatorPanel extends Panel {
 
     private void initNext() {
         WebMarkupContainer next = new WebMarkupContainer(ID_NEXT);
-        next.add(new AttributeModifier("class", new AbstractReadOnlyModel<String>() {
+        next.add(new AttributeModifier("class", new IModel<String>() {
 
             @Override
             public String getObject() {
@@ -235,7 +224,7 @@ public class NavigatorPanel extends Panel {
         }));
         add(next);
 
-        AjaxLink nextLink = new AjaxLink(ID_NEXT_LINK) {
+        AjaxLink<Void> nextLink = new AjaxLink<Void>(ID_NEXT_LINK) {
 
             @Override
             protected void updateAjaxAttributes(AjaxRequestAttributes attributes) {
@@ -259,7 +248,7 @@ public class NavigatorPanel extends Panel {
 
     private void initLast() {
         WebMarkupContainer last = new WebMarkupContainer(ID_LAST);
-        last.add(new AttributeModifier("class", new AbstractReadOnlyModel<String>() {
+        last.add(new AttributeModifier("class", new IModel<String>() {
 
             @Override
             public String getObject() {
@@ -268,7 +257,7 @@ public class NavigatorPanel extends Panel {
         }));
         add(last);
 
-        AjaxLink lastLink = new AjaxLink(ID_LAST_LINK) {
+        AjaxLink<Void> lastLink = new AjaxLink<Void>(ID_LAST_LINK) {
 
             @Override
             protected void updateAjaxAttributes(AjaxRequestAttributes attributes) {
@@ -284,7 +273,7 @@ public class NavigatorPanel extends Panel {
 
             @Override
             public boolean isEnabled() {
-                return BooleanUtils.isTrue(showPageListingModel.getObject()) && isLastEnabled();
+                return !isCountingDisabled() && BooleanUtils.isTrue(showPageListingModel.getObject()) && isLastEnabled();
             }
         });
         last.add(lastLink);
@@ -340,5 +329,9 @@ public class NavigatorPanel extends Panel {
     }
 
     protected void onPageChanged(AjaxRequestTarget target, long page) {
+    }
+
+    protected boolean isCountingDisabled(){
+        return false;
     }
 }

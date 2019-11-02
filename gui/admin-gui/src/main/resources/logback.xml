@@ -1,66 +1,58 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright (c) 2010-2017 Evolveum
+  ~ Copyright (c) 2010-2017 Evolveum and contributors
   ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~     http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
+  ~ This work is dual-licensed under the Apache License 2.0
+  ~ and European Union Public License. See LICENSE file for details.
   -->
 
 <configuration>
 
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <layout class="ch.qos.logback.classic.PatternLayout">
-            <pattern>%date [%X{subsystem}] [%thread] %level \(%logger\): %msg%n</pattern>
-        </layout>
-    </appender>
+    <if condition='"true".equals(property("midpoint.logging.alt.enabled"))'>
+        <then>
+            <include resource="logback-alt.xml" />
+        </then>
+    </if>
 
-    <appender name="IDM_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <!--See http://logback.qos.ch/manual/appenders.html#RollingFileAppender-->
-        <!--and http://logback.qos.ch/manual/appenders.html#TimeBasedRollingPolicy-->
-        <!--for further documentation-->
+    <appender name="MIDPOINT_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- See http://logback.qos.ch/manual/appenders.html#RollingFileAppender -->
+        <!-- and http://logback.qos.ch/manual/appenders.html#SizeAndTimeBasedRollingPolicy -->
+        <!-- for further documentation -->
         <Append>true</Append>
-        <File>${midpoint.home}/logs/idm.log</File>
+        <File>${midpoint.home}/log/midpoint.log</File>
         <encoder>
             <pattern>%date [%X{subsystem}] [%thread] %level \(%logger\): %msg%n</pattern>
         </encoder>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${midpoint.home}/logs/idm-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
-                <maxFileSize>100MB</maxFileSize>
-            </timeBasedFileNamingAndTriggeringPolicy>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${midpoint.home}/log/midpoint-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
             <maxHistory>10</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
             <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
     </appender>
 
     <!-- Appender for profiling purposes -->
-    <appender name="IDM-PROFILE_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <!--See http://logback.qos.ch/manual/appenders.html#RollingFileAppender-->
-        <!--and http://logback.qos.ch/manual/appenders.html#TimeBasedRollingPolicy-->
-        <!--for further documentation-->
+    <appender name="MIDPOINT_PROFILE_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- See http://logback.qos.ch/manual/appenders.html#RollingFileAppender -->
+        <!-- and http://logback.qos.ch/manual/appenders.html#SizeAndTimeBasedRollingPolicy -->
+        <!-- for further documentation -->
         <Append>true</Append>
-        <File>${midpoint.home}/logs/idm-profile.log</File>
+        <File>${midpoint.home}/log/midpoint-profile.log</File>
         <encoder>
             <pattern>%date %level: %msg%n</pattern>
         </encoder>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${midpoint.home}/logs/idm-profile-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
-                <maxFileSize>100MB</maxFileSize>
-            </timeBasedFileNamingAndTriggeringPolicy>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${midpoint.home}/log/midpoint-profile-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
             <maxHistory>10</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
     </appender>
     <!-- Appender for profiling purposes -->
+
+    <logger name="org.springframework.boot.SpringApplication" level="INFO"/>
 
     <logger name="ro.isdc.wro.extensions.processor.css.Less4jProcessor" level="ERROR"/>
     <logger name="org.hibernate.engine.jdbc.spi.SqlExceptionHelper" level="OFF"/>
@@ -69,13 +61,20 @@
     <logger name="PROFILING" level="INFO"/>
     <logger name="com.evolveum.midpoint" level="INFO" />
     <logger name="com.evolveum.midpoint.web.util.MidPointProfilingServletFilter" level="TRACE">
-        <appender-ref ref="IDM-PROFILE_LOG"/>
+        <appender-ref ref="MIDPOINT_PROFILE_LOG"/>
     </logger>
 
-    <root level="WARN">
-        <appender-ref ref="IDM_LOG"/>
-        <appender-ref ref="CONSOLE"/>
-    </root>
+    <if condition='"true".equals(property("midpoint.logging.alt.enabled"))'>
+        <then>
+            <root level="WARN">
+                <appender-ref ref="MIDPOINT_LOG"/>
+                <appender-ref ref="ALT_LOG"/>
+            </root>
+        </then>
+        <else>
+            <root level="WARN">
+                <appender-ref ref="MIDPOINT_LOG"/>
+            </root>
+        </else>
+    </if>
 </configuration>
-
-

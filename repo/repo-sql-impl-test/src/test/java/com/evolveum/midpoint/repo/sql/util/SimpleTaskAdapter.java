@@ -1,54 +1,28 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.util;
 
-import com.evolveum.midpoint.prism.Containerable;
-import com.evolveum.midpoint.prism.Item;
-import com.evolveum.midpoint.prism.ItemDefinition;
-import com.evolveum.midpoint.prism.PrismContainer;
-import com.evolveum.midpoint.prism.PrismObject;
-import com.evolveum.midpoint.prism.PrismProperty;
-import com.evolveum.midpoint.prism.PrismReference;
-import com.evolveum.midpoint.prism.PrismValue;
+import com.evolveum.midpoint.prism.*;
 import com.evolveum.midpoint.prism.delta.ChangeType;
 import com.evolveum.midpoint.prism.delta.ItemDelta;
+import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.schema.statistics.ProvisioningOperation;
 import com.evolveum.midpoint.schema.statistics.SynchronizationInformation;
-import com.evolveum.midpoint.task.api.LightweightTaskHandler;
-import com.evolveum.midpoint.task.api.Task;
-import com.evolveum.midpoint.task.api.TaskBinding;
-import com.evolveum.midpoint.task.api.TaskExecutionStatus;
-import com.evolveum.midpoint.task.api.TaskPersistenceStatus;
-import com.evolveum.midpoint.task.api.TaskRecurrence;
-import com.evolveum.midpoint.task.api.TaskWaitingReason;
-import com.evolveum.midpoint.util.exception.ObjectAlreadyExistsException;
-import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
-import com.evolveum.midpoint.util.exception.SchemaException;
+import com.evolveum.midpoint.task.api.*;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
 import org.jetbrains.annotations.NotNull;
 
 import javax.xml.namespace.QName;
-
 import java.util.*;
 
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.emptySet;
+import static java.util.Collections.*;
 
 /**
  * @author lazyman
@@ -111,7 +85,7 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public boolean isCycle() {
+    public boolean isRecurring() {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -141,8 +115,7 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public void setBindingImmediate(TaskBinding value, OperationResult parentResult)
-            throws ObjectNotFoundException, SchemaException {
+    public void setBindingImmediate(TaskBinding value, OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -157,8 +130,7 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public void setHandlerUriImmediate(String value, OperationResult parentResult)
-            throws ObjectNotFoundException, SchemaException {
+    public void setHandlerUriImmediate(String value, OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -220,13 +192,12 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public <T extends ObjectType> PrismObject<T> getObject(Class<T> type, OperationResult parentResult)
-            throws ObjectNotFoundException, SchemaException {
+    public <T extends ObjectType> PrismObject<T> getObject(Class<T> type, OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public ObjectReferenceType getObjectRef() {
+    public ObjectReferenceType getObjectRefOrClone() {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -256,13 +227,17 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
+    public void setResultTransient(OperationResult result) {
+        throw new UnsupportedOperationException("not implemented yet.");
+    }
+
+    @Override
     public void setResult(OperationResult result) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public void setResultImmediate(OperationResult result, OperationResult parentResult)
-            throws ObjectNotFoundException, SchemaException {
+    public void setResultImmediate(OperationResult result, OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -297,80 +272,62 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public void setNameImmediate(PolyStringType value, OperationResult parentResult)
-            throws ObjectNotFoundException, SchemaException, ObjectAlreadyExistsException {
+    public void setNameImmediate(PolyStringType value, OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public <C extends Containerable> PrismContainer<C> getExtension() {
+    public <IV extends PrismValue,ID extends ItemDefinition> Item<IV,ID> getExtensionItemOrClone(ItemName propertyName) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public <T> PrismProperty<T> getExtensionProperty(QName propertyName) {
+    public <C extends Containerable> void setExtensionContainer(PrismContainer<C> item) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public <T> T getExtensionPropertyRealValue(QName propertyName) {
+    public void setExtensionReference(PrismReference reference) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public <IV extends PrismValue,ID extends ItemDefinition> Item<IV,ID> getExtensionItem(QName propertyName) {
+    public void setExtensionProperty(PrismProperty<?> property) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public <C extends Containerable> void setExtensionContainer(PrismContainer<C> item) throws SchemaException {
+    public void setExtensionPropertyImmediate(PrismProperty<?> property, OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public void setExtensionReference(PrismReference reference) throws SchemaException {
+    public void addExtensionProperty(PrismProperty<?> property) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public void setExtensionProperty(PrismProperty<?> property) throws SchemaException {
+    public <T> void setExtensionPropertyValue(QName propertyName, T value) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public void setExtensionPropertyImmediate(PrismProperty<?> property, OperationResult parentResult)
-            throws ObjectNotFoundException, SchemaException {
+    public <T> void setExtensionPropertyValueTransient(QName propertyName, T value) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public void addExtensionProperty(PrismProperty<?> property) throws SchemaException {
+    public <T extends Containerable> void setExtensionContainerValue(QName containerName, T value) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public <T> void setExtensionPropertyValue(QName propertyName, T value) throws SchemaException {
+    public void setExtensionItem(Item item) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public <T> void setExtensionPropertyValueTransient(QName propertyName, T value) throws SchemaException {
-        throw new UnsupportedOperationException("not implemented yet.");
-    }
-
-    @Override
-    public <T extends Containerable> void setExtensionContainerValue(QName containerName, T value)
-            throws SchemaException {
-        throw new UnsupportedOperationException("not implemented yet.");
-    }
-
-    @Override
-    public void setExtensionItem(Item item) throws SchemaException {
-        throw new UnsupportedOperationException("not implemented yet.");
-    }
-
-    @Override
-    public void modifyExtension(ItemDelta itemDelta) throws SchemaException {
+    public void modifyExtension(ItemDelta itemDelta) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -380,27 +337,39 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public void setProgress(long value) {
+    public void setProgress(Long value) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public void setProgressImmediate(long progress, OperationResult parentResult)
-            throws ObjectNotFoundException, SchemaException {
+    public void setProgressImmediate(Long progress, OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public void setProgressTransient(long value) {
+    public void setProgressTransient(Long value) {
     }
 
+    @NotNull
     @Override
-    public PrismObject<TaskType> getTaskPrismObject() {
+    public PrismObject<TaskType> getUpdatedOrClonedTaskObject() {
+        throw new UnsupportedOperationException("not implemented yet.");
+    }
+
+    @NotNull
+    @Override
+    public PrismObject<TaskType> getUpdatedTaskObject() {
+        throw new UnsupportedOperationException("not implemented yet.");
+    }
+
+    @NotNull
+    @Override
+    public PrismObject<TaskType> getClonedTaskObject() {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public void refresh(OperationResult parentResult) throws ObjectNotFoundException, SchemaException {
+    public void refresh(OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -415,13 +384,7 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public boolean canRun() {
-        throw new UnsupportedOperationException("not implemented yet.");
-    }
-
-    @Override
-    public void savePendingModifications(OperationResult parentResult)
-            throws ObjectNotFoundException, SchemaException, ObjectAlreadyExistsException {
+    public void flushPendingModifications(OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -451,6 +414,11 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
+    public String getNodeAsObserved() {
+        return null;
+    }
+
+    @Override
     public OperationResultStatusType getResultStatus() {
         throw new UnsupportedOperationException("not implemented yet.");
     }
@@ -471,8 +439,48 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public void setDescriptionImmediate(String value, OperationResult parentResult)
-            throws ObjectNotFoundException, SchemaException {
+    public PrismContainer<? extends ExtensionType> getExtensionOrClone() {
+        return null;
+    }
+
+    @NotNull
+    @Override
+    public PrismContainer<? extends ExtensionType> getOrCreateExtension() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public PrismContainer<? extends ExtensionType> getExtensionClone() {
+        return null;
+    }
+
+    @Override
+    public boolean hasExtension() {
+        return false;
+    }
+
+    @Override
+    public <T> PrismProperty<T> getExtensionPropertyOrClone(ItemName propertyName) {
+        return null;
+    }
+
+    @Override
+    public <T> T getExtensionPropertyRealValue(ItemName propertyName) {
+        return null;
+    }
+
+    @Override
+    public <T extends Containerable> T getExtensionContainerRealValueOrClone(ItemName containerName) {
+        return null;
+    }
+
+    @Override
+    public PrismReference getExtensionReferenceOrClone(ItemName name) {
+        return null;
+    }
+
+    @Override
+    public void setDescriptionImmediate(String value, OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -487,7 +495,7 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public void deleteExtensionProperty(PrismProperty<?> property) throws SchemaException {
+    public void deleteExtensionProperty(PrismProperty<?> property) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -512,26 +520,6 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public Task createSubtask(LightweightTaskHandler handler) {
-        throw new UnsupportedOperationException("not implemented yet.");
-    }
-
-//    @Deprecated
-//    @Override
-//    public TaskRunResult waitForSubtasks(Integer interval, OperationResult parentResult)
-//            throws ObjectNotFoundException, SchemaException, ObjectAlreadyExistsException {
-//        throw new UnsupportedOperationException("not implemented yet.");
-//    }
-//
-//    @Deprecated
-//    @Override
-//    public TaskRunResult waitForSubtasks(Integer interval, Collection<ItemDelta<?>> extensionDeltas,
-//                                         OperationResult parentResult)
-//            throws ObjectNotFoundException, SchemaException, ObjectAlreadyExistsException {
-//        throw new UnsupportedOperationException("not implemented yet.");
-//    }
-
-    @Override
     public String getParent() {
         throw new UnsupportedOperationException("not implemented yet.");
     }
@@ -553,22 +541,23 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public void finishHandler(OperationResult parentResult) throws ObjectNotFoundException, SchemaException {
+    public void finishHandler(OperationResult parentResult) {
+        throw new UnsupportedOperationException("not implemented yet.");
+    }
+
+    @NotNull
+    @Override
+    public List<Task> listSubtasks(boolean persistentOnly, OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public List<Task> listSubtasks(OperationResult parentResult) throws SchemaException {
+    public List<Task> listPrerequisiteTasks(OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public List<Task> listPrerequisiteTasks(OperationResult parentResult) throws SchemaException {
-        throw new UnsupportedOperationException("not implemented yet.");
-    }
-
-    @Override
-    public void startWaitingForTasksImmediate(OperationResult result) throws SchemaException, ObjectNotFoundException {
+    public void startWaitingForTasksImmediate(OperationResult result) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -583,17 +572,12 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public List<Task> listDependents(OperationResult result) throws SchemaException, ObjectNotFoundException {
+    public List<Task> listDependents(OperationResult result) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public Task getParentTask(OperationResult result) throws SchemaException, ObjectNotFoundException {
-        throw new UnsupportedOperationException("not implemented yet.");
-    }
-
-    @Override
-    public Task getParentForLightweightAsynchronousTask() {
+    public Task getParentTask(OperationResult result) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -613,6 +597,11 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
+    public void makeWaiting(TaskWaitingReason reason, TaskUnpauseActionType unpauseAction) {
+        throw new UnsupportedOperationException("not implemented yet.");
+    }
+
+    @Override
     public void pushWaitForTasksHandlerUri() {
         throw new UnsupportedOperationException("not implemented yet.");
     }
@@ -623,23 +612,17 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public void setObjectRefImmediate(ObjectReferenceType value, OperationResult parentResult)
-            throws ObjectNotFoundException, SchemaException, ObjectAlreadyExistsException {
+    public void setObjectRefImmediate(ObjectReferenceType value, OperationResult parentResult) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public PrismReference getExtensionReference(QName propertyName) {
+    public void addExtensionReference(PrismReference reference) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
     @Override
-    public void addExtensionReference(PrismReference reference) throws SchemaException {
-        throw new UnsupportedOperationException("not implemented yet.");
-    }
-
-    @Override
-    public List<Task> listSubtasksDeeply(OperationResult result) throws SchemaException {
+    public List<Task> listSubtasksDeeply(boolean persistentOnly, OperationResult result) {
         throw new UnsupportedOperationException("not implemented yet.");
     }
 
@@ -650,43 +633,9 @@ public class SimpleTaskAdapter implements Task {
 
     @Override
     public PolicyRuleType getPolicyRule() {
-    	throw new UnsupportedOperationException("not implemented yet.");
+        throw new UnsupportedOperationException("not implemented yet.");
     }
 
-
-    @Override
-    public LightweightTaskHandler getLightweightTaskHandler() {
-        return null;
-    }
-
-    @Override
-    public boolean isLightweightAsynchronousTask() {
-        return false;
-    }
-
-    @Override
-    public Set<? extends Task> getLightweightAsynchronousSubtasks() {
-        return null;
-    }
-
-    @Override
-    public Set<? extends Task> getRunningLightweightAsynchronousSubtasks() {
-        return null;
-    }
-
-    @Override
-    public boolean lightweightHandlerStartRequested() {
-        return false;
-    }
-
-    @Override
-    public void startLightweightHandler() {
-    }
-
-    @Override
-    public OperationStatsType getAggregatedLiveOperationStats() {
-        return null;
-    }
 
     @Override
     public Long getExpectedTotal() {
@@ -699,7 +648,7 @@ public class SimpleTaskAdapter implements Task {
     }
 
     @Override
-    public void setExpectedTotalImmediate(Long value, OperationResult parentResult) throws ObjectNotFoundException, SchemaException {
+    public void setExpectedTotalImmediate(Long value, OperationResult parentResult) {
         //To change body of implemented methods use File | Settings | File Templates.
     }
 
@@ -721,7 +670,7 @@ public class SimpleTaskAdapter implements Task {
 
     @Override
     public void recordSynchronizationOperationEnd(String objectName, String objectDisplayName, QName objectType, String objectOid, long started,
-			Throwable exception, SynchronizationInformation.Record originalStateIncrement, SynchronizationInformation.Record newStateIncrement) {
+            Throwable exception, SynchronizationInformation.Record originalStateIncrement, SynchronizationInformation.Record newStateIncrement) {
     }
 
     @Override
@@ -781,41 +730,14 @@ public class SimpleTaskAdapter implements Task {
         return null;
     }
 
-    @Override
-    public void startCollectingOperationStatsFromZero(boolean enableIterationStatistics, boolean enableSynchronizationStatistics, boolean enableActionsExecutedStatistics) {
+    @Override public void modify(ItemDelta<?, ?> delta) {
+    }
+
+    @Override public void modify(Collection<ItemDelta<?, ?>> deltas) {
 
     }
 
-    @Override
-    public void startCollectingOperationStatsFromStoredValues(boolean enableIterationStatistics, boolean enableSynchronizationStatistics, boolean enableActionsExecutedStatistics) {
-
-    }
-
-    @Override
-    public void storeOperationStats() {
-
-    }
-
-    @Override
-    public void initializeWorkflowContextImmediate(String processInstanceId, OperationResult result) throws SchemaException {
-    }
-
-    @Override public void addModification(ItemDelta<?, ?> delta) throws SchemaException {
-    }
-
-    @Override public void addModifications(Collection<ItemDelta<?, ?>> deltas) throws SchemaException {
-
-    }
-
-    @Override public void addModificationImmediate(ItemDelta<?, ?> delta, OperationResult parentResult) throws SchemaException {
-    }
-
-    @Override
-    public WfContextType getWorkflowContext() {
-        return null;
-    }
-
-    @Override public void setWorkflowContext(WfContextType context) throws SchemaException {
+    @Override public void modifyAndFlush(ItemDelta<?, ?> delta, OperationResult parentResult) {
     }
 
     @Override
@@ -848,5 +770,131 @@ public class SimpleTaskAdapter implements Task {
 
     @Override
     public void close(OperationResult taskResult, boolean saveState, OperationResult parentResult) {
+    }
+
+    @Override
+    public TaskWorkManagementType getWorkManagement() {
+        return null;
+    }
+
+    @Override
+    public TaskWorkStateType getWorkState() {
+        return null;
+    }
+
+    @Override
+    public TaskUnpauseActionType getUnpauseAction() {
+        return null;
+    }
+
+    @Override
+    public TaskExecutionStatusType getStateBeforeSuspend() {
+        return null;
+    }
+
+    @Override
+    public boolean isPartitionedMaster() {
+        return false;
+    }
+
+    @Override
+    public TaskKindType getKind() {
+        return null;
+    }
+
+    @Override
+    public String getExecutionGroup() {
+        return null;
+    }
+
+    @Override
+    public OperationStatsType getAggregatedLiveOperationStats() {
+        return null;
+    }
+
+    @Override
+    public ObjectReferenceType getSelfReference() {
+        return null;
+    }
+
+    @Override
+    public String getVersion() {
+        return null;
+    }
+
+    @Override
+    public Collection<? extends TriggerType> getTriggers() {
+        return null;
+    }
+
+    @Override
+    public Collection<? extends AssignmentType> getAssignments() {
+        return null;
+    }
+
+    @Override
+    public ObjectReferenceType getOwnerRef() {
+        return null;
+    }
+
+    @NotNull
+    @Override
+    public Collection<String> getCachingProfiles() {
+        return emptySet();
+    }
+
+    @Override
+    public String getOperationResultHandlingStrategyName() {
+        return null;
+    }
+
+    @Override
+    public void setExecutionConstraints(TaskExecutionConstraintsType value) {
+    }
+
+    @Override
+    public TaskExecutionEnvironmentType getExecutionEnvironment() {
+        return null;
+    }
+
+    @Override
+    public void setExecutionEnvironment(TaskExecutionEnvironmentType value) {
+    }
+
+    @Override
+    public void setExecutionEnvironmentImmediate(TaskExecutionEnvironmentType value, OperationResult parentResult) {
+    }
+
+    @Override
+    public void setExecutionEnvironmentTransient(TaskExecutionEnvironmentType value) {
+    }
+
+    @Override
+    public boolean isScavenger() {
+        return false;
+    }
+
+    @NotNull
+    @Override
+    public Collection<TracingRootType> getTracingRequestedFor() {
+        return emptySet();
+    }
+
+    @Override
+    public void addTracingRequest(TracingRootType point) {
+    }
+
+    @Override
+    public void removeTracingRequests() {
+
+    }
+
+    @Override
+    public TracingProfileType getTracingProfile() {
+        return null;
+    }
+
+    @Override
+    public void setTracingProfile(TracingProfileType tracingProfile) {
     }
 }

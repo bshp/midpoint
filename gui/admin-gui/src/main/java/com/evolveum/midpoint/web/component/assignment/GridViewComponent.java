@@ -1,44 +1,32 @@
 /*
- * Copyright (c) 2016 Evolveum
+ * Copyright (c) 2016 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.component.assignment;
 
 import com.evolveum.midpoint.gui.api.component.BasePanel;
 import com.evolveum.midpoint.web.component.data.BaseSortableDataProvider;
 import com.evolveum.midpoint.web.component.data.BoxedPagingPanel;
+import com.evolveum.midpoint.web.component.data.ObjectDataProvider;
 import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.AbstractRoleType;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.behavior.AttributeAppender;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
-import org.apache.wicket.markup.html.panel.Fragment;
-import org.apache.wicket.markup.repeater.AbstractPageableView;
 import org.apache.wicket.markup.repeater.Item;
-import org.apache.wicket.markup.repeater.data.DataViewBase;
 import org.apache.wicket.markup.repeater.data.GridView;
 import org.apache.wicket.markup.repeater.data.IDataProvider;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 
-import java.util.Iterator;
 import java.util.List;
 
 /**
  * Created by honchar.
  */
-public abstract class GridViewComponent<O extends Object> extends BasePanel<IDataProvider<O>> {
+public abstract class GridViewComponent<O extends Object> extends BasePanel<ObjectDataProvider<AssignmentEditorDto, AbstractRoleType>> {
     private static final long serialVersionUID = 1L;
 
     private static final int DEFAULT_ROW_COUNT = 5;
@@ -50,7 +38,7 @@ public abstract class GridViewComponent<O extends Object> extends BasePanel<IDat
     private static final String ID_COUNT = "count";
     private static final String ID_FOOTER_CONTAINER = "footerContainer";
 
-    public GridViewComponent(String id, IModel<IDataProvider<O>> dataProviderModel){
+    public GridViewComponent(String id, IModel<ObjectDataProvider<AssignmentEditorDto, AbstractRoleType>> dataProviderModel){
         super(id, dataProviderModel);
     }
 
@@ -81,8 +69,6 @@ public abstract class GridViewComponent<O extends Object> extends BasePanel<IDat
             public boolean isVisible(){
                 BaseSortableDataProvider p = (BaseSortableDataProvider) GridViewComponent.this.getModelObject();
                 List<AssignmentEditorDto> l = p.getAvailableData();
-
-                if (l != null){}
                 return true;
             }
         });
@@ -105,7 +91,7 @@ public abstract class GridViewComponent<O extends Object> extends BasePanel<IDat
             }
         });
 
-        final Label count = new Label(ID_COUNT, new AbstractReadOnlyModel<String>() {
+        final Label count = new Label(ID_COUNT, new IModel<String>() {
 
             @Override
             public String getObject() {
@@ -153,4 +139,8 @@ public abstract class GridViewComponent<O extends Object> extends BasePanel<IDat
     }
 
     protected abstract void populateItem(Item item);
+
+    public ObjectDataProvider<AssignmentEditorDto, AbstractRoleType> getProvider(){
+        return GridViewComponent.this.getModelObject();
+    }
 }

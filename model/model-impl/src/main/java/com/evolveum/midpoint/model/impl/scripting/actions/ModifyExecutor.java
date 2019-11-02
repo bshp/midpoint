@@ -1,23 +1,15 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2014 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.model.impl.scripting.actions;
 
 import com.evolveum.midpoint.model.api.ModelExecuteOptions;
 import com.evolveum.midpoint.model.impl.scripting.PipelineData;
+import com.evolveum.midpoint.model.impl.util.ModelImplUtils;
 import com.evolveum.midpoint.model.impl.scripting.ExecutionContext;
 import com.evolveum.midpoint.model.api.ScriptExecutionException;
 import com.evolveum.midpoint.model.api.PipelineItem;
@@ -32,6 +24,7 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
 import com.evolveum.midpoint.xml.ns._public.model.scripting_3.ActionExpressionType;
 import com.evolveum.midpoint.xml.ns._public.model.scripting_3.ActionParameterValueType;
 import com.evolveum.prism.xml.ns._public.types_3.ChangeTypeType;
+import com.evolveum.prism.xml.ns._public.types_3.EvaluationTimeType;
 import com.evolveum.prism.xml.ns._public.types_3.ObjectDeltaType;
 
 import org.springframework.stereotype.Component;
@@ -76,16 +69,25 @@ public class ModifyExecutor extends BaseActionExecutor {
                 try {
                     ObjectDelta<? extends ObjectType> delta = createDelta(objectType, deltaData);
                     result.addParam("delta", delta);
+                    // This is only a preliminary solution for MID-4138. There are few things to improve:
+                    // 1. References could be resolved earlier (before the main cycle); however it would require much more
+                    //    coding, as we have only skeleton of ObjectDeltaType there - we don't know the specific object type
+                    //    the delta will be applied to. It is not a big problem, but still a bit of work.
+                    // 2. If the evaluation time is IMPORT, and the bulk action is part of a task that is being imported into
+                    //    repository, it should be perhaps resolved at that time. But again, it is a lot of work and it does
+                    //    not cover bulk actions which are not part of a task.
+                    // We consider this solution to be adequate for now.
+                    ModelImplUtils.resolveReferences(delta, cacheRepositoryService, false, false, EvaluationTimeType.IMPORT, true, prismContext, result);
                     operationsHelper.applyDelta(delta, executionOptions, dryRun, context, result);
                     operationsHelper.recordEnd(context, objectType, started, null);
                 } catch (Throwable ex) {
                     operationsHelper.recordEnd(context, objectType, started, ex);
-					exception = processActionException(ex, NAME, value, context);
+                    exception = processActionException(ex, NAME, value, context);
                 }
                 context.println((exception != null ? "Attempted to modify " : "Modified ") + prismObject.toString() + optionsSuffix(executionOptions, dryRun) + exceptionSuffix(exception));
             } else {
-				//noinspection ThrowableNotThrown
-				processActionException(new ScriptExecutionException("Item is not a PrismObject"), NAME, value, context);
+                //noinspection ThrowableNotThrown
+                processActionException(new ScriptExecutionException("Item is not a PrismObject"), NAME, value, context);
             }
             operationsHelper.trimAndCloneResult(result, globalResult, context);
         }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2018 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.login;
@@ -19,6 +10,7 @@ package com.evolveum.midpoint.web.page.login;
 import com.evolveum.midpoint.gui.api.page.PageBase;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.task.api.Task;
+import com.evolveum.midpoint.util.exception.CommonException;
 import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
 import com.evolveum.midpoint.util.exception.SchemaException;
 import com.evolveum.midpoint.util.logging.Trace;
@@ -32,9 +24,11 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.CredentialsPolicyTyp
 import com.evolveum.midpoint.xml.ns._public.common.common_3.RegistrationsPolicyType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.SecurityPolicyType;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.wicket.RestartResponseException;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
+import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.link.BookmarkablePageLink;
 import org.apache.wicket.protocol.http.servlet.ServletWebRequest;
 import org.apache.wicket.request.cycle.RequestCycle;
@@ -46,23 +40,24 @@ import javax.servlet.http.HttpSession;
 /**
  * @author mserbak
  */
-@PageDescriptor(url = "/login")
+@PageDescriptor(url = "/login", permitAll = true)
 public class PageLogin extends PageBase {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private static final Trace LOGGER = TraceManager.getTrace(PageLogin.class);
+    private static final Trace LOGGER = TraceManager.getTrace(PageLogin.class);
 
     private static final String ID_FORGET_PASSWORD = "forgetpassword";
     private static final String ID_SELF_REGISTRATION = "selfRegistration";
+    private static final String ID_CSRF_FIELD = "csrfField";
 
     private static final String DOT_CLASS = PageLogin.class.getName() + ".";
     protected static final String OPERATION_LOAD_RESET_PASSWORD_POLICY = DOT_CLASS + "loadPasswordResetPolicy";
     private static final String OPERATION_LOAD_REGISTRATION_POLICY = DOT_CLASS + "loadRegistrationPolicy";
-    
+
     public PageLogin() {
         BookmarkablePageLink<String> link = new BookmarkablePageLink<>(ID_FORGET_PASSWORD, PageForgotPassword.class);
         link.add(new VisibleEnableBehaviour() {
-        	private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
             @Override
             public boolean isVisible() {
@@ -71,17 +66,17 @@ public class PageLogin extends PageBase {
                 SecurityPolicyType securityPolicy = null;
                 try {
                     securityPolicy = getModelInteractionService().getSecurityPolicy(null, null, parentResult);
-                } catch (ObjectNotFoundException | SchemaException e) {
+                } catch (CommonException e) {
                     LOGGER.warn("Cannot read credentials policy: " + e.getMessage(), e);
                 }
 
                 if (securityPolicy == null) {
-                	return false;
+                    return false;
                 }
-                
+
                 CredentialsPolicyType creds = securityPolicy.getCredentials();
-                
-                // TODO: Not entirely correct. This means we have reset somehow configured, but not necessarily enabled. 
+
+                // TODO: Not entirely correct. This means we have reset somehow configured, but not necessarily enabled.
                 if (creds != null
                         && ((creds.getSecurityQuestions() != null
                         && creds.getSecurityQuestions().getQuestionNumber() != null) || (securityPolicy.getCredentialsReset() != null))) {
@@ -92,17 +87,17 @@ public class PageLogin extends PageBase {
             }
         });
         add(link);
-        
+
         AjaxLink<String> registration = new AjaxLink<String>(ID_SELF_REGISTRATION) {
-        	private static final long serialVersionUID = 1L;
-        	
-        	@Override
-        	public void onClick(AjaxRequestTarget target) {
-        		setResponsePage(PageSelfRegistration.class);
-        	}
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void onClick(AjaxRequestTarget target) {
+                setResponsePage(PageSelfRegistration.class);
+            }
         };
         registration.add(new VisibleEnableBehaviour() {
-        	private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
             @Override
             public boolean isVisible() {
@@ -110,9 +105,14 @@ public class PageLogin extends PageBase {
 
                 RegistrationsPolicyType registrationPolicies = null;
                 try {
-                	Task task = createAnonymousTask(OPERATION_LOAD_REGISTRATION_POLICY);
-                	registrationPolicies = getModelInteractionService().getRegistrationPolicy(null, task, parentResult);
-                } catch (ObjectNotFoundException | SchemaException e) {
+                    Task task = createAnonymousTask(OPERATION_LOAD_REGISTRATION_POLICY);
+                    registrationPolicies = getModelInteractionService().getFlowPolicy(null, task, parentResult);
+
+                    if (registrationPolicies == null || registrationPolicies.getSelfRegistration() == null) {
+                        registrationPolicies = getModelInteractionService().getRegistrationPolicy(null, task, parentResult);
+                    }
+
+                } catch (CommonException e) {
                     LOGGER.warn("Cannot read credentials policy: " + e.getMessage(), e);
                 }
 
@@ -126,6 +126,9 @@ public class PageLogin extends PageBase {
             }
         });
         add(registration);
+
+        WebMarkupContainer csrfField = SecurityUtils.createHiddenInputForCsrf(ID_CSRF_FIELD);
+        add(csrfField);
     }
 
     @Override
@@ -141,8 +144,13 @@ public class PageLogin extends PageBase {
             return;
         }
 
-        String key = ex.getMessage() != null ? ex.getMessage() : "web.security.provider.unavailable";
-        error(getString(key));
+        String msg = ex.getMessage();
+        if (StringUtils.isEmpty(msg)) {
+            msg = "web.security.provider.unavailable";
+        }
+
+        msg = getLocalizationService().translate(msg, null, getLocale(), msg);
+        error(msg);
 
         httpSession.removeAttribute(WebAttributes.AUTHENTICATION_EXCEPTION);
 

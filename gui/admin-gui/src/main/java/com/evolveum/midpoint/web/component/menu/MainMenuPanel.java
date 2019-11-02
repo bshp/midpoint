@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.component.menu;
 
@@ -23,18 +14,19 @@ import com.evolveum.midpoint.web.component.breadcrumbs.Breadcrumb;
 import com.evolveum.midpoint.web.component.breadcrumbs.BreadcrumbPageClass;
 import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
 import com.evolveum.midpoint.web.security.SecurityUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.IPageFactory;
 import org.apache.wicket.Session;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
+import org.apache.wicket.behavior.AttributeAppender;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.WebPage;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
@@ -47,7 +39,7 @@ import java.util.List;
  * @author Viliam Repan (lazyman)
  */
 public class MainMenuPanel extends BasePanel<MainMenuItem> {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
     private static final String ID_ITEM = "item";
     private static final String ID_LINK = "link";
@@ -59,22 +51,36 @@ public class MainMenuPanel extends BasePanel<MainMenuItem> {
     private static final String ID_SUB_ITEM = "subItem";
     private static final String ID_SUB_LINK = "subLink";
     private static final String ID_SUB_LABEL = "subLabel";
+    private static final String ID_SUB_LINK_ICON = "subLinkIcon";
 
     private static final Trace LOGGER = TraceManager.getTrace(MainMenuPanel.class);
 
     public MainMenuPanel(String id, IModel<MainMenuItem> model) {
         super(id, model);
-        initLayout();
+    }
+
+    private boolean initialized =false;
+
+    @Override
+    protected void onBeforeRender() {
+        super.onBeforeRender();
+
+        if (initialized) {
+            return;
+        }
+
+        initLayout();   // moved to here just to postpone initialization (if not visible, should not be executed at all)
+        initialized = true;
     }
 
     private void initLayout() {
         final MainMenuItem menu = getModelObject();
 
         WebMarkupContainer item = new WebMarkupContainer(ID_ITEM);
-        item.add(AttributeModifier.replace("class", new AbstractReadOnlyModel<String>() {
-			private static final long serialVersionUID = 1L;
+        item.add(AttributeModifier.replace("class", new IModel<String>() {
+            private static final long serialVersionUID = 1L;
 
-			@Override
+            @Override
             public String getObject() {
                 if (menu.isMenuActive((WebPage) getPage())) {
                     return "active";
@@ -93,8 +99,8 @@ public class MainMenuPanel extends BasePanel<MainMenuItem> {
 
         WebMarkupContainer link;
         if (menu.getPageClass() != null) {
-            link = new AjaxLink(ID_LINK) {
-            	private static final long serialVersionUID = 1L;
+            link = new AjaxLink<Void>(ID_LINK) {
+                private static final long serialVersionUID = 1L;
 
                 @Override
                 public void onClick(AjaxRequestTarget target) {
@@ -102,7 +108,7 @@ public class MainMenuPanel extends BasePanel<MainMenuItem> {
                 }
             };
         } else if (menu instanceof AdditionalMenuItem){
-            link = new AjaxLink(ID_LINK) {
+            link = new AjaxLink<Void>(ID_LINK) {
                 private static final long serialVersionUID = 1L;
 
                 @Override
@@ -126,35 +132,35 @@ public class MainMenuPanel extends BasePanel<MainMenuItem> {
 
         Label bubble = new Label(ID_BUBBLE, bubbleModel);
         bubble.add(new VisibleEnableBehaviour() {
-			private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
-			@Override
-			public boolean isVisible() {
-				return bubbleModel.getObject() != null;
-			}
+            @Override
+            public boolean isVisible() {
+                return bubbleModel.getObject() != null;
+            }
         });
         link.add(bubble);
 
         WebMarkupContainer arrow = new WebMarkupContainer(ID_ARROW);
         arrow.add(new VisibleEnableBehaviour() {
-			private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
-			@Override
-		    public boolean isVisible() {
-		        return !menu.getItems().isEmpty() && bubbleModel.getObject() == null;
-		    }
-		});
+            @Override
+            public boolean isVisible() {
+                return !menu.getItems().isEmpty() && bubbleModel.getObject() == null;
+            }
+        });
         link.add(arrow);
 
         WebMarkupContainer submenu = new WebMarkupContainer(ID_SUBMENU);
         submenu.add(new VisibleEnableBehaviour() {
-			private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
-			@Override
-		    public boolean isVisible() {
-		        return !menu.getItems().isEmpty();
-		    }
-		});
+            @Override
+            public boolean isVisible() {
+                return !menu.getItems().isEmpty();
+            }
+        });
         item.add(submenu);
 
         ListView<MenuItem> subItem = new ListView<MenuItem>(ID_SUB_ITEM, new Model((Serializable) menu.getItems())) {
@@ -170,8 +176,8 @@ public class MainMenuPanel extends BasePanel<MainMenuItem> {
     private void createSubmenu(final ListItem<MenuItem> listItem) {
         final MenuItem menuItem = listItem.getModelObject();
 
-        listItem.add(AttributeModifier.replace("class", new AbstractReadOnlyModel<String>() {
-        	private static final long serialVersionUID = 1L;
+        listItem.add(AttributeModifier.replace("class", new IModel<String>() {
+            private static final long serialVersionUID = 1L;
 
             @Override
             public String getObject() {
@@ -180,7 +186,7 @@ public class MainMenuPanel extends BasePanel<MainMenuItem> {
         }));
 
         Link<String> subLink = new Link<String>(ID_SUB_LINK) {
-        	private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
             @Override
             public void onClick() {
@@ -189,11 +195,19 @@ public class MainMenuPanel extends BasePanel<MainMenuItem> {
         };
         listItem.add(subLink);
 
+        WebMarkupContainer subLinkIcon = new WebMarkupContainer(ID_SUB_LINK_ICON);
+        if (StringUtils.isNotEmpty(menuItem.getIconClass())) {
+            subLinkIcon.add(AttributeAppender.append("class", new PropertyModel<>(menuItem, MainMenuItem.F_ICON_CLASS)));
+        } else {
+            subLinkIcon.add(AttributeAppender.append("class", "fa fa-circle-o"));
+        }
+        subLink.add(subLinkIcon);
+
         Label subLabel = new Label(ID_SUB_LABEL, menuItem.getNameModel());
         subLink.add(subLabel);
 
         listItem.add(new VisibleEnableBehaviour() {
-        	private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
             @Override
             public boolean isVisible() {
@@ -221,7 +235,7 @@ public class MainMenuPanel extends BasePanel<MainMenuItem> {
     }
 
     private void menuItemPerformed(MenuItem menu) {
-    	LOGGER.trace("menuItemPerformed: {}", menu);
+        LOGGER.trace("menuItemPerformed: {}", menu);
 
         IPageFactory pFactory = Session.get().getPageFactory();
         WebPage page = pFactory.newPage(menu.getPageClass(), menu.getParams());
@@ -260,7 +274,7 @@ public class MainMenuPanel extends BasePanel<MainMenuItem> {
     }
 
     private void mainMenuPerformed(MainMenuItem menu) {
-    	LOGGER.trace("mainMenuPerformed: {}", menu);
+        LOGGER.trace("mainMenuPerformed: {}", menu);
 
         if (menu.getParams() == null) {
             setResponsePage(menu.getPageClass());
@@ -270,7 +284,7 @@ public class MainMenuPanel extends BasePanel<MainMenuItem> {
     }
 
     private void additionalMenuPerformed(MainMenuItem menu) {
-    	LOGGER.trace("additionalMenuPerformed: {}", menu);
+        LOGGER.trace("additionalMenuPerformed: {}", menu);
 
         if (menu.getPageClass() != null) {
             setResponsePage(menu.getPageClass());

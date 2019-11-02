@@ -1,94 +1,63 @@
 /**
- * Copyright (c) 2015 Evolveum
+ * Copyright (c) 2018 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin;
 
-import com.evolveum.midpoint.gui.api.model.CountableLoadableModel;
-import com.evolveum.midpoint.gui.api.model.LoadableModel;
+import org.apache.wicket.request.mapper.parameter.PageParameters;
+
 import com.evolveum.midpoint.prism.PrismContainerDefinition;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.delta.ObjectDelta;
 import com.evolveum.midpoint.util.exception.SchemaException;
-import com.evolveum.midpoint.web.component.assignment.AssignmentDto;
-import com.evolveum.midpoint.web.component.assignment.AssignmentEditorDto;
-import com.evolveum.midpoint.web.component.prism.ObjectWrapper;
-import com.evolveum.midpoint.web.page.admin.users.dto.UserDtoStatus;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AbstractRoleType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AssignmentType;
-import org.apache.commons.lang.StringUtils;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.RoleType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.ServiceType;
 
 public abstract class PageAdminAbstractRole<T extends AbstractRoleType> extends PageAdminFocus<T> {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private LoadableModel<List<AssignmentEditorDto>> inducementsModel;
+    public PageAdminAbstractRole() {
+        super();
+    }
 
-	public LoadableModel<List<AssignmentEditorDto>> getInducementsModel() {
-		return inducementsModel;
-	}
+    public PageAdminAbstractRole(PageParameters parameters) {
+        super(parameters);
+    }
 
-	@Override
-	protected void prepareObjectDeltaForModify(ObjectDelta<T> focusDelta) throws SchemaException {
-		super.prepareObjectDeltaForModify(focusDelta);
+    public PageAdminAbstractRole(final PrismObject<T> abstractRole) {
+        super(abstractRole);
+    }
 
-		PrismObject<T> abstractRole = getObjectWrapper().getObject();
-		PrismContainerDefinition<AssignmentType> def = abstractRole.getDefinition()
-				.findContainerDefinition(AbstractRoleType.F_INDUCEMENT);
-		handleAssignmentDeltas(focusDelta, inducementsModel.getObject(), def);
-	}
+    public PageAdminAbstractRole(final PrismObject<T> userToEdit, boolean isNewObject) {
+        super(userToEdit, isNewObject);
+    }
 
 
-	@Override
-	protected void prepareObjectForAdd(PrismObject<T> focus) throws SchemaException {
-		super.prepareObjectForAdd(focus);
-//		handleAssignmentForAdd(focus, AbstractRoleType.F_INDUCEMENT, inducementsModel.getObject());
-	}
+    public PageAdminAbstractRole(final PrismObject<T> abstractRole, boolean isNewObject, boolean isReadonly) {
+        super(abstractRole, isNewObject, isReadonly);
+    }
 
-	@Override
-	protected void initializeModel(final PrismObject<T> objectToEdit) {
-		super.initializeModel(objectToEdit);
-		inducementsModel = new LoadableModel<List<AssignmentEditorDto>>(false) {
-			@Override
-			protected List<AssignmentEditorDto> load() {
-				return loadInducements();
-			}
-		};
-	}
+    @Override
+    protected void prepareObjectDeltaForModify(ObjectDelta<T> focusDelta) throws SchemaException {
+        super.prepareObjectDeltaForModify(focusDelta);
 
-	// TODO unify with loadAssignments
-	private List<AssignmentEditorDto> loadInducements() {
+        PrismObject<T> abstractRole = getObjectWrapper().getObject();
+        PrismContainerDefinition<AssignmentType> def = abstractRole.getDefinition()
+                .findContainerDefinition(AbstractRoleType.F_INDUCEMENT);
+    }
 
-		List<AssignmentEditorDto> list = new ArrayList<AssignmentEditorDto>();
-		List<AssignmentType> inducements = getInducementsList();
-		for (AssignmentType inducement : inducements) {
-			list.add(new AssignmentEditorDto(UserDtoStatus.MODIFY, inducement, this));
-		}
+    @Override
+    protected void prepareObjectForAdd(PrismObject<T> focus) throws SchemaException {
+        super.prepareObjectForAdd(focus);
+    }
 
-		Collections.sort(list);
-
-		return list;
-	}
-
-	private List<AssignmentType> getInducementsList(){
-		ObjectWrapper focusWrapper = getObjectWrapper();
-		PrismObject<T> focus = focusWrapper.getObject();
-		List<AssignmentType> inducements = focus.asObjectable().getInducement();
-		return inducements;
-	}
+    @Override
+    protected void initializeModel(final PrismObject<T> objectToEdit, boolean isNewObject, boolean isReadonly) {
+        super.initializeModel(objectToEdit, isNewObject, isReadonly);
+    }
 }

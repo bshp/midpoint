@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.notifications.impl;
@@ -130,7 +121,7 @@ public class AccountOperationListener implements ResourceOperationListener {
 
     private void executeNotifyAny(OperationStatus status, ResourceOperationDescription operationDescription, Task task, OperationResult result) {
         if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace("AccountOperationListener.notify (" + status + ") called with operationDescription = " + operationDescription.debugDump());
+            LOGGER.trace("AccountOperationListener.notify ({}) called with operationDescription = {}", status, operationDescription.debugDump());
         }
 
         if (operationDescription.getObjectDelta() == null) {
@@ -147,8 +138,8 @@ public class AccountOperationListener implements ResourceOperationListener {
         if (operationDescription.getObjectDelta().getObjectTypeClass() == null ||
                 !ShadowType.class.isAssignableFrom(operationDescription.getObjectDelta().getObjectTypeClass())) {
             if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("Object that was changed was not an account, exiting the operation listener (class = " +
-                        operationDescription.getObjectDelta().getObjectTypeClass() + ")");
+                LOGGER.trace("Object that was changed was not an account, exiting the operation listener (class = {})",
+                        operationDescription.getObjectDelta().getObjectTypeClass());
             }
             return;
         }
@@ -158,9 +149,9 @@ public class AccountOperationListener implements ResourceOperationListener {
     }
 
     private ResourceObjectEvent createRequest(OperationStatus status,
-                                                     ResourceOperationDescription operationDescription,
-                                                     Task task,
-                                                     OperationResult result) {
+                                              ResourceOperationDescription operationDescription,
+                                              Task task,
+                                              OperationResult result) {
 
         ResourceObjectEvent event = new ResourceObjectEvent(lightweightIdentifierGenerator);
         event.setAccountOperationDescription(operationDescription);
@@ -169,7 +160,7 @@ public class AccountOperationListener implements ResourceOperationListener {
 
         String accountOid = operationDescription.getObjectDelta().getOid();
 
-        PrismObject<UserType> user = findRequestee(accountOid, task, result, operationDescription.getObjectDelta().isDelete());
+        PrismObject<UserType> user = findRequestee(accountOid, task, result);
         if (user != null) {
             event.setRequestee(new SimpleObjectRefImpl(notificationsUtil, user.asObjectable()));
         }   // otherwise, appropriate messages were already logged
@@ -177,14 +168,14 @@ public class AccountOperationListener implements ResourceOperationListener {
         if (task != null && task.getOwner() != null) {
             event.setRequester(new SimpleObjectRefImpl(notificationsUtil, task.getOwner()));
         } else {
-            LOGGER.warn("No owner for task " + task + ", therefore no requester will be set for event " + event.getId());
+            LOGGER.warn("No owner for task {}, therefore no requester will be set for event {}", task, event.getId());
         }
 
         if (task != null && task.getChannel() != null) {
             event.setChannel(task.getChannel());
         } else if (operationDescription.getSourceChannel() != null) {
-			event.setChannel(operationDescription.getSourceChannel());
-		}
+            event.setChannel(operationDescription.getSourceChannel());
+        }
 
         return event;
     }
@@ -197,59 +188,22 @@ public class AccountOperationListener implements ResourceOperationListener {
 //        return typeMatches(type, entry.getSituation(), opDescr) && statusMatches(status, entry.getSituation());
 //    }
 
-    private PrismObject<UserType> findRequestee(String accountOid, Task task, OperationResult result, boolean isDelete) {
-        PrismObject<UserType> user;
-
-        if (accountOid != null) {
+    private PrismObject<UserType> findRequestee(String shadowOid, Task task, OperationResult result) {
+        // This is (still) a temporary solution. We need to rework it eventually.
+        if (task != null && task.getRequestee() != null) {
+            return task.getRequestee();
+        } else if (shadowOid != null) {
             try {
-                user = cacheRepositoryService.listAccountShadowOwner(accountOid, result);
-                if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace("listAccountShadowOwner for account " + accountOid + " yields " + user);
-                }
+                PrismObject<UserType> user = cacheRepositoryService.listAccountShadowOwner(shadowOid, result);
+                LOGGER.trace("listAccountShadowOwner for shadow {} yields {}", shadowOid, user);
+                return user;
             } catch (ObjectNotFoundException e) {
-                LOGGER.trace("There's a problem finding account " + accountOid, e);
+                LOGGER.trace("There's a problem finding account {}", shadowOid, e);
                 return null;
             }
-
-            if (user != null) {
-                return user;
-            }
-        }
-
-        PrismObject<UserType> requestee = task != null ? task.getRequestee() : null;
-        if (requestee == null) {
-            LOGGER.warn("There is no owner of account " + accountOid + " (in repo nor in task).");
-            if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("Task = " + (task != null ? task.debugDump() : "(null)"));
-            }
-            return null;
-        }
-        if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace("Requestee = " + requestee + " for account " + accountOid);
-        }
-        if (requestee.getOid() == null) {
-            return requestee;
-        }
-
-        // let's try to get current value of requestee ... if it exists (it will NOT exist in case of delete operation)
-        try {
-            return cacheRepositoryService.getObject(UserType.class, requestee.getOid(), null, result);
-        } catch (ObjectNotFoundException e) {
-            if (isDelete) {
-                result.removeLastSubresult();           // get rid of this error - it's not an error
-            }
-            return requestee;           // returning last known value
-//            if (!isDelete) {
-//                LoggingUtils.logException(LOGGER, "Cannot find owner of account " + accountOid, e);
-//            } else {
-//                LOGGER.info("Owner of account " + accountOid + " (user oid " + userOid + ") was probably already deleted.");
-//                result.removeLastSubresult();       // to suppress the error message (in GUI + in tests)
-//            }
-//            return null;
-        } catch (SchemaException e) {
-            LoggingUtils.logException(LOGGER, "Cannot find owner of account " + accountOid, e);
+        } else {
+            LOGGER.debug("There is no owner of account {} (in repo nor in task).", shadowOid);
             return null;
         }
     }
-
 }

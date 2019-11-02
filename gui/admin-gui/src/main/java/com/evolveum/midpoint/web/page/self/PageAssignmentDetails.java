@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2010-2019 Evolveum and contributors
+ *
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
+ */
 package com.evolveum.midpoint.web.page.self;
 
 import com.evolveum.midpoint.gui.api.page.PageBase;
@@ -14,7 +20,6 @@ import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.model.IModel;
 
 import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Created by honchar.
@@ -24,8 +29,8 @@ import java.util.List;
                 label = PageSelf.AUTH_SELF_ALL_LABEL,
                 description = PageSelf.AUTH_SELF_ALL_DESCRIPTION),
         @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_SELF_ASSIGNMENT_DETAILS_URL,
-                label = "PageAssignmentShoppingKart.auth.assignmentDetails.label",
-                description = "PageAssignmentShoppingKart.auth.assignmentDetails.description")})
+                label = "PageAssignmentShoppingCart.auth.assignmentDetails.label",
+                description = "PageAssignmentShoppingCart.auth.assignmentDetails.description")})
 public class PageAssignmentDetails extends PageBase{
     private static final String ID_FORM = "mainForm";
     private static final String ID_DETAILS_PANEL = "detailsPanel";
@@ -47,7 +52,7 @@ public class PageAssignmentDetails extends PageBase{
         mainForm.setOutputMarkupId(true);
         add(mainForm);
 
-        AssignmentDetailsPanel detailsPanel = new AssignmentDetailsPanel(ID_DETAILS_PANEL, assignmentModel, PageAssignmentDetails.this);
+        AssignmentDetailsPanel detailsPanel = new AssignmentDetailsPanel(ID_DETAILS_PANEL, assignmentModel);
         detailsPanel.setOutputMarkupId(true);
         mainForm.add(detailsPanel);
 
@@ -68,7 +73,7 @@ public class PageAssignmentDetails extends PageBase{
             public void onClick(AjaxRequestTarget target) {
                 RoleCatalogStorage storage = getSessionStorage().getRoleCatalog();
                 if (storage.getAssignmentShoppingCart() == null){
-                    storage.setAssignmentShoppingCart(new ArrayList<AssignmentEditorDto>());
+                    storage.setAssignmentShoppingCart(new ArrayList<>());
                 }
                 AssignmentEditorDto dto = assignmentModel.getObject();
                 dto.setMinimized(true);

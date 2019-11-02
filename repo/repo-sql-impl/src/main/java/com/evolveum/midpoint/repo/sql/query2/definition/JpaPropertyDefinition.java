@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.query2.definition;
@@ -29,8 +20,8 @@ public class JpaPropertyDefinition extends JpaDataNodeDefinition {
 
     private final boolean lob;
     private final boolean enumerated;
-	private final boolean indexed;			// unused now (true if @Index-ed)
-	private final boolean count;			// "count"-type variable, like RShadow.pendingOperationCount
+    private final boolean indexed;            // unused now (true if @Index-ed)
+    private final boolean count;            // "count"-type variable, like RShadow.pendingOperationCount
 
     JpaPropertyDefinition(Class jpaClass, Class jaxbClass, boolean lob, boolean enumerated, boolean indexed, boolean count) {
         super(jpaClass, jaxbClass);
@@ -52,11 +43,11 @@ public class JpaPropertyDefinition extends JpaDataNodeDefinition {
         return indexed;
     }
 
-	public boolean isCount() {
-		return count;
-	}
+    public boolean isCount() {
+        return count;
+    }
 
-	@Override
+    @Override
     protected String getDebugDumpClassName() {
         return "Prop";
     }

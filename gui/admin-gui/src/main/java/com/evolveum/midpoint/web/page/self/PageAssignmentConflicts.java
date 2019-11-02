@@ -1,21 +1,23 @@
+/**
+ * Copyright (c) 2010-2019 Evolveum and contributors
+ *
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
+ */
 package com.evolveum.midpoint.web.page.self;
 
 import com.evolveum.midpoint.security.api.AuthorizationConstants;
 import com.evolveum.midpoint.web.application.AuthorizationAction;
 import com.evolveum.midpoint.web.application.PageDescriptor;
-import com.evolveum.midpoint.web.component.AjaxButton;
 import com.evolveum.midpoint.web.component.AjaxSubmitButton;
 import com.evolveum.midpoint.web.component.assignment.AssignmentEditorDto;
 import com.evolveum.midpoint.web.component.form.Form;
-import com.evolveum.midpoint.web.page.admin.users.dto.UserDtoStatus;
 import com.evolveum.midpoint.web.page.self.component.AssignmentConflictPanel;
-import com.evolveum.midpoint.web.page.self.dto.AssignmentConflictDto;
 import com.evolveum.midpoint.web.page.self.dto.ConflictDto;
 import com.evolveum.midpoint.web.util.OnePageParameterEncoder;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.FocusType;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.markup.repeater.RepeatingView;
-import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 
 import java.util.HashMap;
@@ -31,8 +33,8 @@ import java.util.Map;
                 label = PageSelf.AUTH_SELF_ALL_LABEL,
                 description = PageSelf.AUTH_SELF_ALL_DESCRIPTION),
         @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_SELF_ASSIGNMENTS_CONFLICTS_URL,
-                label = "PageAssignmentShoppingKart.auth.assignmentsConflicts.label",
-                description = "PageAssignmentShoppingKart.auth.assignmentsConflicts.description")})
+                label = "PageAssignmentShoppingCart.auth.assignmentsConflicts.label",
+                description = "PageAssignmentShoppingCart.auth.assignmentsConflicts.description")})
 public class PageAssignmentConflicts extends PageSelf {
     private static final String ID_CONFLICTS_PANEL = "conflictsPanel";
     private static final String ID_MAIN_FORM = "mainForm";
@@ -62,7 +64,7 @@ public class PageAssignmentConflicts extends PageSelf {
         AjaxSubmitButton back = new AjaxSubmitButton(ID_BACK, createStringResource("PageAssignmentConflicts.back")) {
 
             @Override
-            public void onSubmit(AjaxRequestTarget target, org.apache.wicket.markup.html.form.Form<?> form) {
+            public void onSubmit(AjaxRequestTarget target) {
                 redirectBack();
             }
 
@@ -72,7 +74,7 @@ public class PageAssignmentConflicts extends PageSelf {
         AjaxSubmitButton submit = new AjaxSubmitButton(ID_SUBMIT, createStringResource("PageAssignmentConflicts.submit")) {
 
             @Override
-            public void onSubmit(AjaxRequestTarget target, org.apache.wicket.markup.html.form.Form<?> form) {
+            public void onSubmit(AjaxRequestTarget target) {
                 processConflictDecisions();
                 redirectBack();
             }

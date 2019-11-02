@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.server.dto;
@@ -33,7 +24,6 @@ import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.TaskType;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 
 import java.util.Collection;
@@ -41,7 +31,7 @@ import java.util.Collection;
 /**
  * @author Pavol Mederly
  */
-public class TaskCurrentStateDtoModel extends AbstractReadOnlyModel<TaskCurrentStateDto> {
+public class TaskCurrentStateDtoModel implements IModel<TaskCurrentStateDto> {
 
     private static final Trace LOGGER = TraceManager.getTrace(TaskCurrentStateDtoModel.class);
 
@@ -55,9 +45,7 @@ public class TaskCurrentStateDtoModel extends AbstractReadOnlyModel<TaskCurrentS
 
     @Override
     public TaskCurrentStateDto getObject() {
-//        if (object == null) {
-            object = getObjectInternal();
-//        }
+        object = getObjectInternal();
         return object;
     }
 
@@ -79,10 +67,10 @@ public class TaskCurrentStateDtoModel extends AbstractReadOnlyModel<TaskCurrentS
         String oid = taskModel.getObject().getOid();
         try {
             LOGGER.debug("Refreshing task {}", taskModel.getObject());
-            Collection<SelectorOptions<GetOperationOptions>> options = GetOperationOptions.createRetrieveAttributesOptions(TaskType.F_SUBTASK, TaskType.F_NODE_AS_OBSERVED);
+            Collection<SelectorOptions<GetOperationOptions>> options = page.retrieveItemsNamed(TaskType.F_SUBTASK, TaskType.F_NODE_AS_OBSERVED);
             PrismObject<TaskType> task = page.getModelService().getObject(TaskType.class, oid, options, operationTask, result);
-            TaskDto taskDto = new TaskDto(task.asObjectable(), page.getModelService(), page.getTaskService(),
-                    page.getModelInteractionService(), taskManager, page.getWorkflowManager(), TaskDtoProviderOptions.fullOptions(), operationTask, result, page);
+            TaskDto taskDto = new TaskDto(task.asObjectable(), null, page.getModelService(), page.getTaskService(),
+                    page.getModelInteractionService(), taskManager, page.getWorkflowManager(), TaskDtoProviderOptions.fullOptions(), true, operationTask, result, page);
             taskModel.setObject(taskDto);
         } catch (CommunicationException|ObjectNotFoundException|SchemaException|SecurityViolationException|ConfigurationException|ExpressionEvaluationException|RuntimeException e) {
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't refresh task {}", e, taskModel.getObject());

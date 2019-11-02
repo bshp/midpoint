@@ -19,11 +19,14 @@
 <body>
 <wicket:extend>
     <form wicket:id="mainForm">
-    	<div class="main-form-panel">
-        	<div wicket:id="workItemsPanel"/>
+        <div class="main-form-panel">
+            <div wicket:id="workItemsPanel"/>
         </div>
 
         <div class="main-button-bar">
+            <span class="button-group">
+                <a class="btn btn-default" wicket:id="back"/>
+            </span>
             <span class="button-group">
                 <a class="btn btn-default" wicket:id="claim"/>
                 <a class="btn btn-default" wicket:id="release"/>

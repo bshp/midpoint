@@ -1,13 +1,16 @@
+/**
+ * Copyright (c) 2010-2019 Evolveum and contributors
+ *
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
+ */
 package com.evolveum.midpoint.web.component.dialog;
 
 import com.evolveum.midpoint.gui.api.model.LoadableModel;
 import com.evolveum.midpoint.gui.api.page.PageBase;
-import com.evolveum.midpoint.prism.path.ItemPath;
-import com.evolveum.midpoint.prism.query.EqualFilter;
-import com.evolveum.midpoint.prism.query.NotFilter;
+import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.query.ObjectFilter;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
-import com.evolveum.midpoint.prism.query.builder.QueryBuilder;
 import com.evolveum.midpoint.schema.GetOperationOptions;
 import com.evolveum.midpoint.schema.SelectorOptions;
 import com.evolveum.midpoint.schema.result.OperationResult;
@@ -32,7 +35,6 @@ import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.model.StringResourceModel;
 
-import java.util.ArrayList;
 import java.util.Collection;
 
 /**
@@ -85,7 +87,7 @@ public class DeleteAllPanel extends Panel  implements Popupable{
 
     private void initLayout(WebMarkupContainer content){
 
-        CheckBox deleteUsersCheckbox = new CheckBox(ID_CHB_USERS, new PropertyModel<Boolean>(model, DeleteAllDto.F_USERS));
+        CheckBox deleteUsersCheckbox = new CheckBox(ID_CHB_USERS, new PropertyModel<>(model, DeleteAllDto.F_USERS));
         deleteUsersCheckbox.add(new OnChangeAjaxBehavior() {
 
             @Override
@@ -95,7 +97,7 @@ public class DeleteAllPanel extends Panel  implements Popupable{
         });
         content.add(deleteUsersCheckbox);
 
-        CheckBox deleteOrgsCheckbox = new CheckBox(ID_CHB_ORG, new PropertyModel<Boolean>(model, DeleteAllDto.F_ORGS));
+        CheckBox deleteOrgsCheckbox = new CheckBox(ID_CHB_ORG, new PropertyModel<>(model, DeleteAllDto.F_ORGS));
         deleteOrgsCheckbox.add(new OnChangeAjaxBehavior() {
 
             @Override
@@ -106,7 +108,7 @@ public class DeleteAllPanel extends Panel  implements Popupable{
         content.add(deleteOrgsCheckbox);
 
         CheckBox deleteAccountShadowsCheckbox = new CheckBox(ID_CHB_ACCOUNT_SHADOW,
-                new PropertyModel<Boolean>(model, DeleteAllDto.F_ACC_SHADOW));
+            new PropertyModel<>(model, DeleteAllDto.F_ACC_SHADOW));
         deleteAccountShadowsCheckbox.add(new OnChangeAjaxBehavior() {
 
             @Override
@@ -117,7 +119,7 @@ public class DeleteAllPanel extends Panel  implements Popupable{
         content.add(deleteAccountShadowsCheckbox);
 
         CheckBox deleteNonAccountShadowsCheckbox = new CheckBox(ID_CHB_NON_ACCOUNT_SHADOW,
-                new PropertyModel<Boolean>(model, DeleteAllDto.F_NON_ACC_SHADOW));
+            new PropertyModel<>(model, DeleteAllDto.F_NON_ACC_SHADOW));
         deleteNonAccountShadowsCheckbox.add(new OnChangeAjaxBehavior() {
 
             @Override
@@ -231,9 +233,8 @@ public class DeleteAllPanel extends Panel  implements Popupable{
         Task task = getPagebase().createSimpleTask(OPERATION_COUNT_TASK);
         OperationResult result = new OperationResult(OPERATION_COUNT_TASK);
 
-        Collection<SelectorOptions<GetOperationOptions>> options = new ArrayList<>();
-        GetOperationOptions opt = GetOperationOptions.createRaw();
-        options.add(SelectorOptions.create(ItemPath.EMPTY_PATH, opt));
+        Collection<SelectorOptions<GetOperationOptions>> options = getPagebase().getSchemaHelper().getOperationOptionsBuilder()
+                .raw().build();
 
         try {
             dto.setUserCount(getPagebase().getModelService().countObjects(UserType.class, null, options, task, result));
@@ -258,9 +259,7 @@ public class DeleteAllPanel extends Panel  implements Popupable{
         Task task = getPagebase().createSimpleTask(OPERATION_COUNT_TASK);
         OperationResult result = new OperationResult(OPERATION_COUNT_TASK);
 
-        Collection<SelectorOptions<GetOperationOptions>> options = new ArrayList<>();
-        GetOperationOptions opt = GetOperationOptions.createRaw();
-        options.add(SelectorOptions.create(ItemPath.EMPTY_PATH, opt));
+        Collection<SelectorOptions<GetOperationOptions>> options = getPagebase().getSchemaHelper().getOperationOptionsBuilder().raw().build();
 
         try {
             dto.setOrgUnitCount(getPagebase().getModelService().countObjects(OrgType.class, null, options, task, result));
@@ -279,20 +278,19 @@ public class DeleteAllPanel extends Panel  implements Popupable{
         Task task = getPagebase().createSimpleTask(OPERATION_SEARCH_ITERATIVE_TASK);
         OperationResult result = new OperationResult(OPERATION_SEARCH_ITERATIVE_TASK);
 
-        Collection<SelectorOptions<GetOperationOptions>> options = new ArrayList<>();
-        GetOperationOptions opt = GetOperationOptions.createRaw();
-        options.add(SelectorOptions.create(ItemPath.EMPTY_PATH, opt));
+        Collection<SelectorOptions<GetOperationOptions>> options = getPagebase().getSchemaHelper().getOperationOptionsBuilder().raw().build();
 
         try {
-            ObjectFilter filter = QueryBuilder.queryFor(ShadowType.class, getPagebase().getPrismContext())
+            PrismContext prismContext = getPagebase().getPrismContext();
+            ObjectFilter filter = prismContext.queryFor(ShadowType.class)
                     .item(ShadowType.F_KIND).eq(ShadowKindType.ACCOUNT)
                     .buildFilter();
             if (isAccountShadow) {
-                ObjectQuery query = ObjectQuery.createObjectQuery(filter);
+                ObjectQuery query = prismContext.queryFactory().createQuery(filter);
                 dto.setAccountShadowCount(getPagebase().getModelService().countObjects(ShadowType.class, query, options, task, result));
                 dto.setObjectsToDelete(dto.getObjectsToDelete() + dto.getAccountShadowCount());
             } else {
-                ObjectQuery query = ObjectQuery.createObjectQuery(NotFilter.createNot(filter));
+                ObjectQuery query = prismContext.queryFactory().createQuery(prismContext.queryFactory().createNot(filter));
                 dto.setNonAccountShadowCount(getPagebase().getModelService().countObjects(ShadowType.class, query, options, task, result));
                 dto.setObjectsToDelete(dto.getObjectsToDelete() + dto.getNonAccountShadowCount());
             }
@@ -349,6 +347,16 @@ public class DeleteAllPanel extends Panel  implements Popupable{
     @Override
     public int getHeight() {
         return 350;
+    }
+
+    @Override
+    public String getWidthUnit(){
+        return "px";
+    }
+
+    @Override
+    public String getHeightUnit(){
+        return "px";
     }
 
     @Override

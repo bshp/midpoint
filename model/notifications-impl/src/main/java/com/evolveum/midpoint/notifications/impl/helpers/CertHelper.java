@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.notifications.impl.helpers;
@@ -39,6 +30,8 @@ import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import static com.evolveum.midpoint.schema.util.CertCampaignTypeUtil.norm;
+
 /**
  * @author mederly
  */
@@ -58,19 +51,20 @@ public class CertHelper {
     public String formatState(AccessCertificationEvent event) {
         AccessCertificationCampaignType campaign = event.getCampaign();
 
+        String i = norm(campaign.getIteration()) > 1 ? " (iteration " + norm(campaign.getIteration()) + ")" : "";
         switch(campaign.getState()) {
             case CREATED:
-                return "Created";
+                return "Created" + i;
             case IN_REVIEW_STAGE:
-                return "In review stage " + formatStage(campaign);
+                return "In review stage " + formatStage(campaign) + i;
             case REVIEW_STAGE_DONE:
-                return "Done review stage " + formatStage(campaign);
+                return "Done review stage " + formatStage(campaign) + i;
             case IN_REMEDIATION:
-                return "Remediation in progress";
+                return "Remediation in progress" + i;
             case CLOSED:
-                return "Closed";
+                return "Closed + i";
             default:
-                return "";      // should not occur
+                return "" + i;      // should not occur
         }
     }
 

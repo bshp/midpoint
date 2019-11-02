@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.prism.show;
@@ -25,10 +16,8 @@ import com.evolveum.midpoint.web.component.data.column.ImagePanel;
 import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
 import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.Component;
-import org.apache.wicket.behavior.AttributeAppender;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
@@ -43,7 +32,7 @@ public class SceneItemLinePanel extends BasePanel<SceneItemLineDto> {
     private static final String ID_OLD_VALUE_CONTAINER = "oldValueContainer";
     private static final String ID_OLD_VALUE_IMAGE = "oldValueImage";
     private static final String ID_OLD_VALUE = "oldValue";
-	private static final String ID_NEW_VALUE_CONTAINER = "newValueContainer";
+    private static final String ID_NEW_VALUE_CONTAINER = "newValueContainer";
     private static final String ID_NEW_VALUE_IMAGE = "newValueImage";
     private static final String ID_NEW_VALUE = "newValue";
 
@@ -51,128 +40,123 @@ public class SceneItemLinePanel extends BasePanel<SceneItemLineDto> {
 
     public SceneItemLinePanel(String id, IModel<SceneItemLineDto> model) {
         super(id, model);
+    }
 
+    @Override
+    protected void onInitialize() {
+        super.onInitialize();
         initLayout();
     }
 
-	private void initLayout() {
-		WebMarkupContainer nameCell = new WebMarkupContainer(ID_NAME_CONTAINER);
-		nameCell.add(new AttributeModifier("rowspan",
-				new PropertyModel<Integer>(getModel(), SceneItemLineDto.F_NUMBER_OF_LINES)));
-		Label label = new Label("name", new AbstractReadOnlyModel<String>() {
-			@Override
-			public String getObject() {
-				final SceneItemLineDto lineDto = getModel().getObject();
-				if (lineDto == null || lineDto.getName() == null) {
-					return null;
-				}
-				String key = lineDto.getName();
-				return getLocalizer().getString(key, SceneItemLinePanel.this, key);
-			}
-		});
-		nameCell.add(label);
-		nameCell.add(new VisibleEnableBehaviour() {
-			@Override
-			public boolean isVisible() {
-				return getModelObject().isFirst();
-			}
-		});
-		add(nameCell);
+    private void initLayout() {
+        WebMarkupContainer nameCell = new WebMarkupContainer(ID_NAME_CONTAINER);
+        nameCell.add(new AttributeModifier("rowspan",
+                new PropertyModel<Integer>(getModel(), SceneItemLineDto.F_NUMBER_OF_LINES)));
 
-		WebMarkupContainer oldValueCell = new WebMarkupContainer(ID_OLD_VALUE_CONTAINER);
-		oldValueCell.add(new VisibleEnableBehaviour() {
-			@Override
-			public boolean isVisible() {
-				return getModelObject().isNullEstimatedOldValues() || getModelObject().isDelta();
-			}
-		});
-		Component sivp;
-		if (getModelObject().isNullEstimatedOldValues()){
-			sivp = new Label(ID_OLD_VALUE, createStringResource("SceneItemLinePanel.unknownLabel"));
-		} else {
-			sivp = new SceneItemValuePanel(ID_OLD_VALUE,
-					new PropertyModel<SceneItemValue>(getModel(), SceneItemLineDto.F_OLD_VALUE));
-		}
-		sivp.setRenderBodyOnly(true);
-		oldValueCell.add(sivp);
+        Label label = new Label("name",createStringResource("${name}", getModel()));
+        nameCell.add(label);
+        nameCell.add(new VisibleEnableBehaviour() {
+            @Override
+            public boolean isVisible() {
+                return getModelObject().isFirst();
+            }
+        });
+        add(nameCell);
 
-		ImagePanel oldValueImagePanel = new ImagePanel(ID_OLD_VALUE_IMAGE, Model.of(GuiStyleConstants.CLASS_MINUS_CIRCLE_DANGER),
-				createStringResource("SceneItemLinePanel.removedValue"));
-		oldValueImagePanel.add(new VisibleEnableBehaviour(){
-			private static final long serialVersionUID = 1L;
+        WebMarkupContainer oldValueCell = new WebMarkupContainer(ID_OLD_VALUE_CONTAINER);
+        oldValueCell.add(new VisibleEnableBehaviour() {
+            @Override
+            public boolean isVisible() {
+                return getModelObject().isNullEstimatedOldValues() || getModelObject().isDelta();
+            }
+        });
+        Component sivp;
+        if (getModelObject().isNullEstimatedOldValues()){
+            sivp = new Label(ID_OLD_VALUE, createStringResource("SceneItemLinePanel.unknownLabel"));
+        } else {
+            sivp = new SceneItemValuePanel(ID_OLD_VALUE,
+                new PropertyModel<>(getModel(), SceneItemLineDto.F_OLD_VALUE));
+        }
+        sivp.setRenderBodyOnly(true);
+        oldValueCell.add(sivp);
 
-			@Override
-			public boolean isVisible(){
-				return getModelObject().getOldValue() != null &&
-						getModelObject().getOldValue().getSourceValue() != null &&
-						!getModelObject().isNullEstimatedOldValues();
-			}
-		});
-		oldValueCell.add(oldValueImagePanel);
+        ImagePanel oldValueImagePanel = new ImagePanel(ID_OLD_VALUE_IMAGE, Model.of(GuiStyleConstants.CLASS_MINUS_CIRCLE_DANGER),
+                createStringResource("SceneItemLinePanel.removedValue"));
+        oldValueImagePanel.add(new VisibleEnableBehaviour(){
+            private static final long serialVersionUID = 1L;
 
-		add(oldValueCell);
+            @Override
+            public boolean isVisible(){
+                return getModelObject().getOldValue() != null &&
+                        getModelObject().getOldValue().getSourceValue() != null &&
+                        !getModelObject().isNullEstimatedOldValues();
+            }
+        });
+        oldValueCell.add(oldValueImagePanel);
 
-		IModel<String> newValueIconModel;
-		IModel<String> newValueTitleModel;
-		if (getModelObject().isNullEstimatedOldValues()){
-			if (getModelObject().isAdd()){
-				newValueIconModel = Model.of(GuiStyleConstants.CLASS_PLUS_CIRCLE_SUCCESS);
-				newValueTitleModel = createStringResource("SceneItemLinePanel.addedValue");
-			} else if (getModelObject().isDelete()){
-				newValueIconModel = Model.of(GuiStyleConstants.CLASS_MINUS_CIRCLE_DANGER);
-				newValueTitleModel = createStringResource("SceneItemLinePanel.removedValue");
-			} else if (getModelObject().isReplace()){
-				newValueIconModel = Model.of(GuiStyleConstants.CLASS_CIRCLE_FULL);
-				newValueTitleModel = createStringResource("SceneItemLinePanel.unchangedValue");
-			} else {
-				newValueIconModel = Model.of("");
-				newValueTitleModel = Model.of("");
-			}
-		} else {
-			newValueIconModel = !getModelObject().isDelta() && getModelObject().isDeltaScene() ?
-					Model.of(GuiStyleConstants.CLASS_CIRCLE_FULL) :
-					Model.of(GuiStyleConstants.CLASS_PLUS_CIRCLE_SUCCESS);
-			newValueTitleModel = !getModelObject().isDelta() && getModelObject().isDeltaScene() ?
-					createStringResource("SceneItemLinePanel.unchangedValue")
-					: createStringResource("SceneItemLinePanel.addedValue");
-		}
+        add(oldValueCell);
 
-		WebMarkupContainer newValueCell = new WebMarkupContainer(ID_NEW_VALUE_CONTAINER);
-		sivp = new SceneItemValuePanel(ID_NEW_VALUE,
-				new PropertyModel<SceneItemValue>(getModel(), SceneItemLineDto.F_NEW_VALUE));
-		sivp.setRenderBodyOnly(true);
-		newValueCell.add(sivp);
-		newValueCell.add(new AttributeModifier("colspan", new AbstractReadOnlyModel<Integer>() {
-			@Override
-			public Integer getObject() {
-				return !getModelObject().isDelta() && !getModelObject().isNullEstimatedOldValues() && getModelObject().isDeltaScene() ? 2 : 1;
-			}
-		}));
-		newValueCell.add(new AttributeModifier("align", new AbstractReadOnlyModel<String>() {
-			@Override
-			public String getObject() {
-				return !getModelObject().isDelta() && !getModelObject().isNullEstimatedOldValues() && getModelObject().isDeltaScene() ? "center" : null;
-			}
-		}));
+        IModel<String> newValueIconModel;
+        IModel<String> newValueTitleModel;
+        if (getModelObject().isNullEstimatedOldValues()){
+            if (getModelObject().isAdd()){
+                newValueIconModel = Model.of(GuiStyleConstants.CLASS_PLUS_CIRCLE_SUCCESS);
+                newValueTitleModel = createStringResource("SceneItemLinePanel.addedValue");
+            } else if (getModelObject().isDelete()){
+                newValueIconModel = Model.of(GuiStyleConstants.CLASS_MINUS_CIRCLE_DANGER);
+                newValueTitleModel = createStringResource("SceneItemLinePanel.removedValue");
+            } else if (getModelObject().isReplace()){
+                newValueIconModel = Model.of(GuiStyleConstants.CLASS_CIRCLE_FULL);
+                newValueTitleModel = createStringResource("SceneItemLinePanel.unchangedValue");
+            } else {
+                newValueIconModel = Model.of("");
+                newValueTitleModel = Model.of("");
+            }
+        } else {
+            newValueIconModel = !getModelObject().isDelta() && getModelObject().isDeltaScene() ?
+                    Model.of(GuiStyleConstants.CLASS_CIRCLE_FULL) :
+                    Model.of(GuiStyleConstants.CLASS_PLUS_CIRCLE_SUCCESS);
+            newValueTitleModel = !getModelObject().isDelta() && getModelObject().isDeltaScene() ?
+                    createStringResource("SceneItemLinePanel.unchangedValue")
+                    : createStringResource("SceneItemLinePanel.addedValue");
+        }
 
-		ImagePanel newValueImagePanel = new ImagePanel(ID_NEW_VALUE_IMAGE, newValueIconModel,
-				newValueTitleModel);
-		newValueImagePanel.add(new VisibleEnableBehaviour(){
-			private static final long serialVersionUID = 1L;
+        WebMarkupContainer newValueCell = new WebMarkupContainer(ID_NEW_VALUE_CONTAINER);
+        sivp = new SceneItemValuePanel(ID_NEW_VALUE,
+            new PropertyModel<>(getModel(), SceneItemLineDto.F_NEW_VALUE));
+        sivp.setRenderBodyOnly(true);
+        newValueCell.add(sivp);
+        newValueCell.add(new AttributeModifier("colspan", new IModel<Integer>() {
+            @Override
+            public Integer getObject() {
+                return !getModelObject().isDelta() && !getModelObject().isNullEstimatedOldValues() && getModelObject().isDeltaScene() ? 2 : 1;
+            }
+        }));
+        newValueCell.add(new AttributeModifier("align", new IModel<String>() {
+            @Override
+            public String getObject() {
+                return !getModelObject().isDelta() && !getModelObject().isNullEstimatedOldValues() && getModelObject().isDeltaScene() ? "center" : null;
+            }
+        }));
 
-			@Override
-			public boolean isVisible(){
-				return getModelObject().getNewValue() != null &&
-						getModelObject().getNewValue().getSourceValue() != null;
-			}
-		});
-//		newValueImagePanel.add(new AttributeAppender("style",
-//				!getModelObject().isDelta() && getModelObject().isDeltaScene() ?
-//						""
-//						: "float: left; margin-right: 5px;"));
-		newValueCell.add(newValueImagePanel);
+        ImagePanel newValueImagePanel = new ImagePanel(ID_NEW_VALUE_IMAGE, newValueIconModel,
+                newValueTitleModel);
+        newValueImagePanel.add(new VisibleEnableBehaviour(){
+            private static final long serialVersionUID = 1L;
 
-		add(newValueCell);
-	}
+            @Override
+            public boolean isVisible(){
+                return getModelObject().getNewValue() != null &&
+                        getModelObject().getNewValue().getSourceValue() != null;
+            }
+        });
+//        newValueImagePanel.add(new AttributeAppender("style",
+//                !getModelObject().isDelta() && getModelObject().isDeltaScene() ?
+//                        ""
+//                        : "float: left; margin-right: 5px;"));
+        newValueCell.add(newValueImagePanel);
+
+        add(newValueCell);
+    }
 
 }

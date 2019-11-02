@@ -1,26 +1,14 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.repo.sql;
 
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.PrismObjectDefinition;
-import com.evolveum.midpoint.prism.PrismReferenceValue;
-import com.evolveum.midpoint.prism.delta.ObjectDelta;
-import com.evolveum.midpoint.prism.delta.PropertyDelta;
-import com.evolveum.midpoint.prism.delta.ReferenceDelta;
+import com.evolveum.midpoint.prism.delta.*;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.util.PrismAsserts;
 import com.evolveum.midpoint.prism.util.PrismTestUtil;
@@ -52,7 +40,7 @@ import java.util.Arrays;
 public class ModifyUser extends BaseSQLRepoTest {
 
     private static final String USER_FULLNAME = "Guybrush Threepwood";
-	private String userOid;
+    private String userOid;
     private String userBigOid;
     private String shadowOid;
 
@@ -77,10 +65,10 @@ public class ModifyUser extends BaseSQLRepoTest {
 
     @Test
     public void test020ModifyUser() throws Exception {
-    	final String TEST_NAME = "test020ModifyUser";
-    	TestUtil.displayTestTitle(TEST_NAME);
+        final String TEST_NAME = "test020ModifyUser";
+        TestUtil.displayTestTitle(TEST_NAME);
 
-    	OperationResult result = new OperationResult(TEST_NAME);
+        OperationResult result = new OperationResult(TEST_NAME);
 
         ObjectModificationType modification = PrismTestUtil.parseAtomicValue(
                 new File(FOLDER_BASIC, "t002.xml"), ObjectModificationType.COMPLEX_TYPE);
@@ -104,10 +92,10 @@ public class ModifyUser extends BaseSQLRepoTest {
 
     @Test
     public void test021ModifyUserNoEmpNum() throws Exception {
-    	final String TEST_NAME = "test021ModifyUserNoEmpNum";
-    	TestUtil.displayTestTitle(TEST_NAME);
+        final String TEST_NAME = "test021ModifyUserNoEmpNum";
+        TestUtil.displayTestTitle(TEST_NAME);
 
-    	OperationResult result = new OperationResult(TEST_NAME);
+        OperationResult result = new OperationResult(TEST_NAME);
 
         ObjectModificationType modification = PrismTestUtil.parseAtomicValue(
                 new File(FOLDER_BASIC, "t002a.xml"), ObjectModificationType.COMPLEX_TYPE);
@@ -131,10 +119,10 @@ public class ModifyUser extends BaseSQLRepoTest {
 
     @Test
     public void test022ModifyUserEmptyEmpNum() throws Exception {
-    	final String TEST_NAME = "test022ModifyUserEmptyEmpNum";
-    	TestUtil.displayTestTitle(TEST_NAME);
+        final String TEST_NAME = "test022ModifyUserEmptyEmpNum";
+        TestUtil.displayTestTitle(TEST_NAME);
 
-    	OperationResult result = new OperationResult(TEST_NAME);
+        OperationResult result = new OperationResult(TEST_NAME);
 
         ObjectModificationType modification = PrismTestUtil.parseAtomicValue(
                 new File(FOLDER_BASIC, "t002b.xml"), ObjectModificationType.COMPLEX_TYPE);
@@ -175,7 +163,7 @@ public class ModifyUser extends BaseSQLRepoTest {
     @Test
     public void test050ModifyBigUser() throws Exception {
         PrismObjectDefinition def = prismContext.getSchemaRegistry().findObjectDefinitionByCompileTimeClass(UserType.class);
-        PropertyDelta delta = PropertyDelta.createModificationReplaceProperty(ObjectType.F_DESCRIPTION, def,
+        PropertyDelta delta = prismContext.deltaFactory().property().createModificationReplaceProperty(ObjectType.F_DESCRIPTION, def,
                 "new description");
 
         repositoryService.modifyObject(UserType.class, userBigOid, Arrays.asList(delta), new OperationResult("asdf"));
@@ -186,13 +174,7 @@ public class ModifyUser extends BaseSQLRepoTest {
         repositoryService.getObject(UserType.class, userBigOid, null, new OperationResult("asdf"));
     }
 
-    /**
-     * This test fails with java.lang.IllegalStateException: An entity copy was already assigned to a different entity.
-     * It's ok to fail, but it should fail somehow differently.
-     *
-     * todo improve later [lazyman]
-     */
-    @Test(enabled = false)
+    @Test
     public void test070ModifyBigUser() throws Exception {
         ObjectModificationType modification = PrismTestUtil.parseAtomicValue(
                 new File(FOLDER_BASIC, "t004.xml"), ObjectModificationType.COMPLEX_TYPE);
@@ -205,14 +187,14 @@ public class ModifyUser extends BaseSQLRepoTest {
     @Test
     public void test100ModifyUserApproverMetadata() throws Exception {
         PrismObjectDefinition userDefinition = prismContext.getSchemaRegistry().findObjectDefinitionByCompileTimeClass(UserType.class);
-        ReferenceDelta delta1 = ReferenceDelta.createModificationAdd(
-                new ItemPath(UserType.F_METADATA, MetadataType.F_CREATE_APPROVER_REF),
+        ReferenceDelta delta1 = prismContext.deltaFactory().reference().createModificationAdd(
+                ItemPath.create(UserType.F_METADATA, MetadataType.F_CREATE_APPROVER_REF),
                 userDefinition,
-                new PrismReferenceValue("target-oid-1", UserType.COMPLEX_TYPE));
-        ReferenceDelta delta2 = ReferenceDelta.createModificationAdd(
-                new ItemPath(UserType.F_METADATA, MetadataType.F_MODIFY_APPROVER_REF),
+                itemFactory().createReferenceValue("target-oid-1", UserType.COMPLEX_TYPE));
+        ReferenceDelta delta2 = prismContext.deltaFactory().reference().createModificationAdd(
+                ItemPath.create(UserType.F_METADATA, MetadataType.F_MODIFY_APPROVER_REF),
                 userDefinition,
-                new PrismReferenceValue("target-oid-1", UserType.COMPLEX_TYPE));            // the same as in delta1
+                itemFactory().createReferenceValue("target-oid-1", UserType.COMPLEX_TYPE));            // the same as in delta1
 
         repositoryService.modifyObject(UserType.class, userOid, Arrays.asList(delta1, delta2), new OperationResult("asdf"));
     }

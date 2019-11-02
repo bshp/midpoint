@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.server.handlers;
@@ -29,62 +20,62 @@ import java.util.Arrays;
 import java.util.Collections;
 
 import static com.evolveum.midpoint.schema.constants.SchemaConstants.*;
-import static com.evolveum.midpoint.web.page.admin.server.handlers.dto.GenericHandlerDto.item;
+import static com.evolveum.midpoint.web.page.admin.server.handlers.dto.GenericHandlerDto.extensionItem;
 
 /**
  * @author mederly
  */
 public class HandlerDtoFactory {
-	public static HandlerDtoFactory instance() {
-		return new HandlerDtoFactory();		// TODO
-	}
+    public static HandlerDtoFactory instance() {
+        return new HandlerDtoFactory();        // TODO
+    }
 
-	public HandlerDto createDtoForTask(TaskDto taskDto, PageBase pageBase, Task opTask, OperationResult thisOpResult) {
-		if (taskDto.isLiveSync()) {
-			return new LiveSyncHandlerDto(taskDto, pageBase, opTask, thisOpResult);
-		} else if (taskDto.isImportAccounts()) {
-			return new ResourceRelatedHandlerDto(taskDto, pageBase, opTask, thisOpResult);
-		} else if (taskDto.isReconciliation()) {
-			return new ResourceRelatedHandlerDto(taskDto, pageBase, opTask, thisOpResult);
-		} else if (taskDto.isTriggerScanner() || taskDto.isFocusValidityScanner()) {
-			return new ScannerHandlerDto(taskDto);
-		} else if (taskDto.isBulkAction()) {
-			return new ScriptExecutionHandlerDto(taskDto);
-		} else if (taskDto.isDelete()) {
-			return new DeleteHandlerDto(taskDto);
-		} else if (taskDto.isRecomputation()) {
-			return new RecomputeHandlerDto(taskDto);
-		} else if (taskDto.isExecuteChanges()) {
-			return new ExecuteChangesHandlerDto(taskDto);
-		} else if (taskDto.isShadowIntegrityCheck()) {
-			return new GenericHandlerDto(taskDto, Arrays.asList(
-					item(MODEL_EXTENSION_OBJECT_QUERY, QueryType.class),
-					item(MODEL_EXTENSION_DIAGNOSE, String.class),
-					item(MODEL_EXTENSION_FIX, String.class),
-					item(MODEL_EXTENSION_DRY_RUN, Boolean.class),
-					item(MODEL_EXTENSION_DUPLICATE_SHADOWS_RESOLVER, String.class),
-					item(MODEL_EXTENSION_CHECK_DUPLICATES_ON_PRIMARY_IDENTIFIERS_ONLY, Boolean.class)), pageBase);
-		} else if (taskDto.isCleanup()) {
-			return new GenericHandlerDto(taskDto, Collections.singletonList(
-					item(MODEL_EXTENSION_CLEANUP_POLICIES, CleanupPoliciesType.class)), pageBase);
-		} else if (taskDto.isNoOp()) {
-			return new GenericHandlerDto(taskDto, Arrays.asList(
-					item(SchemaConstants.NOOP_STEPS_QNAME, Integer.class),
-					item(SchemaConstants.NOOP_DELAY_QNAME, Integer.class)), pageBase);
-		} else if (taskDto.isReportCreate()) {
-			return new ReportCreateHandlerDto(taskDto);
-		} else if (taskDto.isJdbcPing()) {
-			return new GenericHandlerDto(taskDto, Arrays.asList(
-					item(SchemaConstants.JDBC_PING_TESTS_QNAME, Integer.class),
-					item(SchemaConstants.JDBC_PING_INTERVAL_QNAME, Integer.class),
-					item(SchemaConstants.JDBC_PING_TEST_QUERY_QNAME, String.class),
-					item(SchemaConstants.JDBC_PING_JDBC_URL_QNAME, String.class),
-					item(SchemaConstants.JDBC_PING_JDBC_USERNAME_QNAME, String.class),
-					//item(SchemaConstants.JDBC_PING_JDBC_PASSWORD_QNAME, String.class),
-					item(SchemaConstants.JDBC_PING_LOG_ON_INFO_LEVEL_QNAME, Boolean.class)
-			), pageBase);
-		} else {
-			return new HandlerDto(taskDto);
-		}
-	}
+    public HandlerDto createDtoForTask(TaskDto taskDto, PageBase pageBase, Task opTask, OperationResult thisOpResult) {
+        if (taskDto.isLiveSync()) {
+            return new LiveSyncHandlerDto(taskDto, pageBase, opTask, thisOpResult);
+        } else if (taskDto.isImportAccounts()) {
+            return new ResourceRelatedHandlerDto(taskDto, pageBase, opTask, thisOpResult);
+        } else if (taskDto.isReconciliation()) {
+            return new ResourceRelatedHandlerDto(taskDto, pageBase, opTask, thisOpResult);
+        } else if (taskDto.isTriggerScanner() || taskDto.isFocusValidityScanner()) {
+            return new ScannerHandlerDto(taskDto);
+        } else if (taskDto.isBulkAction()) {
+            return new ScriptExecutionHandlerDto(taskDto);
+        } else if (taskDto.isDelete()) {
+            return new DeleteHandlerDto(taskDto);
+        } else if (taskDto.isRecomputation()) {
+            return new RecomputeHandlerDto(taskDto);
+        } else if (taskDto.isExecuteChanges()) {
+            return new ExecuteChangesHandlerDto(taskDto);
+        } else if (taskDto.isShadowIntegrityCheck()) {
+            return new GenericHandlerDto(taskDto, Arrays.asList(
+                    extensionItem(MODEL_EXTENSION_OBJECT_QUERY, QueryType.class),
+                    extensionItem(MODEL_EXTENSION_DIAGNOSE, String.class),
+                    extensionItem(MODEL_EXTENSION_FIX, String.class),
+                    extensionItem(MODEL_EXTENSION_DRY_RUN, Boolean.class),
+                    extensionItem(MODEL_EXTENSION_DUPLICATE_SHADOWS_RESOLVER, String.class),
+                    extensionItem(MODEL_EXTENSION_CHECK_DUPLICATES_ON_PRIMARY_IDENTIFIERS_ONLY, Boolean.class)), pageBase);
+        } else if (taskDto.isCleanup()) {
+            return new GenericHandlerDto(taskDto, Collections.singletonList(
+                    extensionItem(MODEL_EXTENSION_CLEANUP_POLICIES, CleanupPoliciesType.class)), pageBase);
+        } else if (taskDto.isNoOp()) {
+            return new GenericHandlerDto(taskDto, Arrays.asList(
+                    extensionItem(SchemaConstants.NOOP_STEPS_QNAME, Integer.class),
+                    extensionItem(SchemaConstants.NOOP_DELAY_QNAME, Integer.class)), pageBase);
+        } else if (taskDto.isReportCreate()) {
+            return new ReportCreateHandlerDto(taskDto);
+        } else if (taskDto.isJdbcPing()) {
+            return new GenericHandlerDto(taskDto, Arrays.asList(
+                    extensionItem(SchemaConstants.JDBC_PING_TESTS_QNAME, Integer.class),
+                    extensionItem(SchemaConstants.JDBC_PING_INTERVAL_QNAME, Integer.class),
+                    extensionItem(SchemaConstants.JDBC_PING_TEST_QUERY_QNAME, String.class),
+                    extensionItem(SchemaConstants.JDBC_PING_JDBC_URL_QNAME, String.class),
+                    extensionItem(SchemaConstants.JDBC_PING_JDBC_USERNAME_QNAME, String.class),
+                    //item(SchemaConstants.JDBC_PING_JDBC_PASSWORD_QNAME, String.class),
+                    extensionItem(SchemaConstants.JDBC_PING_LOG_ON_INFO_LEVEL_QNAME, Boolean.class)
+            ), pageBase);
+        } else {
+            return new HandlerDto(taskDto);
+        }
+    }
 }

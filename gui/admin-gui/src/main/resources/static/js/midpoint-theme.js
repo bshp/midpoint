@@ -19,7 +19,31 @@ $(window).load(function() {
     $("body").removeClass("custom-hold-transition");
 
     initAjaxStatusSigns();
+
+    Wicket.Event.subscribe('/ajax/call/failure', function( attrs, jqXHR, textStatus, jqEvent, errorThrown ) {
+        console.error("Ajax call failure:\n" + JSON.stringify(attrs.target.location)
+            + "\nStatus:\n" + JSON.stringify(textStatus));
+    });
+
+    fixContentHeight();
+    $(window, ".wrapper").resize(function () {
+        fixContentHeight();
+    });
 });
+
+// I'm not sure why sidebar has 15px padding -> and why I had to use 10px constant here [lazyman]
+function fixContentHeight() {
+    if ($(".main-footer").length > 0) {
+        return;
+    }
+
+    var window_height = $(window).height();
+    var sidebar_height = $(".sidebar").height() || 0;
+
+    if (window_height < sidebar_height) {
+        $(".content-wrapper, .right-side").css('min-height', sidebar_height + 10); // footer size
+    }
+}
 
 function clickFuncWicket6(eventData) {
     var clickedElement = (window.event) ? event.srcElement : eventData.target;
@@ -29,7 +53,8 @@ function clickFuncWicket6(eventData) {
         || (clickedElement.tagName.toUpperCase() == 'INPUT' 
         && (clickedElement.type.toUpperCase() == 'BUTTON' 
         || clickedElement.type.toUpperCase() == 'SUBMIT')))
-        && clickedElement.parentNode.id.toUpperCase() != 'NOBUSY' ) {
+        && clickedElement.parentNode.id.toUpperCase() != 'NOBUSY'
+        && clickedElement.disabled == 'false') {
         showAjaxStatusSign();
     }
 }
@@ -46,11 +71,11 @@ function initAjaxStatusSigns() {
 }
 
 function showAjaxStatusSign() {
-    document.getElementById('ajax_busy').style.display = 'inline';
+    document.getElementById('ajax_busy').style.visibility = 'visible';
 }
 
 function hideAjaxStatusSign() {
-    document.getElementById('ajax_busy').style.display = 'none';
+    document.getElementById('ajax_busy').style.visibility = 'hidden';
 }
 
 /**

@@ -1,25 +1,13 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.component.assignment;
 
 import com.evolveum.midpoint.gui.api.component.BasePanel;
-import com.evolveum.midpoint.gui.api.page.PageBase;
-import com.evolveum.midpoint.prism.path.ItemPath;
-import com.evolveum.midpoint.schema.constants.SchemaConstants;
-import com.evolveum.midpoint.util.MiscUtil;
+import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.util.exception.SchemaException;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
@@ -30,8 +18,6 @@ import com.evolveum.midpoint.web.component.objectdetails.AbstractObjectMainPanel
 import com.evolveum.midpoint.web.page.admin.users.dto.UserDtoStatus;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import org.apache.wicket.ajax.AjaxRequestTarget;
-import org.apache.wicket.extensions.ajax.markup.html.modal.ModalWindow;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 
 import java.util.ArrayList;
@@ -65,7 +51,7 @@ public abstract class AbstractAssignmentListPanel extends BasePanel<List<Assignm
     }
 
     public Popupable getDeleteAssignmentPopupContent(AssignmentEditorDto dto) {
-        return new ConfirmationPanel(getPageBase().getMainPopupBodyId(), new AbstractReadOnlyModel<String>() {
+        return new ConfirmationPanel(getPageBase().getMainPopupBodyId(), new IModel<String>() {
 
             private static final long serialVersionUID = 1L;
 
@@ -79,19 +65,15 @@ public abstract class AbstractAssignmentListPanel extends BasePanel<List<Assignm
 
             @Override
             public void yesPerformed(AjaxRequestTarget target) {
-                ModalWindow modalWindow = findParent(ModalWindow.class);
-                if (modalWindow != null) {
-                    modalWindow.close(target);
-                    List<AssignmentEditorDto> assignmentsListToDelete;
-                    if (dto != null){
-                        assignmentsListToDelete = new ArrayList<>();
-                        assignmentsListToDelete.add(dto);
-                    } else {
-                        assignmentsListToDelete = getSelectedAssignments();
-                    }
-                    deleteAssignmentConfirmedPerformed(target, assignmentsListToDelete);
-                    reloadMainFormButtons(target);
+                List<AssignmentEditorDto> assignmentsListToDelete;
+                if (dto != null){
+                    assignmentsListToDelete = new ArrayList<>();
+                    assignmentsListToDelete.add(dto);
+                } else {
+                    assignmentsListToDelete = getSelectedAssignments();
                 }
+                deleteAssignmentConfirmedPerformed(target, assignmentsListToDelete);
+                reloadMainFormButtons(target);
             }
         };
     }
@@ -114,18 +96,18 @@ public abstract class AbstractAssignmentListPanel extends BasePanel<List<Assignm
     }
 
     protected void deleteAssignmentConfirmedPerformed(AjaxRequestTarget target,
-			List<AssignmentEditorDto> toDelete) {
-		List<AssignmentEditorDto> assignments = getAssignmentModel().getObject();
+            List<AssignmentEditorDto> toDelete) {
+        List<AssignmentEditorDto> assignments = getAssignmentModel().getObject();
 
-		for (AssignmentEditorDto assignment : toDelete) {
-			if (UserDtoStatus.ADD.equals(assignment.getStatus())) {
-				assignments.remove(assignment);
-			} else {
-				assignment.setStatus(UserDtoStatus.DELETE);
-				assignment.setSelected(false);
-			}
-		}
-		target.add(getPageBase().getFeedbackPanel());
+        for (AssignmentEditorDto assignment : toDelete) {
+            if (UserDtoStatus.ADD.equals(assignment.getStatus())) {
+                assignments.remove(assignment);
+            } else {
+                assignment.setStatus(UserDtoStatus.DELETE);
+                assignment.setSelected(false);
+            }
+        }
+        target.add(getPageBase().getFeedbackPanel());
         reloadMainAssignmentsComponent(target);
     }
 
@@ -144,7 +126,7 @@ public abstract class AbstractAssignmentListPanel extends BasePanel<List<Assignm
             }
             if (object instanceof UserType) {
                 AssignmentEditorDto dto = AssignmentEditorDto.createDtoAddFromSelectedObject(object,
-                        SchemaConstants.ORG_DEPUTY, getPageBase());
+                        WebComponentUtil.getDefaultRelationOrFail(RelationKindType.DELEGATION), getPageBase());
                 dto.getTargetRef().setRelation(relation);
                 return dto;
             } else {
@@ -167,15 +149,16 @@ public abstract class AbstractAssignmentListPanel extends BasePanel<List<Assignm
         assignment.setConstruction(construction);
 
         try {
-            getPageBase().getPrismContext().adopt(assignment, UserType.class,
-                    new ItemPath(UserType.F_ASSIGNMENT));
+            getPageBase().getPrismContext().adopt(assignment, UserType.class, UserType.F_ASSIGNMENT);
         } catch (SchemaException e) {
             error(getString("Could not create assignment", resource.getName(), e.getMessage()));
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't create assignment", e);
             return null;
         }
 
-        construction.setResource(resource);
+        ObjectReferenceType resourceRef = new ObjectReferenceType();
+        resourceRef.asReferenceValue().setObject(resource.asPrismObject());
+        construction.setResourceRef(resourceRef);
 
         AssignmentEditorDto dto = new AssignmentEditorDto(UserDtoStatus.ADD, assignment, getPageBase());
 
@@ -197,7 +180,7 @@ public abstract class AbstractAssignmentListPanel extends BasePanel<List<Assignm
 
         return selected;
     }
-    
+
     protected String getNoAssignmentsSelectedMessage(){
         return getString("AssignmentTablePanel.message.noAssignmentSelected");
     }

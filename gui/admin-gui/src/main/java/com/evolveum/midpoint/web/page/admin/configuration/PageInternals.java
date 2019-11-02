@@ -1,65 +1,35 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.configuration;
 
 import com.evolveum.midpoint.common.Clock;
 import com.evolveum.midpoint.gui.api.model.LoadableModel;
-import com.evolveum.midpoint.schema.internals.InternalCounters;
 import com.evolveum.midpoint.schema.internals.InternalMonitor;
 import com.evolveum.midpoint.schema.internals.InternalOperationClasses;
-import com.evolveum.midpoint.schema.internals.InternalsConfig;
-import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.security.api.AuthorizationConstants;
-import com.evolveum.midpoint.util.DebugUtil;
-import com.evolveum.midpoint.util.Producer;
-import com.evolveum.midpoint.util.QNameUtil;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.application.AuthorizationAction;
 import com.evolveum.midpoint.web.application.PageDescriptor;
-import com.evolveum.midpoint.web.component.AjaxSubmitButton;
 import com.evolveum.midpoint.web.component.TabbedPanel;
-import com.evolveum.midpoint.web.component.form.CheckFormGroup;
-import com.evolveum.midpoint.web.component.input.DatePanel;
 import com.evolveum.midpoint.web.page.admin.configuration.dto.InternalsConfigDto;
 
-import org.apache.commons.collections4.map.HashedMap;
-import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.extensions.markup.html.tabs.AbstractTab;
 import org.apache.wicket.extensions.markup.html.tabs.ITab;
 import org.apache.wicket.markup.html.WebMarkupContainer;
-import org.apache.wicket.markup.html.basic.Label;
-import org.apache.wicket.markup.html.form.Form;
-import org.apache.wicket.markup.html.list.ListItem;
-import org.apache.wicket.markup.html.list.ListView;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
-import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.spring.injection.annot.SpringBean;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.function.Supplier;
 
 import javax.xml.datatype.XMLGregorianCalendar;
 
@@ -69,16 +39,14 @@ import javax.xml.datatype.XMLGregorianCalendar;
         @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_CONFIGURATION_INTERNALS_URL,
                 label = "PageInternals.auth.configInternals.label", description = "PageInternals.auth.configInternals.description")})
 public class PageInternals extends PageAdminConfiguration {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private static final Trace LOGGER = TraceManager.getTrace(PageInternals.class);
+    private static final Trace LOGGER = TraceManager.getTrace(PageInternals.class);
 
-	@SpringBean(name = "clock")
+    @SpringBean(name = "clock")
     private Clock clock;
 
     private static final String ID_TAB_PANEL = "tabPanel";
-    
-    
 
     private LoadableModel<XMLGregorianCalendar> model;
     private IModel<InternalsConfigDto> internalsModel;
@@ -86,9 +54,9 @@ public class PageInternals extends PageAdminConfiguration {
 
     public PageInternals() {
         model = new LoadableModel<XMLGregorianCalendar>() {
-			private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
-			@Override
+            @Override
             protected XMLGregorianCalendar load() {
                 return clock.currentTimeXMLGregorianCalendar();
             }
@@ -97,75 +65,120 @@ public class PageInternals extends PageAdminConfiguration {
         internalsModel = new Model<>(new InternalsConfigDto());
         tracesMap = new HashMap<>();
         for (InternalOperationClasses op: InternalOperationClasses.values()) {
-        	tracesMap.put(op.getKey(), InternalMonitor.isTrace(op));
+            tracesMap.put(op.getKey(), InternalMonitor.isTrace(op));
         }
 
         initLayout();
     }
 
     private void initLayout() {
-       
+
         List<ITab> tabs = new ArrayList<>();
         tabs.add(new AbstractTab(createStringResource("PageInternals.tab.clock")) {
-			
-			private static final long serialVersionUID = 1L;
 
-			@Override
-			public WebMarkupContainer getPanel(String panelId) {
-				return createClockPanel(panelId);
-			}
-		});
-        
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public WebMarkupContainer getPanel(String panelId) {
+                return createClockPanel(panelId);
+            }
+        });
+
         tabs.add(new AbstractTab(createStringResource("PageInternals.tab.debugUtil")) {
-			
-			private static final long serialVersionUID = 1L;
 
-			@Override
-			public WebMarkupContainer getPanel(String panelId) {
-				return initDebugUtilForm(panelId);
-			}
-		});
-        
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public WebMarkupContainer getPanel(String panelId) {
+                return initDebugUtilForm(panelId);
+            }
+        });
+
         tabs.add(new AbstractTab(createStringResource("PageInternals.tab.internalConfig")) {
-			
-			private static final long serialVersionUID = 1L;
 
-			@Override
-			public WebMarkupContainer getPanel(String panelId) {
-				return initInternalsConfigForm(panelId);
-			}
-		});
-        
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public WebMarkupContainer getPanel(String panelId) {
+                return initInternalsConfigForm(panelId);
+            }
+        });
+
         tabs.add(new AbstractTab(createStringResource("PageInternals.tab.traces")) {
-			
-			private static final long serialVersionUID = 1L;
 
-			@Override
-			public WebMarkupContainer getPanel(String panelId) {
-				return initTraces(panelId);
-			}
-		});
-        
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public WebMarkupContainer getPanel(String panelId) {
+                return initTraces(panelId);
+            }
+        });
+
         tabs.add(new AbstractTab(createStringResource("PageInternals.tab.counters")) {
-			
-			private static final long serialVersionUID = 1L;
 
-			@Override
-			public WebMarkupContainer getPanel(String panelId) {
-				return initCounters(panelId);
-			}
-		});
-        
-        TabbedPanel<ITab> tabPannel = new TabbedPanel<>(ID_TAB_PANEL, tabs);
-        add(tabPannel);
-       
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public WebMarkupContainer getPanel(String panelId) {
+                return initCounters(panelId);
+            }
+        });
+
+        tabs.add(new AbstractTab(createStringResource("PageInternals.tab.cache")) {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public WebMarkupContainer getPanel(String panelId) {
+                return initCachePanel(panelId);
+            }
+        });
+        // TODO show only if experimental features are enabled?
+        tabs.add(new AbstractTab(createStringResource("PageInternals.tab.memory")) {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public WebMarkupContainer getPanel(String panelId) {
+                return initMemoryPanel(panelId);
+            }
+        });
+        tabs.add(new AbstractTab(createStringResource("PageInternals.tab.threads")) {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public WebMarkupContainer getPanel(String panelId) {
+                return initThreadsPanel(panelId);
+            }
+        });
+        tabs.add(new AbstractTab(createStringResource("PageInternals.tab.performance")) {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public WebMarkupContainer getPanel(String panelId) {
+                return initPerformancePanel(panelId);
+            }
+        });
+        tabs.add(new AbstractTab(createStringResource("PageInternals.tab.loggedUsers")) {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public WebMarkupContainer getPanel(String panelId) {
+                return initLoggedUsersPanel(panelId);
+            }
+        });
+
+        add(new TabbedPanel<>(ID_TAB_PANEL, tabs));
     }
-    
+
     private WebMarkupContainer createClockPanel(String panelId) {
-    	return new InternalsClockPanel(panelId, model);
+        return new InternalsClockPanel(panelId, model);
     }
 
-	private WebMarkupContainer initDebugUtilForm(String panelId) {
+    private WebMarkupContainer initDebugUtilForm(String panelId) {
        return new InternalsDebugUtilPanel(panelId, internalsModel);
     }
 
@@ -176,12 +189,28 @@ public class PageInternals extends PageAdminConfiguration {
     private WebMarkupContainer initTraces(String panelId) {
         return new InternalsTracesPanel(panelId, tracesMap);
     }
-    
+
     private WebMarkupContainer initCounters(String panelId) {
-    	return new InternalsCountersPanel(panelId);
-	}
+            return new InternalsCountersPanel(panelId);
+    }
 
+    private WebMarkupContainer initCachePanel(String panelId) {
+        return new InternalsCachePanel(panelId);
+    }
 
-   
-    
+    private WebMarkupContainer initThreadsPanel(String panelId) {
+        return new InternalsThreadsPanel(panelId);
+    }
+
+    private WebMarkupContainer initPerformancePanel(String panelId) {
+        return new InternalsPerformancePanel(panelId);
+    }
+
+    private WebMarkupContainer initMemoryPanel(String panelId) {
+        return new InternalsMemoryPanel(panelId);
+    }
+
+    private WebMarkupContainer initLoggedUsersPanel(String panelId) {
+        return new InternalsLoggedInUsersPanel(panelId);
+    }
 }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.server.dto;
@@ -25,15 +16,17 @@ import com.evolveum.midpoint.util.DebugUtil;
  * @author lazyman
  */
 public class TasksSearchDto implements Serializable, DebugDumpable {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	public static final String F_STATUS = "status";
+    public static final String F_STATUS = "status";
     public static final String F_CATEGORY = "category";
     public static final String F_SHOW_SUBTASKS = "showSubtasks";
+    public static final String F_SHOW_PROGRESS = "showProgress";
 
     private TaskDtoExecutionStatusFilter status;
     private String category;
     private boolean showSubtasks;
+    private boolean showProgress;
 
     public boolean isShowSubtasks() {
         return showSubtasks;
@@ -41,6 +34,14 @@ public class TasksSearchDto implements Serializable, DebugDumpable {
 
     public void setShowSubtasks(boolean showSubtasks) {
         this.showSubtasks = showSubtasks;
+    }
+
+    public boolean isShowProgress() {
+        return showProgress;
+    }
+
+    public void setShowProgress(boolean showProgress) {
+        this.showProgress = showProgress;
     }
 
     public String getCategory() {
@@ -60,18 +61,19 @@ public class TasksSearchDto implements Serializable, DebugDumpable {
     }
 
     @Override
-	public String debugDump() {
-		return debugDump(0);
-	}
+    public String debugDump() {
+        return debugDump(0);
+    }
 
-	@Override
-	public String debugDump(int indent) {
-		StringBuilder sb = new StringBuilder();
-		DebugUtil.indentDebugDump(sb, indent);
-		sb.append("TasksSearchDto\n");
-		DebugUtil.debugDumpWithLabelLn(sb, "status", status==null?null:status.toString(), indent+1);
-		DebugUtil.debugDumpWithLabelLn(sb, "category", category, indent+1);
-		DebugUtil.debugDumpWithLabel(sb, "showSubtasks", showSubtasks, indent+1);
-		return sb.toString();
-	}
+    @Override
+    public String debugDump(int indent) {
+        StringBuilder sb = new StringBuilder();
+        DebugUtil.indentDebugDump(sb, indent);
+        sb.append("TasksSearchDto\n");
+        DebugUtil.debugDumpWithLabelLn(sb, "status", status==null?null:status.toString(), indent+1);
+        DebugUtil.debugDumpWithLabelLn(sb, "category", category, indent+1);
+        DebugUtil.debugDumpWithLabel(sb, "showSubtasks", showSubtasks, indent+1);
+        DebugUtil.debugDumpWithLabel(sb, "showProgress", showProgress, indent+1);
+        return sb.toString();
+    }
 }

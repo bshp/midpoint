@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.query2.hqm;
@@ -28,7 +19,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Query in HQL that is being created.
@@ -59,7 +49,7 @@ public abstract class HibernateQuery {
      */
     private List<Condition> conditions = new ArrayList<>();
 
-    public class Ordering {
+    public static class Ordering {
         @NotNull private final String byProperty;
         private final OrderDirection direction;
 
@@ -81,7 +71,7 @@ public abstract class HibernateQuery {
     private List<Ordering> orderingList = new ArrayList<>();
 
 
-    public class Grouping {
+    public static class Grouping {
         @NotNull private final String byProperty;
 
         Grouping(@NotNull String byProperty) {
@@ -135,14 +125,15 @@ public abstract class HibernateQuery {
         conditions.add(condition);
     }
 
+    // Seems to have some side effects. Do not call twice!
     public String getAsHqlText(int indent, boolean distinct) {
         StringBuilder sb = new StringBuilder();
 
         indent(sb, indent);
         sb.append("select");
         if (distinct) {
-        	sb.append(" distinct");
-		}
+            sb.append(" distinct");
+        }
         sb.append("\n");
         ProjectionElement.dumpToHql(sb, projectionElements, indent + 1);     // we finish at the end of the last line (not at the new line)
         sb.append("\n");

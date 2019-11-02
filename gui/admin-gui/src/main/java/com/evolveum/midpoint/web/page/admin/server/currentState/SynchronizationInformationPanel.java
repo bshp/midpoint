@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.server.currentState;
@@ -47,28 +38,28 @@ public class SynchronizationInformationPanel extends BasePanel<SynchronizationIn
 
     public SynchronizationInformationPanel(String id, IModel<SynchronizationInformationDto> model, boolean useAfter) {
         super(id, model);
-		initLayout(useAfter);
+        initLayout(useAfter);
     }
 
     protected void initLayout(final boolean useAfter) {
 
-		WebMarkupContainer titleBefore = new WebMarkupContainer(ID_TITLE_BEFORE);
-		titleBefore.add(new VisibleEnableBehaviour() {
-			@Override
-			public boolean isVisible() {
-				return !useAfter;
-			}
-		});
-		add(titleBefore);
+        WebMarkupContainer titleBefore = new WebMarkupContainer(ID_TITLE_BEFORE);
+        titleBefore.add(new VisibleEnableBehaviour() {
+            @Override
+            public boolean isVisible() {
+                return !useAfter;
+            }
+        });
+        add(titleBefore);
 
-		WebMarkupContainer titleAfter = new WebMarkupContainer(ID_TITLE_AFTER);
-		titleAfter.add(new VisibleEnableBehaviour() {
-			@Override
-			public boolean isVisible() {
-				return useAfter;
-			}
-		});
-		add(titleAfter);
+        WebMarkupContainer titleAfter = new WebMarkupContainer(ID_TITLE_AFTER);
+        titleAfter.add(new VisibleEnableBehaviour() {
+            @Override
+            public boolean isVisible() {
+                return useAfter;
+            }
+        });
+        add(titleAfter);
 
         Label aProtected = new Label(ID_PROTECTED, new PropertyModel<>(getModel(), SynchronizationInformationDto.F_COUNT_PROTECTED));
         add(aProtected);

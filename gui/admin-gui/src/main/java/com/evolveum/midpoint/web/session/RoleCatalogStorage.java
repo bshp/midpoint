@@ -1,70 +1,70 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.session;
 
-import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.query.ObjectPaging;
 import com.evolveum.midpoint.util.DebugUtil;
 import com.evolveum.midpoint.web.component.assignment.AssignmentEditorDto;
 import com.evolveum.midpoint.web.component.search.Search;
-import com.evolveum.midpoint.web.component.util.SelectableBean;
+import com.evolveum.midpoint.web.component.util.TreeSelectableBean;
 import com.evolveum.midpoint.web.page.admin.users.dto.TreeStateSet;
+import com.evolveum.midpoint.web.page.self.PageAssignmentShoppingCart;
 import com.evolveum.midpoint.web.page.self.dto.AssignmentViewType;
 import com.evolveum.midpoint.web.page.self.dto.ConflictDto;
-import com.evolveum.midpoint.web.page.self.dto.ShoppingCartConfigurationDto;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.OrgType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 
+import javax.xml.namespace.QName;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Created by honchar.
  */
 public class RoleCatalogStorage implements PageStorage, OrgTreeStateStorage {
     /**
-     * DTO used for search in {@link com.evolveum.midpoint.web.page.self.PageAssignmentShoppingKart}
+     * DTO used for search in {@link PageAssignmentShoppingCart}
      */
-    private Search roleCatalogSearch;
+    private Map<Integer, Search> roleCatalogSearchMap = new HashMap<>();
 
-    /**
-     * Paging DTO used in table on page {@link com.evolveum.midpoint.web.page.self.PageAssignmentShoppingKart}
+    /**<
+     * Paging DTO used in table on page {@link PageAssignmentShoppingCart}
      */
 
-    private SelectableBean<OrgType> selectedItem;                //selected tree item on the Org. structure page
+    private TreeSelectableBean<OrgType> selectedItem;                //selected tree item on the Org. structure page
     private String selectedOid;
-    private TreeStateSet<SelectableBean<OrgType>> expandedItems; //expanded tree items on the Org. structure page
+    private TreeStateSet<TreeSelectableBean<OrgType>> expandedItems; //expanded tree items on the Org. structure page
     private int selectedTabId = 0;                 //selected tab id on the Org. structure page
-    private SelectableBean<OrgType> collapsedItem = null;                 //collapsed tree item
+    private TreeSelectableBean<OrgType> collapsedItem = null;                 //collapsed tree item
     private List<AssignmentEditorDto> assignmentShoppingCart;   //  a list of assignments in the shopping cart
     private AssignmentViewType viewType = null;      //the current view type
-    private List<UserType> targetUserList = new ArrayList<>();
+    private int defaultTabIndex = -1;
+    private List<String> targetUserOidsList = new ArrayList<>();
     private UserType assignmentsUserOwner = null;
     private List<ConflictDto> conflictsList;
     private String requestDescription = "";
     private ObjectPaging roleCatalogPaging;
-
-    private ShoppingCartConfigurationDto shoppingCartConfigurationDto = null;
+    private int assignmentRequestLimit = -1;
+    private boolean inverse = false;
+    private QName selectedRelation = null;
 
     public Search getSearch() {
-        return roleCatalogSearch;
+        return roleCatalogSearchMap.get(getDefaultTabIndex() < 0 ? 0 : getDefaultTabIndex());
     }
 
-    public void setSearch(Search roleCatalog) {
-        this.roleCatalogSearch = roleCatalog;
+    public void setSearch(Search roleCatalogSearch) {
+        int selectedTab = getDefaultTabIndex() < 0 ? 0 : getDefaultTabIndex();
+        if (!roleCatalogSearchMap.containsKey(selectedTab)){
+            roleCatalogSearchMap.put(selectedTab, roleCatalogSearch);
+        } else {
+            roleCatalogSearchMap.replace(selectedTab, roleCatalogSearch);
+        }
     }
 
     @Override
@@ -95,28 +95,28 @@ public class RoleCatalogStorage implements PageStorage, OrgTreeStateStorage {
         StringBuilder sb = new StringBuilder();
         DebugUtil.indentDebugDump(sb, indent);
         sb.append("RoleCatalogStorage\n");
-        DebugUtil.debugDumpWithLabelLn(sb, "roleCatalogSearch", roleCatalogSearch, indent+1);
+        DebugUtil.debugDumpWithLabelLn(sb, "roleCatalogSearchMap", roleCatalogSearchMap, indent+1);
         DebugUtil.debugDumpWithLabelLn(sb, "roleCatalogPaging", roleCatalogPaging, indent + 1);
         return sb.toString();
     }
 
     @Override
-    public SelectableBean<OrgType> getSelectedItem() {
+    public TreeSelectableBean<OrgType> getSelectedItem() {
         return selectedItem;
     }
 
     @Override
-    public void setSelectedItem(SelectableBean<OrgType> selectedItem) {
+    public void setSelectedItem(TreeSelectableBean<OrgType> selectedItem) {
         this.selectedItem = selectedItem;
     }
 
     @Override
-    public TreeStateSet<SelectableBean<OrgType>> getExpandedItems() {
+    public TreeStateSet<TreeSelectableBean<OrgType>> getExpandedItems() {
         return expandedItems;
     }
 
     @Override
-    public void setExpandedItems(TreeStateSet<SelectableBean<OrgType>> expandedItems) {
+    public void setExpandedItems(TreeStateSet<TreeSelectableBean<OrgType>> expandedItems) {
         this.expandedItems = expandedItems;
     }
 
@@ -131,12 +131,12 @@ public class RoleCatalogStorage implements PageStorage, OrgTreeStateStorage {
     }
 
     @Override
-    public SelectableBean<OrgType> getCollapsedItem() {
+    public TreeSelectableBean<OrgType> getCollapsedItem() {
         return collapsedItem;
     }
 
     @Override
-    public void setCollapsedItem(SelectableBean<OrgType> collapsedItem) {
+    public void setCollapsedItem(TreeSelectableBean<OrgType> collapsedItem) {
         this.collapsedItem = collapsedItem;
     }
 
@@ -167,6 +167,14 @@ public class RoleCatalogStorage implements PageStorage, OrgTreeStateStorage {
         this.viewType = viewType;
     }
 
+    public int getDefaultTabIndex() {
+        return defaultTabIndex;
+    }
+
+    public void setDefaultTabIndex(int defaultTabIndex) {
+        this.defaultTabIndex = defaultTabIndex;
+    }
+
     public String getSelectedOid() {
         return selectedOid;
     }
@@ -175,12 +183,12 @@ public class RoleCatalogStorage implements PageStorage, OrgTreeStateStorage {
         this.selectedOid = selectedOid;
     }
 
-    public List<UserType> getTargetUserList() {
-        return targetUserList;
+    public List<String> getTargetUserOidsList() {
+        return targetUserOidsList;
     }
 
-    public void setTargetUserList(List<UserType> targetUserList) {
-        this.targetUserList = targetUserList;
+    public void setTargetUserOidsList(List<String> targetUserOidsList) {
+        this.targetUserOidsList = targetUserOidsList;
     }
 
     public UserType getAssignmentsUserOwner() {
@@ -192,18 +200,36 @@ public class RoleCatalogStorage implements PageStorage, OrgTreeStateStorage {
     }
 
     public boolean isSelfRequest(){
-        return getTargetUserList() == null || getTargetUserList().size() == 0;
+        return getTargetUserOidsList() == null || getTargetUserOidsList().size() == 0;
     }
 
     public boolean isMultiUserRequest(){
-        return getTargetUserList() != null && getTargetUserList().size() > 1;
+        return getTargetUserOidsList() != null && getTargetUserOidsList().size() > 1;
     }
 
-    public ShoppingCartConfigurationDto getShoppingCartConfigurationDto() {
-        return shoppingCartConfigurationDto;
+    public int getAssignmentRequestLimit() {
+        return assignmentRequestLimit;
     }
 
-    public void setShoppingCartConfigurationDto(ShoppingCartConfigurationDto shoppingCartConfigurationDto) {
-        this.shoppingCartConfigurationDto = shoppingCartConfigurationDto;
+    public void setAssignmentRequestLimit(int assignmentRequestLimit) {
+        this.assignmentRequestLimit = assignmentRequestLimit;
+    }
+
+    public QName getSelectedRelation() {
+        return selectedRelation;
+    }
+
+    public void setSelectedRelation(QName selectedRelation) {
+        this.selectedRelation = selectedRelation;
+    }
+
+    @Override
+    public boolean isInverse(){
+        return inverse;
+    }
+
+    @Override
+    public void setInverse(boolean inverse){
+        this.inverse = inverse;
     }
 }

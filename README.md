@@ -1,7 +1,5 @@
-Status: [![Build Status](https://travis-ci.org/Evolveum/midpoint.svg?branch=master)](https://travis-ci.org/Evolveum/midpoint)
-
-midPoint 3.6 "Comenius"
-------------------------------------
+MidPoint 4.1 Development Branch
+-------------------------------
 
 General information:
 
@@ -12,7 +10,7 @@ The most important features of midPoint are:
 - Security auditing and reporting
 - Organizational structure management
 - Credential Management
-- Workflow
+- Request approval
 - Entitlement Management 
 
 Read more about these features at https://evolveum.com/midpoint/about-midpoint/
@@ -21,7 +19,7 @@ Other features:
 
 - User provisioning and deprovisioning
 - Administration GUI
-- Identity repository implemention (SQL)
+- Identity repository implementation (SQL)
 - Custom schema extensibility
 - Identity synchronization (liveSync, reconciliation, discovery, import)
 - Support for expressions in synchronization mappings (Groovy, JavaScript, Python)
@@ -30,14 +28,16 @@ Other features:
 - Password policies
 - Password reset
 - Entitlements
-- Support for ConnId and OpenICF connectors
+- Archetypes
+- Support for ConnId connectors
 - Provisioning consistency and error handling
+- Data protection (experimental)
 - Reporting
 - Notifications
 - Local Java APIs, Remote web service interface (SOAP), REST API
-- High availablity (HA) support
+- High availability (HA) support
 
-For more information bout midPoint identity manager please go to:
+For more information about midPoint identity manager please go to:
 http://midpoint.evolveum.com/
 
 For bugtracking system please go to:
@@ -52,6 +52,5 @@ https://github.com/Evolveum/midpoint.git
 
 git@github.com:Evolveum/midpoint.git
 
-This project is developed under Apache license (version 2.0) You may get copy
-of licence in LICENSE file. Please also see NOTICE file for addtional
-copyright statements.
+This project is dual-licensed under Apache License 2.0 
+and European Union Public License. See LICENSE file for details.

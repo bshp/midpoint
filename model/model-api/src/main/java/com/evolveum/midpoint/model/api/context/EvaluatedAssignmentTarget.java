@@ -1,22 +1,15 @@
 /**
- * Copyright (c) 2015-2016 Evolveum
+ * Copyright (c) 2015-2016 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.model.api.context;
 
 import com.evolveum.midpoint.prism.PrismObject;
+import com.evolveum.midpoint.schema.RelationRegistry;
 import com.evolveum.midpoint.util.DebugDumpable;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.AssignmentHolderType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AssignmentType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.FocusType;
 import org.jetbrains.annotations.NotNull;
@@ -27,28 +20,34 @@ import org.jetbrains.annotations.NotNull;
  */
 public interface EvaluatedAssignmentTarget extends DebugDumpable {
 
-	PrismObject<? extends FocusType> getTarget();
+    PrismObject<? extends AssignmentHolderType> getTarget();
 
-	boolean isDirectlyAssigned();
+    boolean isDirectlyAssigned();
 
-	// if this target applies to focus (by direct assignment or by some inducement)
-	boolean appliesToFocus();
+    // if this target applies to focus (by direct assignment or by some inducement)
+    // currently matches only default (member) relations - TODO clarify this
+    boolean appliesToFocus();
 
-	/**
-	 * True for roles whose constructions are evaluated - i.e. those roles that are considered to be applied
-	 * to the focal object (e.g. to the user).
- 	 */
-	boolean isEvaluateConstructions();
+    // if this target applies to focus (by direct assignment or by some inducement)
+    // accepts all relations
+    // TODO clarify this
+    boolean appliesToFocusWithAnyRelation(RelationRegistry relationRegistry);
 
-	/**
-	 * An assignment which assigns the given role (useful for knowing e.g. tenantRef or orgRef).
-	 * TODO consider providing here also the "magic assignment"
-	 * (https://wiki.evolveum.com/display/midPoint/Assignment+Configuration#AssignmentConfiguration-ConstructionVariables)
-	 */
-	AssignmentType getAssignment();
+    /**
+     * True for roles whose constructions are evaluated - i.e. those roles that are considered to be applied
+     * to the focal object (e.g. to the user).
+      */
+    boolean isEvaluateConstructions();
 
-	@NotNull
-	AssignmentPath getAssignmentPath();
+    /**
+     * An assignment which assigns the given role (useful for knowing e.g. tenantRef or orgRef).
+     * TODO consider providing here also the "magic assignment"
+     * (https://wiki.evolveum.com/display/midPoint/Assignment+Configuration#AssignmentConfiguration-ConstructionVariables)
+     */
+    AssignmentType getAssignment();
 
-	boolean isValid();
+    @NotNull
+    AssignmentPath getAssignmentPath();
+
+    boolean isValid();
 }

@@ -1,31 +1,24 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.server;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
 import javax.xml.namespace.QName;
 
 import com.evolveum.midpoint.common.refinery.RefinedResourceSchemaImpl;
+import com.evolveum.midpoint.prism.delta.DeltaFactory;
+import com.evolveum.midpoint.web.component.input.DropDownChoicePanel;
 import org.apache.commons.lang.StringUtils;
+import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.form.AjaxFormComponentUpdatingBehavior;
 import org.apache.wicket.ajax.markup.html.form.AjaxCheckBox;
@@ -40,23 +33,19 @@ import org.apache.wicket.markup.html.form.DropDownChoice;
 import org.apache.wicket.markup.html.form.EnumChoiceRenderer;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.TextField;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.util.string.Strings;
 
-import com.evolveum.midpoint.common.refinery.RefinedResourceSchema;
 import com.evolveum.midpoint.gui.api.model.LoadableModel;
 import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.gui.api.util.WebModelServiceUtils;
-import com.evolveum.midpoint.prism.Definition;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.PrismProperty;
 import com.evolveum.midpoint.prism.PrismPropertyDefinition;
 import com.evolveum.midpoint.prism.delta.ObjectDelta;
 import com.evolveum.midpoint.prism.path.ItemPath;
-import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.processor.ResourceSchema;
@@ -126,12 +115,13 @@ public class PageTaskAdd extends PageAdminTasks {
     private static final String ID_NAME = "name";
     private static final String ID_CATEGORY = "category";
     private static final String ID_RESOURCE = "resource";
-    private static final String ID_RUN_UNTIL_NODW_DOWN = "runUntilNodeDown";
+    private static final String ID_RUN_UNTIL_NODE_DOWN = "runUntilNodeDown";
     private static final String ID_CREATE_SUSPENDED = "createSuspended";
     private static final String ID_THREAD_STOP = "threadStop";
     private static final String ID_MISFIRE_ACTION = "misfireAction";
     private static final String ID_RECURRING = "recurring";
     private static final String ID_CONTAINER = "container";
+    private static final String ID_TIME_CONTAINER = "timeContainer";
     private static final String ID_BOUND_CONTAINER = "boundContainer";
     private static final String ID_BOUND_HELP = "boundHelp";
     private static final String ID_BOUND = "bound";
@@ -152,6 +142,7 @@ public class PageTaskAdd extends PageAdminTasks {
     private static final String OPERATION_SAVE_TASK = DOT_CLASS + "saveTask";
 
     private static final StringChoiceRenderer CATEGORY_RENDERER = StringChoiceRenderer.prefixed("pageTask.category.");
+    private static final String MEDIUM_NOTIME_STYLE = "M-";
 
     private IModel<TaskAddDto> model;
 
@@ -182,57 +173,51 @@ public class PageTaskAdd extends PageAdminTasks {
     }
 
     private TaskAddDto loadTask(TaskType taskType) {
-    	TaskAddDto taskAdd = new TaskAddDto();
-    	taskAdd.setCategory(taskType.getCategory());
-    	PrismProperty<ShadowKindType> pKind;
-		try {
-			pKind = taskType.asPrismObject().findOrCreateProperty(new ItemPath(TaskType.F_EXTENSION, SchemaConstants.MODEL_EXTENSION_KIND));
-			taskAdd.setKind(pKind.getRealValue());
-		} catch (SchemaException e) {
-			warn("Could not set kind for new task : " + e.getMessage());
-		}
+        TaskAddDto taskAdd = new TaskAddDto();
+        taskAdd.setCategory(taskType.getCategory());
+        PrismProperty<ShadowKindType> pKind;
+        try {
+            pKind = taskType.asPrismObject().findOrCreateProperty(ItemPath.create(TaskType.F_EXTENSION, SchemaConstants.MODEL_EXTENSION_KIND));
+            taskAdd.setKind(pKind.getRealValue());
+        } catch (SchemaException e) {
+            warn("Could not set kind for new task : " + e.getMessage());
+        }
 
-    	PrismProperty<String> pIntent;
-		try {
-			pIntent = taskType.asPrismObject().findOrCreateProperty(new ItemPath(TaskType.F_EXTENSION, SchemaConstants.MODEL_EXTENSION_INTENT));
-			taskAdd.setIntent(pIntent.getRealValue());
-		} catch (SchemaException e) {
-			warn("Could not set intent for new task : " + e.getMessage());
-		}
+        PrismProperty<String> pIntent;
+        try {
+            pIntent = taskType.asPrismObject().findOrCreateProperty(ItemPath.create(TaskType.F_EXTENSION, SchemaConstants.MODEL_EXTENSION_INTENT));
+            taskAdd.setIntent(pIntent.getRealValue());
+        } catch (SchemaException e) {
+            warn("Could not set intent for new task : " + e.getMessage());
+        }
 
-    	PrismProperty<QName> pObjectClass;
-		try {
-			pObjectClass = taskType.asPrismObject().findOrCreateProperty(new ItemPath(TaskType.F_EXTENSION, SchemaConstants.OBJECTCLASS_PROPERTY_NAME));
-			QName objectClass = pObjectClass.getRealValue();
-			if (objectClass != null){
-	    		taskAdd.setObjectClass(objectClass.getLocalPart());
-	    	}
-		} catch (SchemaException e) {
-			warn("Could not set obejctClass for new task : " + e.getMessage());
-		}
+        PrismProperty<QName> pObjectClass;
+        try {
+            pObjectClass = taskType.asPrismObject().findOrCreateProperty(ItemPath.create(TaskType.F_EXTENSION, SchemaConstants.MODEL_EXTENSION_OBJECTCLASS));
+            QName objectClass = pObjectClass.getRealValue();
+            if (objectClass != null){
+                taskAdd.setObjectClass(objectClass.getLocalPart());
+            }
+        } catch (SchemaException e) {
+            warn("Could not set objectClass for new task : " + e.getMessage());
+        }
 
 
-    	ObjectReferenceType ref = taskType.getObjectRef();
-    	if (ref != null) {
-    	TaskAddResourcesDto resource= new TaskAddResourcesDto(ref.getOid(), WebComponentUtil.getName(ref));
-    	taskAdd.setResource(resource);
-    	}
+        ObjectReferenceType ref = taskType.getObjectRef();
+        if (ref != null) {
+        TaskAddResourcesDto resource= new TaskAddResourcesDto(ref.getOid(), WebComponentUtil.getName(ref));
+        taskAdd.setResource(resource);
+        }
         return taskAdd;
     }
 
     private void initLayout() {
-        Form mainForm = new Form(ID_FORM_MAIN);
+        Form mainForm = new com.evolveum.midpoint.web.component.form.Form(ID_FORM_MAIN);
         add(mainForm);
 
-        final DropDownChoice resource = new DropDownChoice<>(ID_RESOURCE,
-                new PropertyModel<TaskAddResourcesDto>(model, TaskAddDto.F_RESOURCE),
-                new AbstractReadOnlyModel<List<TaskAddResourcesDto>>() {
-
-                    @Override
-                    public List<TaskAddResourcesDto> getObject() {
-                        return createResourceList();
-                    }
-                }, new ChoiceableChoiceRenderer<TaskAddResourcesDto>());
+        final DropDownChoicePanel resource = new DropDownChoicePanel<TaskAddResourcesDto>(ID_RESOURCE,
+            new PropertyModel<>(model, TaskAddDto.F_RESOURCE),
+                Model.ofList(createResourceList()), new ChoiceableChoiceRenderer<>());
         resource.add(new VisibleEnableBehaviour() {
 
             @Override
@@ -244,7 +229,7 @@ public class PageTaskAdd extends PageAdminTasks {
                 return sync || recon || importAccounts;
             }
         });
-        resource.add(new AjaxFormComponentUpdatingBehavior("change") {
+        resource.getBaseFormComponent().add(new AjaxFormComponentUpdatingBehavior("change") {
 
             @Override
             protected void onUpdate(AjaxRequestTarget target) {
@@ -256,8 +241,8 @@ public class PageTaskAdd extends PageAdminTasks {
         mainForm.add(resource);
 
         final DropDownChoice focusType = new DropDownChoice<>(ID_FOCUS_TYPE,
-                new PropertyModel<QName>(model, TaskAddDto.F_FOCUS_TYPE),
-                new AbstractReadOnlyModel<List<QName>>() {
+            new PropertyModel<>(model, TaskAddDto.F_FOCUS_TYPE),
+                new IModel<List<QName>>() {
 
                     @Override
                     public List<QName> getObject() {
@@ -277,8 +262,8 @@ public class PageTaskAdd extends PageAdminTasks {
 
 
         final DropDownChoice kind = new DropDownChoice<>(ID_KIND,
-                new PropertyModel<ShadowKindType>(model, TaskAddDto.F_KIND),
-                WebComponentUtil.createReadonlyModelFromEnum(ShadowKindType.class), new EnumChoiceRenderer<ShadowKindType>());
+            new PropertyModel<>(model, TaskAddDto.F_KIND),
+                WebComponentUtil.createReadonlyModelFromEnum(ShadowKindType.class), new EnumChoiceRenderer<>());
         kind.setOutputMarkupId(true);
         kind.add(new VisibleEnableBehaviour(){
 
@@ -317,11 +302,12 @@ public class PageTaskAdd extends PageAdminTasks {
         autoCompleteSettings.setShowListOnEmptyInput(true);
         autoCompleteSettings.setMaxHeightInPx(200);
         final AutoCompleteTextField<String> objectClass = new AutoCompleteTextField<String>(ID_OBJECT_CLASS,
-                new PropertyModel<String>(model, TaskAddDto.F_OBJECT_CLASS), autoCompleteSettings) {
+            new PropertyModel<>(model, TaskAddDto.F_OBJECT_CLASS), autoCompleteSettings) {
 
             @Override
             protected Iterator<String> getChoices(String input) {
-                return prepareObjectClassChoiceList(input);
+                Iterator<String> ret = prepareObjectClassChoiceList(input);
+                return ret;
             }
         };
         objectClass.add(new VisibleEnableBehaviour(){
@@ -337,8 +323,8 @@ public class PageTaskAdd extends PageAdminTasks {
         });
         mainForm.add(objectClass);
 
-        DropDownChoice type = new DropDownChoice<>(ID_CATEGORY, new PropertyModel<String>(model, TaskAddDto.F_CATEGORY),
-                new AbstractReadOnlyModel<List<String>>() {
+        DropDownChoice type = new DropDownChoice<>(ID_CATEGORY, new PropertyModel<>(model, TaskAddDto.F_CATEGORY),
+                new IModel<List<String>>() {
 
                     @Override
                     public List<String> getObject() {
@@ -366,7 +352,7 @@ public class PageTaskAdd extends PageAdminTasks {
         initScheduling(mainForm);
         initAdvanced(mainForm);
 
-        CheckBox dryRun = new CheckBox(ID_DRY_RUN, new PropertyModel<Boolean>(model, TaskAddDto.F_DRY_RUN));
+        CheckBox dryRun = new CheckBox(ID_DRY_RUN, new PropertyModel<>(model, TaskAddDto.F_DRY_RUN));
         mainForm.add(dryRun);
 
         initButtons(mainForm);
@@ -376,7 +362,14 @@ public class PageTaskAdd extends PageAdminTasks {
         List<String> choices = new ArrayList<>();
 
         if(model.getObject().getResource() == null){
-            return choices.iterator();
+            List<TaskAddResourcesDto> resources = createResourceList();
+            if(resources.isEmpty()) {
+                return choices.iterator();
+            } else {
+                List<TaskAddResourcesDto> sortedResources = WebComponentUtil.sortDropDownChoices(Model.ofList(resources), new ChoiceableChoiceRenderer<>());
+                model.getObject().setResource(sortedResources.get(0));
+                loadResource();
+            }
         }
 
         if(Strings.isEmpty(input)){
@@ -407,15 +400,7 @@ public class PageTaskAdd extends PageAdminTasks {
         if(resourcesDto != null){
             PrismObject<ResourceType> resource = WebModelServiceUtils.loadObject(ResourceType.class,
                     resourcesDto.getOid(), PageTaskAdd.this, task, result);
-
-            try {
-                ResourceSchema schema = RefinedResourceSchemaImpl.getResourceSchema(resource, getPrismContext());
-                model.getObject().setObjectClassList(schema.getObjectClassList());
-            } catch (Exception e){
-                LoggingUtils.logUnexpectedException(LOGGER, "Couldn't load object class list from resource.", e);
-                error("Couldn't load object class list from resource.");
-            }
-
+            model.getObject().setObjectClassList(WebComponentUtil.loadResourceObjectClassValues(resource.asObjectable(), PageTaskAdd.this));
         }
     }
 
@@ -463,11 +448,21 @@ public class PageTaskAdd extends PageAdminTasks {
         cronContainer.setOutputMarkupId(true);
         container.add(cronContainer);
 
+        final WebMarkupContainer timeContainer = new WebMarkupContainer(ID_TIME_CONTAINER);
+        timeContainer.setOutputMarkupId(true);
+        mainForm.add(timeContainer);
+
         AjaxCheckBox recurring = new AjaxCheckBox(ID_RECURRING, recurringCheck) {
 
             @Override
             protected void onUpdate(AjaxRequestTarget target) {
                 target.add(container);
+                if(recurringCheck.getObject()) {
+                    timeContainer.add(new AttributeModifier("class", ""));
+                } else {
+                    timeContainer.add(new AttributeModifier("class", "tbody-nth-of-type-even"));
+                }
+                target.add(timeContainer);
             }
         };
         mainForm.add(recurring);
@@ -493,9 +488,9 @@ public class PageTaskAdd extends PageAdminTasks {
         TextField<String> cron = new TextField<>(ID_CRON, new PropertyModel<String>(
                 model, TaskAddDto.F_CRON));
         cron.add(new EmptyOnBlurAjaxFormUpdatingBehaviour());
-//		if (recurringCheck.getObject() && !boundCheck.getObject()) {
-//			cron.setRequired(true);
-//		}
+//        if (recurringCheck.getObject() && !boundCheck.getObject()) {
+//            cron.setRequired(true);
+//        }
         cronContainer.add(cron);
 
         Label cronHelp = new Label(ID_CRON_HELP);
@@ -503,24 +498,24 @@ public class PageTaskAdd extends PageAdminTasks {
         cronContainer.add(cronHelp);
 
         final DateTimeField notStartBefore = new DateTimeField(ID_NO_START_BEFORE_FIELD,
-                new PropertyModel<Date>(model, TaskAddDto.F_NOT_START_BEFORE)) {
+            new PropertyModel<>(model, TaskAddDto.F_NOT_START_BEFORE)) {
             @Override
             protected DateTextField newDateTextField(String id, PropertyModel dateFieldModel) {
-                return DateTextField.forDatePattern(id, dateFieldModel, "dd/MMM/yyyy"); // todo i18n
+                return DateTextField.forDatePattern(id, dateFieldModel, WebComponentUtil.getLocalizedDatePattern(MEDIUM_NOTIME_STYLE));
             }
         };
         notStartBefore.setOutputMarkupId(true);
-        mainForm.add(notStartBefore);
+        timeContainer.add(notStartBefore);
 
-        final DateTimeField notStartAfter = new DateTimeField(ID_NO_START_AFTER_FIELD, new PropertyModel<Date>(
-                model, TaskAddDto.F_NOT_START_AFTER)) {
+        final DateTimeField notStartAfter = new DateTimeField(ID_NO_START_AFTER_FIELD, new PropertyModel<>(
+            model, TaskAddDto.F_NOT_START_AFTER)) {
             @Override
             protected DateTextField newDateTextField(String id, PropertyModel dateFieldModel) {
-                return DateTextField.forDatePattern(id, dateFieldModel, "dd/MMM/yyyy"); // todo i18n
+                return DateTextField.forDatePattern(id, dateFieldModel, WebComponentUtil.getLocalizedDatePattern(MEDIUM_NOTIME_STYLE));
             }
         };
         notStartAfter.setOutputMarkupId(true);
-        mainForm.add(notStartAfter);
+        timeContainer.add(notStartAfter);
 
         mainForm.add(new StartEndDateValidator(notStartBefore, notStartAfter));
         mainForm.add(new ScheduleValidator(getTaskManager(), recurring, bound, interval, cron));
@@ -528,8 +523,8 @@ public class PageTaskAdd extends PageAdminTasks {
     }
 
     private void initAdvanced(Form mainForm) {
-        CheckBox runUntilNodeDown = new CheckBox(ID_RUN_UNTIL_NODW_DOWN, new PropertyModel<Boolean>(model,
-                TaskAddDto.F_RUN_UNTIL_NODW_DOWN));
+        CheckBox runUntilNodeDown = new CheckBox(ID_RUN_UNTIL_NODE_DOWN, new PropertyModel<>(model,
+            TaskAddDto.F_RUN_UNTIL_NODW_DOWN));
         mainForm.add(runUntilNodeDown);
 
         final IModel<Boolean> createSuspendedCheck = new PropertyModel<>(model, TaskAddDto.F_SUSPENDED_STATE);
@@ -541,13 +536,13 @@ public class PageTaskAdd extends PageAdminTasks {
             @Override
             public ThreadStopActionType getObject() {
                 TaskAddDto dto = model.getObject();
-//				if (dto.getThreadStop() == null) {
-//					if (!dto.getRunUntilNodeDown()) {
-//						dto.setThreadStop(ThreadStopActionType.RESTART);
-//					} else {
-//						dto.setThreadStop(ThreadStopActionType.CLOSE);
-//					}
-//				}
+//                if (dto.getThreadStop() == null) {
+//                    if (!dto.getRunUntilNodeDown()) {
+//                        dto.setThreadStop(ThreadStopActionType.RESTART);
+//                    } else {
+//                        dto.setThreadStop(ThreadStopActionType.CLOSE);
+//                    }
+//                }
                 return dto.getThreadStop();
             }
 
@@ -556,14 +551,14 @@ public class PageTaskAdd extends PageAdminTasks {
                 model.getObject().setThreadStop(object);
             }
         }, WebComponentUtil.createReadonlyModelFromEnum(ThreadStopActionType.class),
-                new EnumChoiceRenderer<ThreadStopActionType>(PageTaskAdd.this));
+            new EnumChoiceRenderer<>(PageTaskAdd.this));
         mainForm.add(threadStop);
 
         mainForm.add(new TsaValidator(runUntilNodeDown, threadStop));
 
-        DropDownChoice misfire = new DropDownChoice<>(ID_MISFIRE_ACTION, new PropertyModel<MisfireActionType>(
-                model, TaskAddDto.F_MISFIRE_ACTION), WebComponentUtil.createReadonlyModelFromEnum(MisfireActionType.class),
-                new EnumChoiceRenderer<MisfireActionType>(PageTaskAdd.this));
+        DropDownChoice misfire = new DropDownChoice<>(ID_MISFIRE_ACTION, new PropertyModel<>(
+            model, TaskAddDto.F_MISFIRE_ACTION), WebComponentUtil.createReadonlyModelFromEnum(MisfireActionType.class),
+            new EnumChoiceRenderer<>(PageTaskAdd.this));
         mainForm.add(misfire);
     }
 
@@ -572,12 +567,12 @@ public class PageTaskAdd extends PageAdminTasks {
                 createStringResource("PageBase.button.save")) {
 
             @Override
-            protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            protected void onSubmit(AjaxRequestTarget target) {
                 savePerformed(target);
             }
 
             @Override
-            protected void onError(AjaxRequestTarget target, Form<?> form) {
+            protected void onError(AjaxRequestTarget target) {
                 target.add(getFeedbackPanel());
             }
         };
@@ -621,13 +616,13 @@ public class PageTaskAdd extends PageAdminTasks {
         OperationResult result = new OperationResult(OPERATION_LOAD_RESOURCES);
         Task task = createSimpleTask(OPERATION_LOAD_RESOURCES);
         List<PrismObject<ResourceType>> resources = null;
-        List<TaskAddResourcesDto> resourceList = new ArrayList<TaskAddResourcesDto>();
+        List<TaskAddResourcesDto> resourceList = new ArrayList<>();
 
         try {
-            resources = getModelService().searchObjects(ResourceType.class, new ObjectQuery(), null, task, result);
+            resources = getModelService().searchObjects(ResourceType.class, null, null, task, result);
             result.recomputeStatus();
         } catch (Exception ex) {
-            result.recordFatalError("Couldn't get resource list.", ex);
+            result.recordFatalError(getString("PageTaskAdd.message.createResourceList.fatalError"), ex);
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't get resource list", ex);
         }
 
@@ -663,7 +658,7 @@ public class PageTaskAdd extends PageAdminTasks {
             setResponsePage(PageTasks.class);
         } catch (Exception ex) {
             result.recomputeStatus();
-            result.recordFatalError("Unable to save task.", ex);
+            result.recordFatalError(getString("PageTaskAdd.message.savePerformed.fatalError"), ex);
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't add new task", ex);
         }
         showResult(result);
@@ -671,13 +666,13 @@ public class PageTaskAdd extends PageAdminTasks {
     }
 
     private List<ObjectDelta<? extends ObjectType>> prepareChangesToExecute(TaskType taskToBeAdded) {
-        List<ObjectDelta<? extends ObjectType>> retval = new ArrayList<ObjectDelta<? extends ObjectType>>();
-        retval.add(ObjectDelta.createAddDelta(taskToBeAdded.asPrismObject()));
+        List<ObjectDelta<? extends ObjectType>> retval = new ArrayList<>();
+        retval.add(DeltaFactory.Object.createAddDelta(taskToBeAdded.asPrismObject()));
         return retval;
     }
 
     private TaskType createTask(TaskAddDto dto) throws SchemaException {
-        TaskType task = new TaskType();
+        TaskType task = new TaskType(getPrismContext());
         MidPointPrincipal owner = SecurityUtils.getPrincipalUser();
 
         ObjectReferenceType ownerRef = new ObjectReferenceType();
@@ -723,7 +718,7 @@ public class PageTaskAdd extends PageAdminTasks {
             task.setThreadStopAction(dto.getThreadStop());
         } else {
             // fill-in default
-            if (dto.getRunUntilNodeDown() == true) {
+            if (dto.getRunUntilNodeDown()) {
                 task.setThreadStopAction(ThreadStopActionType.CLOSE);
             } else {
                 task.setThreadStopAction(ThreadStopActionType.RESTART);
@@ -732,7 +727,7 @@ public class PageTaskAdd extends PageAdminTasks {
 
         if (dto.isDryRun()) {
             PrismObject<TaskType> prismTask = task.asPrismObject();
-            ItemPath path = new ItemPath(TaskType.F_EXTENSION,SchemaConstants.MODEL_EXTENSION_DRY_RUN);
+            ItemPath path = ItemPath.create(TaskType.F_EXTENSION,SchemaConstants.MODEL_EXTENSION_DRY_RUN);
             PrismProperty dryRun = prismTask.findOrCreateProperty(path);
 
             SchemaRegistry registry = getPrismContext().getSchemaRegistry();
@@ -743,17 +738,17 @@ public class PageTaskAdd extends PageAdminTasks {
 
         if (dto.getFocusType() != null){
 
-        	PrismObject<TaskType> prismTask = task.asPrismObject();
+            PrismObject<TaskType> prismTask = task.asPrismObject();
 
-        	ItemPath path = new ItemPath(TaskType.F_EXTENSION, SchemaConstants.MODEL_EXTENSION_OBJECT_TYPE);
-			PrismProperty focusType = prismTask.findOrCreateProperty(path);
-			focusType.setRealValue(dto.getFocusType());
+            ItemPath path = ItemPath.create(TaskType.F_EXTENSION, SchemaConstants.MODEL_EXTENSION_OBJECT_TYPE);
+            PrismProperty focusType = prismTask.findOrCreateProperty(path);
+            focusType.setRealValue(dto.getFocusType());
 
-		}
+        }
 
         if(dto.getKind() != null){
             PrismObject<TaskType> prismTask = task.asPrismObject();
-            ItemPath path = new ItemPath(TaskType.F_EXTENSION, SchemaConstants.MODEL_EXTENSION_KIND);
+            ItemPath path = ItemPath.create(TaskType.F_EXTENSION, SchemaConstants.MODEL_EXTENSION_KIND);
             PrismProperty kind = prismTask.findOrCreateProperty(path);
 
             SchemaRegistry registry = getPrismContext().getSchemaRegistry();
@@ -764,7 +759,7 @@ public class PageTaskAdd extends PageAdminTasks {
 
         if(dto.getIntent() != null && StringUtils.isNotEmpty(dto.getIntent())){
             PrismObject<TaskType> prismTask = task.asPrismObject();
-            ItemPath path = new ItemPath(TaskType.F_EXTENSION, SchemaConstants.MODEL_EXTENSION_INTENT);
+            ItemPath path = ItemPath.create(TaskType.F_EXTENSION, SchemaConstants.MODEL_EXTENSION_INTENT);
             PrismProperty intent = prismTask.findOrCreateProperty(path);
 
             SchemaRegistry registry = getPrismContext().getSchemaRegistry();
@@ -775,7 +770,7 @@ public class PageTaskAdd extends PageAdminTasks {
 
         if(dto.getObjectClass() != null && StringUtils.isNotEmpty(dto.getObjectClass())){
             PrismObject<TaskType> prismTask = task.asPrismObject();
-            ItemPath path = new ItemPath(TaskType.F_EXTENSION, SchemaConstants.OBJECTCLASS_PROPERTY_NAME);
+            ItemPath path = ItemPath.create(TaskType.F_EXTENSION, SchemaConstants.MODEL_EXTENSION_OBJECTCLASS);
             PrismProperty objectClassProperty = prismTask.findOrCreateProperty(path);
 
             QName objectClass = null;
@@ -786,7 +781,7 @@ public class PageTaskAdd extends PageAdminTasks {
             }
 
             SchemaRegistry registry = getPrismContext().getSchemaRegistry();
-            PrismPropertyDefinition def = registry.findPropertyDefinitionByElementName(SchemaConstants.OBJECTCLASS_PROPERTY_NAME);
+            PrismPropertyDefinition def = registry.findPropertyDefinitionByElementName(SchemaConstants.MODEL_EXTENSION_OBJECTCLASS);
             objectClassProperty.setDefinition(def);
             objectClassProperty.setRealValue(objectClass);
         }

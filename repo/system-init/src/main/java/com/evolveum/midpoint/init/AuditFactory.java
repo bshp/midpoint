@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.init;
@@ -39,14 +30,13 @@ import java.util.List;
  */
 public class AuditFactory implements ApplicationContextAware, RuntimeConfiguration {
 
-    private static final String AUDIT_CONFIGURATION = "midpoint.audit";
     private static final String CONF_AUDIT_SERVICE = "auditService";
     private static final String CONF_AUDIT_SERVICE_FACTORY = "auditServiceFactoryClass";
     private static final Trace LOGGER = TraceManager.getTrace(AuditFactory.class);
     private ApplicationContext applicationContext;
     @Autowired
     MidpointConfiguration midpointConfiguration;
-    private List<AuditServiceFactory> serviceFactories = new ArrayList<AuditServiceFactory>();
+    private List<AuditServiceFactory> serviceFactories = new ArrayList<>();
     private AuditService auditService;
 
     public void init() {
@@ -54,7 +44,7 @@ public class AuditFactory implements ApplicationContextAware, RuntimeConfigurati
         //TODO FIX CONFIGURATION, CLEANUP REALLY NEEDED
         List<SubnodeConfiguration> auditServices = ((XMLConfiguration) ((CompositeConfiguration)
                 ((SubsetConfiguration) config).getParent()).getConfiguration(0))
-                .configurationsAt(AUDIT_CONFIGURATION + "." + CONF_AUDIT_SERVICE);
+                .configurationsAt(MidpointConfiguration.AUDIT_CONFIGURATION + "." + CONF_AUDIT_SERVICE);
 
         for (SubnodeConfiguration serviceConfig : auditServices) {
             try {
@@ -125,11 +115,11 @@ public class AuditFactory implements ApplicationContextAware, RuntimeConfigurati
 
     @Override
     public String getComponentId() {
-        return AUDIT_CONFIGURATION;
+        return MidpointConfiguration.AUDIT_CONFIGURATION;
     }
 
     @Override
     public Configuration getCurrentConfiguration() {
-        return midpointConfiguration.getConfiguration(AUDIT_CONFIGURATION);
+        return midpointConfiguration.getConfiguration(MidpointConfiguration.AUDIT_CONFIGURATION);
     }
 }

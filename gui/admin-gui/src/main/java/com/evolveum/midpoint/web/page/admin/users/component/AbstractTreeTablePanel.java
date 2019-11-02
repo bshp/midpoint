@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.users.component;
@@ -20,9 +11,9 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import com.evolveum.midpoint.prism.query.builder.QueryBuilder;
 import com.evolveum.midpoint.prism.query.builder.S_AtomicFilterExit;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
+import com.evolveum.midpoint.web.component.util.TreeSelectableBean;
+import com.evolveum.midpoint.web.page.admin.orgs.MidpointNestedTree;
 import org.apache.commons.lang.StringUtils;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.extensions.markup.html.repeater.tree.ITreeProvider;
@@ -36,13 +27,8 @@ import com.evolveum.midpoint.gui.api.component.BasePanel;
 import com.evolveum.midpoint.gui.api.model.LoadableModel;
 import com.evolveum.midpoint.gui.api.page.PageBase;
 import com.evolveum.midpoint.prism.PrismContext;
-import com.evolveum.midpoint.prism.match.PolyStringNormMatchingRule;
 import com.evolveum.midpoint.prism.polystring.PolyStringNormalizer;
-import com.evolveum.midpoint.prism.query.AndFilter;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
-import com.evolveum.midpoint.prism.query.OrFilter;
-import com.evolveum.midpoint.prism.query.OrgFilter;
-import com.evolveum.midpoint.prism.query.SubstringFilter;
 import com.evolveum.midpoint.schema.constants.ObjectTypes;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
@@ -103,17 +89,17 @@ public abstract class AbstractTreeTablePanel extends BasePanel<String> {
 
     protected static final List<String> SEARCH_SCOPE_VALUES = Arrays.asList( SEARCH_SCOPE_SUBTREE, SEARCH_SCOPE_ONE);
 
-    protected IModel<SelectableBean<OrgType>> selected;
+    protected IModel<TreeSelectableBean<OrgType>> selected;
 
     public AbstractTreeTablePanel(String id, IModel<String> rootOid) {
         super(id, rootOid);
     }
 
 
-    protected SelectableBean<OrgType> getRootFromProvider() {
-        TableTree<SelectableBean<OrgType>, String> tree = getTree();
-        ITreeProvider<SelectableBean<OrgType>> provider = tree.getProvider();
-        Iterator<? extends SelectableBean<OrgType>> iterator = provider.getRoots();
+    protected TreeSelectableBean<OrgType> getRootFromProvider() {
+        MidpointNestedTree tree = getTree();
+        ITreeProvider<TreeSelectableBean<OrgType>> provider = tree.getProvider();
+        Iterator<? extends TreeSelectableBean<OrgType>> iterator = provider.getRoots();
 
         return iterator.hasNext() ? iterator.next() : null;
     }
@@ -136,8 +122,8 @@ public abstract class AbstractTreeTablePanel extends BasePanel<String> {
         target.add(page.getFeedbackPanel());
     }
 
-    protected TableTree<SelectableBean<OrgType>, String> getTree() {
-        return (TableTree<SelectableBean<OrgType>, String>) get(createComponentPath(ID_TREE_CONTAINER, ID_TREE));
+    protected MidpointNestedTree getTree() {
+        return (MidpointNestedTree) get(createComponentPath(ID_TREE_CONTAINER, ID_TREE));
     }
 
     protected WebMarkupContainer getOrgChildContainer() {
@@ -149,7 +135,7 @@ public abstract class AbstractTreeTablePanel extends BasePanel<String> {
     }
 
     protected ObjectQuery createOrgChildQuery() {
-    	SelectableBean<OrgType> dto = selected.getObject();
+        SelectableBean<OrgType> dto = selected.getObject();
         String oid = dto != null && dto.getValue() != null ? dto.getValue().getOid() : getModel().getObject();
 
         BasicSearchPanel<String> basicSearch = (BasicSearchPanel) get(createComponentPath(ID_SEARCH_FORM, ID_BASIC_SEARCH));
@@ -159,7 +145,7 @@ public abstract class AbstractTreeTablePanel extends BasePanel<String> {
         String scope = searchScopeChoice.getModelObject();
 
         if (StringUtils.isBlank(object)) {
-        	object = null;
+            object = null;
         }
 
         PageBase page = getPageBase();
@@ -167,10 +153,10 @@ public abstract class AbstractTreeTablePanel extends BasePanel<String> {
 
         S_AtomicFilterExit q;
         if (object == null || SEARCH_SCOPE_ONE.equals(scope)) {
-            q = QueryBuilder.queryFor(OrgType.class, context)
+            q = context.queryFor(OrgType.class)
                     .isDirectChildOf(oid);
         } else {
-            q = QueryBuilder.queryFor(OrgType.class, context)
+            q = context.queryFor(OrgType.class)
                     .isChildOf(oid);
         }
 

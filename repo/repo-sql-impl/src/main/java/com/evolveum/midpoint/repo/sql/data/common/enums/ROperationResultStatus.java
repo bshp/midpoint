@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.data.common.enums;
@@ -37,16 +28,28 @@ public enum ROperationResultStatus implements SchemaEnum<OperationResultStatusTy
 
     private OperationResultStatusType status;
 
-    private ROperationResultStatus(OperationResultStatusType status) {
+    ROperationResultStatus(OperationResultStatusType status) {
         this.status = status;
     }
 
     public OperationResultStatus getStatus(){
-    	return OperationResultStatus.parseStatusType(status);
+        return OperationResultStatus.parseStatusType(status);
     }
 
     @Override
     public OperationResultStatusType getSchemaValue() {
         return status;
+    }
+
+    public static ROperationResultStatus toRepo(OperationResultStatusType jaxb) {
+        if (jaxb == null) {
+            return null;
+        }
+        for (ROperationResultStatus st : values()) {
+            if (jaxb == st.status) {
+                return st;
+            }
+        }
+        throw new IllegalArgumentException("Unknown operation result state '" + jaxb + "'.");
     }
 }

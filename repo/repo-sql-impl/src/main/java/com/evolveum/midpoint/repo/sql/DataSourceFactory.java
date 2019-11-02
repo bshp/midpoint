@@ -1,33 +1,25 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql;
 
 import com.evolveum.midpoint.repo.api.RepositoryServiceFactoryException;
-import com.evolveum.midpoint.repo.sql.util.MidPointConnectionCustomizer;
-import com.evolveum.midpoint.repo.sql.util.MidPointConnectionTester;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
-import com.mchange.v2.c3p0.ComboPooledDataSource;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.jndi.JndiObjectFactoryBean;
 
+import javax.annotation.PreDestroy;
 import javax.naming.NamingException;
 import javax.sql.DataSource;
-import java.beans.PropertyVetoException;
+import java.io.Closeable;
+import java.io.IOException;
 
 /**
  * @author Viliam Repan (lazyman)
@@ -38,7 +30,12 @@ public class DataSourceFactory {
 
     private SqlRepositoryConfiguration configuration;
 
+    private DataSource internalDataSource;
     private DataSource dataSource;
+
+    public SqlRepositoryConfiguration getConfiguration() {
+        return configuration;
+    }
 
     public void setConfiguration(SqlRepositoryConfiguration configuration) {
         this.configuration = configuration;
@@ -52,48 +49,89 @@ public class DataSourceFactory {
 
         try {
             if (StringUtils.isNotEmpty(configuration.getDataSource())) {
-                LOGGER.info("JDNI datasource present in configuration, looking for '{}'.",
-                        new Object[]{configuration.getDataSource()});
-                return createJNDIDataSource();
+                LOGGER.info("JNDI datasource present in configuration, looking for '{}'.", configuration.getDataSource());
+                dataSource = createJNDIDataSource();
+            } else {
+                LOGGER.info("Constructing default datasource with connection pooling; JDBC URL: {}", configuration.getJdbcUrl());
+                internalDataSource = createDataSourceInternal();
+                dataSource = internalDataSource;
             }
-
-            LOGGER.info("Constructing default C3P0 datasource with connection pooling; JDBC URL: {}", configuration.getJdbcUrl());
-            dataSource = createC3P0DataSource();
             return dataSource;
         } catch (Exception ex) {
             throw new RepositoryServiceFactoryException("Couldn't initialize datasource, reason: " + ex.getMessage(), ex);
         }
     }
 
+    public DataSource getDataSource() {
+        return dataSource;
+    }
+
     private DataSource createJNDIDataSource() throws IllegalArgumentException, NamingException {
         JndiObjectFactoryBean factory = new JndiObjectFactoryBean();
         factory.setJndiName(configuration.getDataSource());
         factory.afterPropertiesSet();
-
         return (DataSource) factory.getObject();
     }
 
-    private DataSource createC3P0DataSource() throws PropertyVetoException {
-        ComboPooledDataSource ds = new ComboPooledDataSource();
-        ds.setDriverClass(configuration.getDriverClassName());
-        ds.setJdbcUrl(configuration.getJdbcUrl());
-        ds.setUser(configuration.getJdbcUsername());
-        ds.setPassword(configuration.getJdbcPassword());
+    private HikariConfig createConfig() {
+        HikariConfig config = new HikariConfig();
 
-        ds.setAcquireIncrement(3);
-        ds.setMinPoolSize(configuration.getMinPoolSize());
-        ds.setMaxPoolSize(configuration.getMaxPoolSize());
-        ds.setIdleConnectionTestPeriod(1800);
-        ds.setConnectionTesterClassName(MidPointConnectionTester.class.getName());
-        ds.setConnectionCustomizerClassName(MidPointConnectionCustomizer.class.getName());
+        config.setDriverClassName(configuration.getDriverClassName());
+        config.setJdbcUrl(configuration.getJdbcUrl());
+        config.setUsername(configuration.getJdbcUsername());
+        config.setPassword(configuration.getJdbcPassword());
 
-        return ds;
+        config.setRegisterMbeans(true);
+
+        config.setMinimumIdle(configuration.getMinPoolSize());
+        config.setMaximumPoolSize(configuration.getMaxPoolSize());
+
+        if (configuration.getMaxLifetime() != null) {
+            config.setMaxLifetime(configuration.getMaxLifetime());
+        }
+
+        if (configuration.getIdleTimeout() != null) {
+            config.setIdleTimeout(configuration.getIdleTimeout());
+        }
+
+        config.setIsolateInternalQueries(true);
+//        config.setAutoCommit(false);
+
+        TransactionIsolation ti = configuration.getTransactionIsolation();
+        if (ti != null && TransactionIsolation.SNAPSHOT != ti) {
+            config.setTransactionIsolation("TRANSACTION_" + ti.name());
+        }
+
+        if (configuration.isUsingMySqlCompatible()) {
+            config.addDataSourceProperty("cachePrepStmts", "true");
+            config.addDataSourceProperty("prepStmtCacheSize", "250");
+            config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+
+//            config.addDataSourceProperty("useServerPrepStmts", "true");
+//            config.addDataSourceProperty("useLocalSessionState", "true");
+//            config.addDataSourceProperty("useLocalTransactionState", "true");
+//            config.addDataSourceProperty("rewriteBatchedStatements", "true");
+//            config.addDataSourceProperty("cacheResultSetMetadata", "true");
+//            config.addDataSourceProperty("cacheServerConfiguration", "true");
+//            config.addDataSourceProperty("elideSetAutoCommits", "true");
+//            config.addDataSourceProperty("maintainTimeStats", "false");
+        }
+
+        config.setInitializationFailTimeout(configuration.getInitializationFailTimeout());
+
+        return config;
     }
 
-    public void destroy() {
-        if (dataSource instanceof ComboPooledDataSource) {
-            ComboPooledDataSource ds = (ComboPooledDataSource) dataSource;
-            ds.close();
+    private DataSource createDataSourceInternal() {
+        HikariConfig config = createConfig();
+
+        return new HikariDataSource(config);
+    }
+
+    @PreDestroy
+    public void destroy() throws IOException {
+        if (internalDataSource instanceof Closeable) {
+            ((Closeable) internalDataSource).close();
         }
     }
 }

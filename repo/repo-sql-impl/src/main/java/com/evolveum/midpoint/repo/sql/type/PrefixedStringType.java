@@ -1,9 +1,15 @@
+/**
+ * Copyright (c) 2010-2019 Evolveum and contributors
+ *
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
+ */
 package com.evolveum.midpoint.repo.sql.type;
 
 import org.hibernate.HibernateException;
 import org.hibernate.dialect.Oracle10gDialect;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
-import org.hibernate.engine.spi.SessionImplementor;
+import org.hibernate.engine.spi.SharedSessionContractImplementor;
 import org.hibernate.type.StringType;
 import org.hibernate.usertype.UserType;
 
@@ -48,7 +54,7 @@ public class PrefixedStringType implements UserType {
     }
 
     @Override
-    public Object nullSafeGet(ResultSet rs, String[] names, SessionImplementor session, Object owner)
+    public Object nullSafeGet(ResultSet rs, String[] names, SharedSessionContractImplementor session, Object owner)
             throws HibernateException, SQLException {
         String value = StringType.INSTANCE.nullSafeGet(rs, names[0], session);
         if (isOracle(session) && value != null) {
@@ -59,7 +65,7 @@ public class PrefixedStringType implements UserType {
     }
 
     @Override
-    public void nullSafeSet(PreparedStatement st, Object value, int index, SessionImplementor session)
+    public void nullSafeSet(PreparedStatement st, Object value, int index, SharedSessionContractImplementor session)
             throws HibernateException, SQLException {
         if (isOracle(session) && value != null) {
             value = '\u0000' + ((String) value);
@@ -68,7 +74,7 @@ public class PrefixedStringType implements UserType {
         StringType.INSTANCE.nullSafeSet(st, value, index, session);
     }
 
-    private boolean isOracle(SessionImplementor session) {
+    private boolean isOracle(SharedSessionContractImplementor session) {
         SessionFactoryImplementor factory = session.getFactory();
         //System.out.println("]]] " + Oracle10gDialect.class.isAssignableFrom(factory.getDialect().getClass()));
         return Oracle10gDialect.class.isAssignableFrom(factory.getDialect().getClass());

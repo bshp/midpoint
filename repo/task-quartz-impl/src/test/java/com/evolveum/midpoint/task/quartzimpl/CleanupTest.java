@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.task.quartzimpl;
@@ -50,22 +41,13 @@ import static com.evolveum.midpoint.test.IntegrationTestTools.display;
 /**
  * @author lazyman
  */
-@ContextConfiguration(locations = {"classpath:ctx-task.xml",
-        "classpath:ctx-task-test.xml",
-        "classpath:ctx-repo-cache.xml",
-        "classpath:ctx-repo-common.xml",
-        "classpath:ctx-expression-test.xml",
-        "classpath*:ctx-repository-test.xml",
-        "classpath:ctx-audit.xml",
-        "classpath:ctx-security.xml",
-        "classpath:ctx-common.xml",
-        "classpath:ctx-configuration-test.xml"})
+@ContextConfiguration(locations = {"classpath:ctx-task-test.xml"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class CleanupTest extends AbstractTestNGSpringContextTests {
 
     private static final Trace LOGGER = TraceManager.getTrace(CleanupTest.class);
 
-    public static final File FOLDER_REPO = new File("./src/test/resources/repo");
+    public static final File FOLDER_BASIC = new File("./src/test/resources/basic");
 
     @Autowired
     private TaskManagerQuartzImpl taskManager;
@@ -78,7 +60,7 @@ public class CleanupTest extends AbstractTestNGSpringContextTests {
     public void testTasksCleanup() throws Exception {
 
         // GIVEN
-        final File file = new File(FOLDER_REPO, "tasks-for-cleanup.xml");
+        final File file = new File(FOLDER_BASIC, "tasks-for-cleanup.xml");
         List<PrismObject<? extends Objectable>> elements = prismContext.parserFor(file).parseObjects();
 
         OperationResult result = new OperationResult("tasks cleanup");
@@ -91,10 +73,10 @@ public class CleanupTest extends AbstractTestNGSpringContextTests {
         // because now we can't move system time (we're not using DI for it) we create policy
         // which should always point to 2013-05-07T12:00:00.000+02:00
         final long NOW = System.currentTimeMillis();
-        Calendar when = create_2013_07_12_12_00_Calendar();
+        Calendar when = create_2013_05_07_12_00_00_Calendar();
         CleanupPolicyType policy = createPolicy(when, NOW);
 
-        taskManager.cleanupTasks(policy, taskManager.createTaskInstance(), result);
+        taskManager.cleanupTasks(policy, taskManager.createFakeRunningTask(taskManager.createTaskInstance()), result);
 
         // THEN
         List<PrismObject<TaskType>> tasks = repositoryService.searchObjects(TaskType.class, null, null, result);
@@ -114,7 +96,7 @@ public class CleanupTest extends AbstractTestNGSpringContextTests {
         AssertJUnit.assertTrue("finished: " + finished + ", mark: " + mark, finished.after(mark));
     }
 
-    private Calendar create_2013_07_12_12_00_Calendar() {
+    private Calendar create_2013_05_07_12_00_00_Calendar() {
         Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("GMT+2"));
         calendar.set(Calendar.YEAR, 2013);
         calendar.set(Calendar.MONTH, Calendar.MAY);

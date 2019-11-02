@@ -1,47 +1,36 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.data.common.id;
 
-import java.io.Serializable;
+import com.evolveum.midpoint.repo.sql.data.common.any.RAExtReference;
+
+import java.util.Objects;
 
 /**
  * @author lazyman
  */
-public class RAExtReferenceId implements Serializable {
+public class RAExtReferenceId extends RAExtBaseId {
 
-    private String ownerOid;
-    private Integer ownerId;
     private String value;
-    private String name;
 
+    @Override
     public String getOwnerOid() {
-        return ownerOid;
+        return super.getOwnerOid();
     }
 
-    public void setOwnerOid(String ownerOid) {
-        this.ownerOid = ownerOid;
-    }
-
+    @Override
     public Integer getOwnerId() {
-        return ownerId;
+        return super.getOwnerId();
     }
 
-    public void setOwnerId(Integer ownerId) {
-        this.ownerId = ownerId;
+    @Override
+    public Integer getItemId() {
+        return super.getItemId();
     }
 
     public String getValue() {
@@ -52,36 +41,20 @@ public class RAExtReferenceId implements Serializable {
         this.value = value;
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
+        if (!(o instanceof RAExtReferenceId))
+            return false;
+        if (!super.equals(o))
+            return false;
         RAExtReferenceId that = (RAExtReferenceId) o;
-
-        if (name != null ? !name.equals(that.name) : that.name != null) return false;
-        if (ownerId != null ? !ownerId.equals(that.ownerId) : that.ownerId != null) return false;
-        if (ownerOid != null ? !ownerOid.equals(that.ownerOid) : that.ownerOid != null) return false;
-        if (value != null ? !value.equals(that.value) : that.value != null) return false;
-
-        return true;
+        return Objects.equals(value, that.value);
     }
 
     @Override
     public int hashCode() {
-        int result = ownerOid != null ? ownerOid.hashCode() : 0;
-        result = 31 * result + (ownerId != null ? ownerId.hashCode() : 0);
-        result = 31 * result + (value != null ? value.hashCode() : 0);
-        result = 31 * result + (name != null ? name.hashCode() : 0);
-        return result;
+        return Objects.hash(super.hashCode(), value);
     }
 
     @Override
@@ -89,7 +62,15 @@ public class RAExtReferenceId implements Serializable {
         return "RAReferenceId{" +
                 "ownerOid='" + ownerOid + '\'' +
                 ", ownerId=" + ownerId +
+                ", itemId=" + itemId +
                 ", value='" + value + '\'' +
                 '}';
+    }
+
+    public static RAExtReferenceId createFromValue(RAExtReference value) {
+        RAExtReferenceId rv = new RAExtReferenceId();
+        rv.value = value.getValue();
+        rv.fillInFromValue(value);
+        return rv;
     }
 }

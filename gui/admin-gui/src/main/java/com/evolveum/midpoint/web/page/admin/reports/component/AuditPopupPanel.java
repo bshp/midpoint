@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.reports.component;
@@ -59,11 +50,11 @@ public class AuditPopupPanel extends BasePanel<AuditReportDto> {
     @SuppressWarnings("serial")
     private void initLayout(final Component component) {
 
-        TextFormGroup name = new TextFormGroup(ID_NAME, new PropertyModel<String>(getModel(), AuditReportDto.F_NAME),
+        TextFormGroup name = new TextFormGroup(ID_NAME, new PropertyModel<>(getModel(), AuditReportDto.F_NAME),
                 createStringResource("ObjectType.name"), ID_LABEL_SIZE, ID_INPUT_SIZE, true);
         add(name);
 
-        TextFormGroup description = new TextFormGroup(ID_DESCRIPTION, new PropertyModel<String>(getModel(), AuditReportDto.F_DESCRIPTION),
+        TextFormGroup description = new TextFormGroup(ID_DESCRIPTION, new PropertyModel<>(getModel(), AuditReportDto.F_DESCRIPTION),
                 createStringResource("ObjectType.description"), ID_LABEL_SIZE, ID_INPUT_SIZE, true);
         add(description);
 
@@ -78,11 +69,11 @@ public class AuditPopupPanel extends BasePanel<AuditReportDto> {
                 choices, renderer, createStringResource("AuditPopupPanel.auditEventType"), ID_LABEL_SIZE, ID_INPUT_SIZE, false);
         add(auditEventType);
 
-        DateFormGroup dateFrom = new DateFormGroup(ID_DATE_FROM, new PropertyModel<XMLGregorianCalendar>(getModel(), AuditReportDto.F_FROM_GREG),
+        DateFormGroup dateFrom = new DateFormGroup(ID_DATE_FROM, new PropertyModel<>(getModel(), AuditReportDto.F_FROM_GREG),
                 createStringResource("AuditPopupPanel.dateFrom"), ID_LABEL_SIZE, ID_INPUT_SIZE, false);
         add(dateFrom);
 
-        DateFormGroup dateTo = new DateFormGroup(ID_DATE_TO, new PropertyModel<XMLGregorianCalendar>(getModel(), AuditReportDto.F_TO_GREG),
+        DateFormGroup dateTo = new DateFormGroup(ID_DATE_TO, new PropertyModel<>(getModel(), AuditReportDto.F_TO_GREG),
                 createStringResource("AuditPopupPanel.dateTo"), ID_LABEL_SIZE, ID_INPUT_SIZE, false);
         add(dateTo);
     }

@@ -1,36 +1,24 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.notifications.impl.formatters;
 
+import com.evolveum.midpoint.common.LocalizationService;
 import com.evolveum.midpoint.notifications.api.events.SimpleObjectRef;
 import com.evolveum.midpoint.notifications.impl.NotificationFunctionsImpl;
 import com.evolveum.midpoint.prism.*;
 import com.evolveum.midpoint.prism.delta.ItemDelta;
 import com.evolveum.midpoint.prism.delta.ObjectDelta;
-import com.evolveum.midpoint.prism.path.IdItemPathSegment;
-import com.evolveum.midpoint.prism.path.ItemPath;
-import com.evolveum.midpoint.prism.path.ItemPathSegment;
-import com.evolveum.midpoint.prism.path.NameItemPathSegment;
+import com.evolveum.midpoint.prism.path.*;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.xml.XmlTypeConverter;
 import com.evolveum.midpoint.repo.api.RepositoryService;
 import com.evolveum.midpoint.schema.GetOperationOptions;
 import com.evolveum.midpoint.schema.SelectorOptions;
-import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.schema.util.ValueDisplayUtil;
 import com.evolveum.midpoint.util.DebugUtil;
@@ -42,6 +30,7 @@ import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang.Validate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -61,10 +50,9 @@ import static com.evolveum.midpoint.prism.polystring.PolyString.getOrig;
 public class TextFormatter {
 
     @Autowired @Qualifier("cacheRepositoryService") private transient RepositoryService cacheRepositoryService;
+    @Autowired private PrismContext prismContext;
     @Autowired protected NotificationFunctionsImpl functions;
-
-	private static final ResourceBundle RESOURCE_BUNDLE = ResourceBundle.getBundle(
-			SchemaConstants.SCHEMA_LOCALIZATION_PROPERTIES_RESOURCE_BASE_PATH);
+    @Autowired private LocalizationService localizationService;
 
     private static final Trace LOGGER = TraceManager.getTrace(TextFormatter.class);
 
@@ -100,7 +88,7 @@ public class TextFormatter {
             retval.append(" - ");
             retval.append(getItemDeltaLabel(itemDelta, objectDefinition));
             retval.append(":\n");
-            formatItemDeltaContent(retval, itemDelta, hiddenPaths, showOperationalAttributes);
+            formatItemDeltaContent(retval, itemDelta, objectOld, hiddenPaths, showOperationalAttributes);
         }
 
         explainPaths(retval, toBeDisplayed, objectDefinition, objectOld, objectNew, hiddenPaths, showOperationalAttributes);
@@ -116,7 +104,7 @@ public class TextFormatter {
         List<ItemPath> alreadyExplained = new ArrayList<>();
         for (ItemDelta itemDelta : deltas) {
             ItemPath pathToExplain = getPathToExplain(itemDelta);
-            if (pathToExplain == null || ItemPath.containsSubpathOrEquivalent(alreadyExplained, pathToExplain)) {
+            if (pathToExplain == null || ItemPathCollectionsUtil.containsSubpathOrEquivalent(alreadyExplained, pathToExplain)) {
                 continue;       // null or already processed
             }
             PrismObject source = null;
@@ -158,23 +146,41 @@ public class TextFormatter {
         }
     }
 
-    private void formatItemDeltaContent(StringBuilder sb, ItemDelta itemDelta, List<ItemPath> hiddenPaths, boolean showOperationalAttributes) {
-        formatItemDeltaValues(sb, "ADD", itemDelta.getValuesToAdd(), false, hiddenPaths, showOperationalAttributes);
-        formatItemDeltaValues(sb, "DELETE", itemDelta.getValuesToDelete(), true, hiddenPaths, showOperationalAttributes);
-        formatItemDeltaValues(sb, "REPLACE", itemDelta.getValuesToReplace(), false, hiddenPaths, showOperationalAttributes);
+    private void formatItemDeltaContent(StringBuilder sb, ItemDelta itemDelta, PrismObject objectOld,
+            List<ItemPath> hiddenPaths, boolean showOperationalAttributes) {
+        formatItemDeltaValues(sb, "ADD", itemDelta.getValuesToAdd(), false, itemDelta.getPath(), objectOld, hiddenPaths, showOperationalAttributes);
+        formatItemDeltaValues(sb, "DELETE", itemDelta.getValuesToDelete(), true, itemDelta.getPath(), objectOld, hiddenPaths, showOperationalAttributes);
+        formatItemDeltaValues(sb, "REPLACE", itemDelta.getValuesToReplace(), false, itemDelta.getPath(), objectOld, hiddenPaths, showOperationalAttributes);
     }
 
-    private void formatItemDeltaValues(StringBuilder sb, String type, Collection<? extends PrismValue> values, boolean mightBeRemoved, List<ItemPath> hiddenPaths, boolean showOperationalAttributes) {
+    private void formatItemDeltaValues(StringBuilder sb, String type, Collection<? extends PrismValue> values,
+            boolean isDelete, ItemPath path, PrismObject objectOld,
+            List<ItemPath> hiddenPaths, boolean showOperationalAttributes) {
         if (values != null) {
             for (PrismValue prismValue : values) {
                 sb.append("   - ").append(type).append(": ");
                 String prefix = "     ";
-                formatPrismValue(sb, prefix, prismValue, mightBeRemoved, hiddenPaths, showOperationalAttributes);
+                if (isDelete && prismValue instanceof PrismContainerValue) {
+                    prismValue = fixEmptyContainerValue((PrismContainerValue) prismValue, path, objectOld);
+                }
+                formatPrismValue(sb, prefix, prismValue, isDelete, hiddenPaths, showOperationalAttributes);
                 if (!(prismValue instanceof PrismContainerValue)) {         // container values already end with newline
                     sb.append("\n");
                 }
             }
         }
+    }
+
+    private PrismValue fixEmptyContainerValue(PrismContainerValue pcv, ItemPath path, PrismObject objectOld) {
+        if (pcv.getId() == null || CollectionUtils.isNotEmpty(pcv.getItems())) {
+            return pcv;
+        }
+        PrismContainer oldContainer = objectOld.findContainer(path);
+        if (oldContainer == null) {
+            return pcv;
+        }
+        PrismContainerValue oldValue = oldContainer.getValue(pcv.getId());
+        return oldValue != null ? oldValue : pcv;
     }
 
     // todo - should each hiddenAttribute be prefixed with something like F_ATTRIBUTE? Currently it should not be.
@@ -195,9 +201,9 @@ public class TextFormatter {
             boolean first = true;
             for (ShadowAssociationType shadowAssociationType : shadowType.getAssociation()) {
                 if (first) {
-					first = false;
-					retval.append("\n");
-				}
+                    first = false;
+                    retval.append("\n");
+                }
                 retval.append("Association:\n");
                 formatContainerValue(retval, "  ", shadowAssociationType.asPrismContainerValue(), false, hiddenAttributes, showOperationalAttributes);
                 retval.append("\n");
@@ -283,7 +289,7 @@ public class TextFormatter {
                 sb.append(formatReferenceValue(referenceValue, mightBeRemoved));
             }
         } else if (item.size() == 1) {
-            sb.append(formatReferenceValue(((PrismReference) item).getValue(0), mightBeRemoved));
+            sb.append(formatReferenceValue(((PrismReference) item).getAnyValue(), mightBeRemoved));
         }
         sb.append("\n");
     }
@@ -300,7 +306,7 @@ public class TextFormatter {
                 sb.append(ValueDisplayUtil.toStringValue(propertyValue));
             }
         } else if (item.size() == 1) {
-            sb.append(ValueDisplayUtil.toStringValue(((PrismProperty<?>) item).getValue(0)));
+            sb.append(ValueDisplayUtil.toStringValue(((PrismProperty<?>) item).getAnyValue()));
         }
         sb.append("\n");
     }
@@ -318,12 +324,16 @@ public class TextFormatter {
         String qualifier = "";
         if (object != null && object.asObjectable() instanceof ShadowType) {
             ShadowType shadowType = (ShadowType) object.asObjectable();
-            ResourceType resourceType = shadowType.getResource();
-            if (resourceType == null) {
-                PrismObject<? extends ObjectType> resource = getPrismObject(shadowType.getResourceRef().getOid(), false, result);
+            ObjectReferenceType resourceRef = shadowType.getResourceRef();
+            PrismObject<ResourceType> resource = resourceRef.asReferenceValue().getObject();
+            ResourceType resourceType = null;
+            if (resource == null) {
+                resource = getPrismObject(resourceRef.getOid(), false, result);
                 if (resource != null) {
                     resourceType = (ResourceType) resource.asObjectable();
                 }
+            } else {
+                resourceType = resource.asObjectable();
             }
             if (resourceType != null) {
                 qualifier = " on " + resourceType.getName();
@@ -338,7 +348,7 @@ public class TextFormatter {
                     " (" + object.toDebugType() + ")" +
                     qualifier;
         } else {
-        	String nameOrOid = value.getTargetName() != null ? value.getTargetName().getOrig() : value.getOid();
+            String nameOrOid = value.getTargetName() != null ? value.getTargetName().getOrig() : value.getOid();
             if (mightBeRemoved) {
                 referredObjectIdentification = "(cannot display the actual name of " + localPart(value.getTargetType()) + ":" + nameOrOid + ", as it might be already removed)";
             } else {
@@ -347,14 +357,14 @@ public class TextFormatter {
         }
 
         return value.getRelation() != null ?
-				referredObjectIdentification + " [" + value.getRelation().getLocalPart() + "]"
-				: referredObjectIdentification;
+                referredObjectIdentification + " [" + value.getRelation().getLocalPart() + "]"
+                : referredObjectIdentification;
     }
 
-    private PrismObject<? extends ObjectType> getPrismObject(String oid, boolean mightBeRemoved, OperationResult result) {
+    private <O extends ObjectType> PrismObject<O> getPrismObject(String oid, boolean mightBeRemoved, OperationResult result) {
         try {
             Collection<SelectorOptions<GetOperationOptions>> options = SelectorOptions.createCollection(GetOperationOptions.createReadOnly());
-			return cacheRepositoryService.getObject(ObjectType.class, oid, options, result);
+            return (PrismObject<O>) cacheRepositoryService.getObject(ObjectType.class, oid, options, result);
         } catch (ObjectNotFoundException e) {
             if (!mightBeRemoved) {
                 LoggingUtils.logException(LOGGER, "Couldn't resolve reference when displaying object name within a notification (it might be already removed)", e);
@@ -378,52 +388,53 @@ public class TextFormatter {
 
     private String getItemPathLabel(ItemPath path, Definition deltaDefinition, PrismObjectDefinition objectDefinition) {
 
-        NameItemPathSegment lastNamedSegment = path.lastNamed();
+        int lastNameIndex = path.lastNameIndex();
 
         StringBuilder sb = new StringBuilder();
-        for (ItemPathSegment segment : path.getSegments()) {
-            if (segment instanceof NameItemPathSegment) {
+        for (int i = 0; i < path.size(); i++) {
+            Object segment = path.getSegment(i);
+            if (ItemPath.isName(segment)) {
                 if (sb.length() > 0) {
                     sb.append("/");
                 }
                 Definition itemDefinition;
                 if (objectDefinition == null) {
-                    if (segment == lastNamedSegment) {  // definition for last segment is the definition taken from delta
+                    if (i == lastNameIndex) {  // definition for last segment is the definition taken from delta
                         itemDefinition = deltaDefinition;    // this may be null but we don't care
                     } else {
                         itemDefinition = null;          // definitions for previous segments are unknown
                     }
                 } else {
                     // todo we could make this iterative (resolving definitions while walking down the path); but this is definitely simpler to implement and debug :)
-                    itemDefinition = objectDefinition.findItemDefinition(path.allUpToIncluding(segment));
+                    itemDefinition = objectDefinition.findItemDefinition(path.allUpToIncluding(i));
                 }
                 if (itemDefinition != null && itemDefinition.getDisplayName() != null) {
                     sb.append(resolve(itemDefinition.getDisplayName()));
                 } else {
-                    sb.append(((NameItemPathSegment) segment).getName().getLocalPart());
+                    sb.append(ItemPath.toName(segment).getLocalPart());
                 }
-            } else if (segment instanceof IdItemPathSegment) {
-                sb.append("[").append(((IdItemPathSegment) segment).getId()).append("]");
+            } else if (ItemPath.isId(segment)) {
+                sb.append("[").append(ItemPath.toId(segment)).append("]");
             }
         }
         return sb.toString();
     }
 
-	private String resolve(String key) {
-		if (key != null && RESOURCE_BUNDLE.containsKey(key)) {
-			return RESOURCE_BUNDLE.getString(key);
-		} else {
-			return key;
-		}
-	}
+    private String resolve(String key) {
+        if (key != null) {
+            return localizationService.translate(key, null, Locale.getDefault(), key);
+        } else {
+            return null;
+        }
+    }
 
-	// we call this on filtered list of item deltas - all of they have definition set
+    // we call this on filtered list of item deltas - all of they have definition set
     private ItemPath getPathToExplain(ItemDelta itemDelta) {
         ItemPath path = itemDelta.getPath();
 
         for (int i = 0; i < path.size(); i++) {
-            ItemPathSegment segment = path.getSegments().get(i);
-            if (segment instanceof IdItemPathSegment) {
+            Object segment = path.getSegment(i);
+            if (ItemPath.isId(segment)) {
                 if (i < path.size()-1 || itemDelta.isDelete()) {
                     return path.allUpToIncluding(i);
                 } else {
@@ -444,17 +455,17 @@ public class TextFormatter {
         for (ItemDelta itemDelta: objectDelta.getModifications()) {
             if (itemDelta.getDefinition() != null) {
                 if ((showOperationalAttributes || !itemDelta.getDefinition().isOperational()) && !NotificationFunctionsImpl
-						.isAmongHiddenPaths(itemDelta.getPath(), hiddenPaths)) {
+                        .isAmongHiddenPaths(itemDelta.getPath(), hiddenPaths)) {
                     toBeDisplayed.add(itemDelta);
                 }
             } else {
                 noDefinition.add(itemDelta.getElementName());
             }
         }
-		if (!noDefinition.isEmpty()) {
-			LOGGER.error("ItemDeltas for {} without definition - WILL NOT BE INCLUDED IN NOTIFICATION. Containing object delta:\n{}",
-					noDefinition, objectDelta.debugDump());
-		}
+        if (!noDefinition.isEmpty()) {
+            LOGGER.error("ItemDeltas for {} without definition - WILL NOT BE INCLUDED IN NOTIFICATION. Containing object delta:\n{}",
+                    noDefinition, objectDelta.debugDump());
+        }
         toBeDisplayed.sort((delta1, delta2) -> {
             Integer order1 = delta1.getDefinition().getDisplayOrder();
             Integer order2 = delta2.getDefinition().getDisplayOrder();
@@ -477,7 +488,7 @@ public class TextFormatter {
                 resolve(item.getDefinition().getDisplayName()) : item.getElementName().getLocalPart();
     }
 
-    private List<Item> filterAndOrderItems(List<Item> items, List<ItemPath> hiddenPaths, boolean showOperationalAttributes) {
+    private List<Item> filterAndOrderItems(Collection<Item> items, List<ItemPath> hiddenPaths, boolean showOperationalAttributes) {
         if (items == null) {
             return new ArrayList<>();
         }
@@ -490,13 +501,13 @@ public class TextFormatter {
                     toBeDisplayed.add(item);
                 }
             } else {
-				noDefinition.add(item.getElementName());
+                noDefinition.add(item.getElementName());
             }
         }
-		if (!noDefinition.isEmpty()) {
-			LOGGER.error("Items {} without definition - THEY WILL NOT BE INCLUDED IN NOTIFICATION.\nAll items:\n{}",
-					noDefinition, DebugUtil.debugDump(items));
-		}
+        if (!noDefinition.isEmpty()) {
+            LOGGER.error("Items {} without definition - THEY WILL NOT BE INCLUDED IN NOTIFICATION.\nAll items:\n{}",
+                    noDefinition, DebugUtil.debugDump(items));
+        }
         toBeDisplayed.sort((item1, item2) -> {
             Integer order1 = item1.getDefinition().getDisplayOrder();
             Integer order2 = item2.getDefinition().getDisplayOrder();
@@ -535,8 +546,8 @@ public class TextFormatter {
 
     // TODO implement seriously
     public String formatDateTime(XMLGregorianCalendar timestamp) {
-		//DateFormatUtils.format(timestamp.toGregorianCalendar(), DateFormatUtils.SMTP_DATETIME_FORMAT.getPattern());
-		return String.valueOf(XmlTypeConverter.toDate(timestamp));
-	}
+        //DateFormatUtils.format(timestamp.toGregorianCalendar(), DateFormatUtils.SMTP_DATETIME_FORMAT.getPattern());
+        return String.valueOf(XmlTypeConverter.toDate(timestamp));
+    }
 
 }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.model.intest;
 
@@ -28,8 +19,6 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
 
-import static com.evolveum.midpoint.test.IntegrationTestTools.display;
-
 /**
  * @author mederly
  *
@@ -38,51 +27,51 @@ import static com.evolveum.midpoint.test.IntegrationTestTools.display;
 @DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 public class TestModelVisualization extends AbstractInitializedModelIntegrationTest {
 
-	public static final File TEST_DIR = new File("src/test/resources/modelVisualization");
+    public static final File TEST_DIR = new File("src/test/resources/modelVisualization");
 
-	@Override
-	public void initSystem(Task initTask, OperationResult initResult) throws Exception {
-		super.initSystem(initTask, initResult);
-	}
+    @Override
+    public void initSystem(Task initTask, OperationResult initResult) throws Exception {
+        super.initSystem(initTask, initResult);
+    }
 
-	@Test
+    @Test
     public void test100VisualizeOneResource() throws Exception {
-		final String TEST_NAME = "test100VisualizeOneResource";
+        final String TEST_NAME = "test100VisualizeOneResource";
 
-		TestUtil.displayTestTitle(this, TEST_NAME);
+        TestUtil.displayTestTitle(this, TEST_NAME);
 
-		// GIVEN
-		Task task = taskManager.createTaskInstance(TestModelVisualization.class.getName() + "." + TEST_NAME);
-		OperationResult result = task.getResult();
+        // GIVEN
+        Task task = taskManager.createTaskInstance(TestModelVisualization.class.getName() + "." + TEST_NAME);
+        OperationResult result = task.getResult();
 
-		// WHEN
-		String output = modelDiagnosticService.exportDataModel(Collections.singleton(RESOURCE_DUMMY_OID),
-				DataModelVisualizer.Target.DOT, task, result);
+        // WHEN
+        String output = modelDiagnosticService.exportDataModel(Collections.singleton(RESOURCE_DUMMY_OID),
+                DataModelVisualizer.Target.DOT, task, result);
 
-		// THEN
-		display("Visualization output", output);
-		result.computeStatus();
-		TestUtil.assertSuccess(result);
-	}
+        // THEN
+        display("Visualization output", output);
+        result.computeStatus();
+        TestUtil.assertSuccess(result);
+    }
 
-	@Test
-	public void test110VisualizeTwoResources() throws Exception {
-		final String TEST_NAME = "test110VisualizeTwoResources";
+    @Test
+    public void test110VisualizeTwoResources() throws Exception {
+        final String TEST_NAME = "test110VisualizeTwoResources";
 
-		TestUtil.displayTestTitle(this, TEST_NAME);
+        TestUtil.displayTestTitle(this, TEST_NAME);
 
-		// GIVEN
-		Task task = taskManager.createTaskInstance(TestModelVisualization.class.getName() + "." + TEST_NAME);
-		OperationResult result = task.getResult();
+        // GIVEN
+        Task task = taskManager.createTaskInstance(TestModelVisualization.class.getName() + "." + TEST_NAME);
+        OperationResult result = task.getResult();
 
-		// WHEN
-		String output = modelDiagnosticService.exportDataModel(Arrays.asList(RESOURCE_DUMMY_OID, RESOURCE_DUMMY_BLACK_OID),
-				DataModelVisualizer.Target.DOT, task, result);
+        // WHEN
+        String output = modelDiagnosticService.exportDataModel(Arrays.asList(RESOURCE_DUMMY_OID, RESOURCE_DUMMY_BLACK_OID),
+                DataModelVisualizer.Target.DOT, task, result);
 
-		// THEN
-		display("Visualization output", output);
-		result.computeStatus();
-		TestUtil.assertSuccess(result);
-	}
+        // THEN
+        display("Visualization output", output);
+        result.computeStatus();
+        TestUtil.assertSuccess(result);
+    }
 
 }

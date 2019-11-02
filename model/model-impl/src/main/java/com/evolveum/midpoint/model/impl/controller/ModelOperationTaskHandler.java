@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.model.impl.controller;
@@ -25,30 +16,32 @@ import com.evolveum.midpoint.prism.delta.ObjectDelta;
 import com.evolveum.midpoint.provisioning.api.ProvisioningService;
 import com.evolveum.midpoint.repo.api.PreconditionViolationException;
 import com.evolveum.midpoint.schema.result.OperationResult;
-import com.evolveum.midpoint.task.api.Task;
-import com.evolveum.midpoint.task.api.TaskCategory;
-import com.evolveum.midpoint.task.api.TaskHandler;
-import com.evolveum.midpoint.task.api.TaskManager;
-import com.evolveum.midpoint.task.api.TaskRunResult;
+import com.evolveum.midpoint.task.api.*;
 import com.evolveum.midpoint.util.exception.*;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.LensContextType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.TaskPartitionDefinitionType;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import java.util.Iterator;
-import java.util.List;
+
+import static com.evolveum.midpoint.model.impl.lens.LensContext.*;
 
 /**
  * Handles a "ModelOperation task" - executes a given model operation in a context
  * of the task (i.e., in most cases, asynchronously).
  *
- * The context of the model operation (i.e., model context) is stored in task extension property
+ * The context of the model operation (i.e., model context) is stored in task property
  * called "modelContext". When this handler is executed, the context is retrieved, unwrapped from
  * its XML representation, and the model operation is (re)started.
+ *
+ * This was to be used for workflow execution. Currently this responsibility is moved to CaseOperationExecutionTaskHandler
+ * and this class is unused.
  *
  * @author mederly
  */
@@ -64,26 +57,25 @@ public class ModelOperationTaskHandler implements TaskHandler {
 
     @Autowired private TaskManager taskManager;
     @Autowired private PrismContext prismContext;
-	@Autowired private ProvisioningService provisioningService;
-	@Autowired private Clockwork clockwork;
+    @Autowired private ProvisioningService provisioningService;
+    @Autowired private Clockwork clockwork;
 
-	@Override
-	public TaskRunResult run(Task task) {
+    @Override
+    public TaskRunResult run(RunningTask task, TaskPartitionDefinitionType partition) {
+        OperationResult result = task.getResult().createSubresult(DOT_CLASS + "run");
+        TaskRunResult runResult = new TaskRunResult();
 
-		OperationResult result = task.getResult().createSubresult(DOT_CLASS + "run");
-		TaskRunResult runResult = new TaskRunResult();
-
-		LensContextType contextType = task.getModelOperationContext();
-		if (contextType == null) {
-			LOGGER.trace("No model context found, skipping the model operation execution.");
-			if (result.isUnknown()) {
-				result.computeStatus();
-			}
-			runResult.setRunResultStatus(TaskRunResult.TaskRunResultStatus.FINISHED);
-		} else {
+        LensContextType contextType = task.getModelOperationContext();
+        if (contextType == null) {
+            LOGGER.trace("No model context found, skipping the model operation execution.");
+            if (result.isUnknown()) {
+                result.computeStatus();
+            }
+            runResult.setRunResultStatus(TaskRunResult.TaskRunResultStatus.FINISHED);
+        } else {
             LensContext context;
             try {
-                context = LensContext.fromLensContextType(contextType, prismContext, provisioningService, task, result);
+                context = fromLensContextType(contextType, prismContext, provisioningService, task, result);
             } catch (SchemaException e) {
                 throw new SystemException("Cannot recover model context from task " + task + " due to schema exception", e);
             } catch (ObjectNotFoundException | ConfigurationException | ExpressionEvaluationException e) {
@@ -103,7 +95,7 @@ public class ModelOperationTaskHandler implements TaskHandler {
                 Iterator<LensProjectionContext> projectionIterator = context.getProjectionContextsIterator();
                 while (projectionIterator.hasNext()) {
                     LensProjectionContext projectionContext = projectionIterator.next();
-                    if (!ObjectDelta.isNullOrEmpty(projectionContext.getPrimaryDelta()) || !ObjectDelta.isNullOrEmpty(projectionContext.getSyncDelta())) {
+                    if (!ObjectDelta.isEmpty(projectionContext.getPrimaryDelta()) || !ObjectDelta.isEmpty(projectionContext.getSyncDelta())) {
                         continue;       // don't remove client requested or externally triggered actions!
                     }
                     if (LOGGER.isTraceEnabled()) {
@@ -111,13 +103,13 @@ public class ModelOperationTaskHandler implements TaskHandler {
                     }
                     projectionIterator.remove();
                 }
-				if (task.getChannel() == null) {
-					task.setChannel(context.getChannel());
-				}
+                if (task.getChannel() == null) {
+                    task.setChannel(context.getChannel());
+                }
                 clockwork.run(context, task, result);
 
-				task.setModelOperationContext(context.toLensContextType(context.getState() == ModelState.FINAL));
-                task.savePendingModifications(result);
+                task.setModelOperationContext(context.toLensContextType(context.getState() == ModelState.FINAL ? ExportType.REDUCED : ExportType.OPERATIONAL));
+                task.flushPendingModifications(result);
 
                 if (result.isUnknown()) {
                     result.computeStatus();
@@ -133,34 +125,26 @@ public class ModelOperationTaskHandler implements TaskHandler {
         }
 
         task.getResult().recomputeStatus();
-		runResult.setOperationResult(task.getResult());
-		return runResult;
-	}
+        runResult.setOperationResult(task.getResult());
+        return runResult;
+    }
 
-	@Override
-	public Long heartbeat(Task task) {
-		return null; // null - as *not* to record progress
-	}
+    @Override
+    public Long heartbeat(Task task) {
+        return null; // null - as *not* to record progress
+    }
 
-	@Override
-	public void refreshStatus(Task task) {
-	}
+    @Override
+    public void refreshStatus(Task task) {
+    }
 
     @Override
     public String getCategoryName(Task task) {
         return TaskCategory.WORKFLOW;
     }
 
-    @Override
-    public List<String> getCategoryNames() {
-        return null;
+    @PostConstruct
+    private void initialize() {
+        taskManager.registerHandler(MODEL_OPERATION_TASK_URI, this);
     }
-
-	@PostConstruct
-	private void initialize() {
-        if (LOGGER.isTraceEnabled()) {
-		    LOGGER.trace("Registering with taskManager as a handler for " + MODEL_OPERATION_TASK_URI);
-        }
-		taskManager.registerHandler(MODEL_OPERATION_TASK_URI, this);
-	}
 }

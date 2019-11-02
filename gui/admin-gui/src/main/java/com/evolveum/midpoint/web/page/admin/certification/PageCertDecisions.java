@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.certification;
@@ -27,22 +18,23 @@ import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.application.AuthorizationAction;
 import com.evolveum.midpoint.web.application.PageDescriptor;
-import com.evolveum.midpoint.web.component.DateLabelComponent;
+import com.evolveum.midpoint.web.component.AjaxIconButton;
 import com.evolveum.midpoint.web.component.data.BoxedTablePanel;
+import com.evolveum.midpoint.web.component.data.MultiButtonPanel;
 import com.evolveum.midpoint.web.component.data.Table;
 import com.evolveum.midpoint.web.component.data.column.*;
-import com.evolveum.midpoint.web.component.data.column.DoubleButtonColumn.BUTTON_COLOR_CLASS;
+import com.evolveum.midpoint.web.component.data.column.DoubleButtonColumn.ButtonColorClass;
 import com.evolveum.midpoint.web.component.menu.cog.InlineMenuItem;
-import com.evolveum.midpoint.web.page.admin.certification.dto.CertWorkItemDto;
-import com.evolveum.midpoint.web.page.admin.certification.dto.CertWorkItemDtoProvider;
-import com.evolveum.midpoint.web.page.admin.certification.dto.SearchingUtils;
+import com.evolveum.midpoint.web.component.menu.cog.InlineMenuItemAction;
+import com.evolveum.midpoint.web.component.util.EnableBehaviour;
+import com.evolveum.midpoint.web.component.util.VisibleBehaviour;
+import com.evolveum.midpoint.web.page.admin.certification.dto.*;
 import com.evolveum.midpoint.web.page.admin.certification.helpers.AvailableResponses;
 import com.evolveum.midpoint.web.page.admin.configuration.component.HeaderMenuAction;
 import com.evolveum.midpoint.web.session.UserProfileStorage;
 import com.evolveum.midpoint.web.util.OnePageParameterEncoder;
 import com.evolveum.midpoint.web.util.TooltipBehavior;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AccessCertificationCampaignType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.AccessCertificationCaseType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AccessCertificationResponseType;
 import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.Component;
@@ -61,7 +53,6 @@ import org.apache.wicket.markup.html.form.CheckBox;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.panel.Fragment;
 import org.apache.wicket.markup.repeater.Item;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.request.mapper.parameter.PageParameters;
@@ -102,7 +93,7 @@ public class PageCertDecisions extends PageAdminCertification {
     private static final String ID_SHOW_NOT_DECIDED_ONLY = "showNotDecidedOnly";
     private static final String ID_TABLE_HEADER = "tableHeader";
 
-    CertDecisionHelper helper = new CertDecisionHelper();
+    private CertDecisionHelper helper = new CertDecisionHelper();
 
     private IModel<Boolean> showNotDecidedOnlyModel = new Model<>(false);
 
@@ -121,11 +112,11 @@ public class PageCertDecisions extends PageAdminCertification {
     }
 
     private ObjectQuery createCaseQuery() {
-		return new ObjectQuery();
+        return getPrismContext().queryFactory().createQuery();
     }
 
     private ObjectQuery createCampaignQuery() {
-		return new ObjectQuery();
+        return getPrismContext().queryFactory().createQuery();
     }
 
     private String getCurrentUserOid() {
@@ -134,18 +125,19 @@ public class PageCertDecisions extends PageAdminCertification {
         } catch (SecurityViolationException e) {
             // TODO handle more cleanly
             throw new SystemException("Couldn't get currently logged user OID", e);
-		}
-	}
+        }
+    }
     //endregion
 
     //region Layout
     private void initLayout() {
-        Form mainForm = new Form(ID_MAIN_FORM);
+        Form mainForm = new com.evolveum.midpoint.web.component.form.Form(ID_MAIN_FORM);
         add(mainForm);
         CertWorkItemDtoProvider provider = createProvider();
         int itemsPerPage = (int) getItemsPerPage(UserProfileStorage.TableId.PAGE_CERT_DECISIONS_PANEL);
         BoxedTablePanel<CertWorkItemDto> table = new BoxedTablePanel<CertWorkItemDto>(ID_DECISIONS_TABLE, provider, initColumns(),
                 UserProfileStorage.TableId.PAGE_CERT_DECISIONS_PANEL, itemsPerPage) {
+            private static final long serialVersionUID = 1L;
 
             @Override
             protected WebMarkupContainer createHeader(String headerId) {
@@ -162,14 +154,14 @@ public class PageCertDecisions extends PageAdminCertification {
         //addVisibleOnWarningBehavior(getTempFeedbackPanel());
     }
 
-//	private void addVisibleOnWarningBehavior(Component c) {
-//		c.add(new VisibleEnableBehaviour() {
-//			@Override
-//			public boolean isVisible() {
-//				return PageCertDecisions.this.getFeedbackMessages().hasMessage(FeedbackMessage.WARNING);
-//			}
-//		});
-//	}
+//    private void addVisibleOnWarningBehavior(Component c) {
+//        c.add(new VisibleEnableBehaviour() {
+//            @Override
+//            public boolean isVisible() {
+//                return PageCertDecisions.this.getFeedbackMessages().hasMessage(FeedbackMessage.WARNING);
+//            }
+//        });
+//    }
 
     private List<IColumn<CertWorkItemDto, String>> initColumns() {
         List<IColumn<CertWorkItemDto, String>> columns = new ArrayList<>();
@@ -179,10 +171,10 @@ public class PageCertDecisions extends PageAdminCertification {
         column = new CheckBoxHeaderColumn<>();
         columns.add(column);
 
-		column = helper.createTypeColumn(OBJECT, this);
-		columns.add(column);
+        column = helper.createTypeColumn(OBJECT, this);
+        columns.add(column);
 
-		column = helper.createObjectNameColumn(this, "PageCertDecisions.table.objectName");
+        column = helper.createObjectNameColumn(this, "PageCertDecisions.table.objectName");
         columns.add(column);
 
         column = helper.createTypeColumn(TARGET, this);
@@ -198,50 +190,68 @@ public class PageCertDecisions extends PageAdminCertification {
         columns.add(column);
 
         if (WebComponentUtil.isAuthorized(AuthorizationConstants.AUTZ_UI_CERTIFICATION_ALL_URL,
-				AuthorizationConstants.AUTZ_UI_CERTIFICATION_CAMPAIGN_URL)) {
+                AuthorizationConstants.AUTZ_UI_CERTIFICATION_CAMPAIGN_URL)) {
 
-			column = new LinkColumn<CertWorkItemDto>(
-					createStringResource("PageCertDecisions.table.campaignName"),
-					SearchingUtils.CAMPAIGN_NAME, CertWorkItemDto.F_CAMPAIGN_NAME) {
-				@Override
-				public void populateItem(Item<ICellPopulator<CertWorkItemDto>> item, String componentId, IModel<CertWorkItemDto> rowModel) {
-					super.populateItem(item, componentId, rowModel);
-					AccessCertificationCampaignType campaign = rowModel.getObject().getCampaign();
-					if (campaign != null && campaign.getDescription() != null) {
-						item.add(AttributeModifier.replace("title", campaign.getDescription()));
-						item.add(new TooltipBehavior());
-					}
-				}
+            column = new LinkColumn<CertWorkItemDto>(
+                    createStringResource("PageCertDecisions.table.campaignName"),
+                    SearchingUtils.CAMPAIGN_NAME, CertWorkItemDto.F_CAMPAIGN_NAME) {
+                private static final long serialVersionUID = 1L;
 
-				@Override
-				public void onClick(AjaxRequestTarget target, IModel<CertWorkItemDto> rowModel) {
-					CertWorkItemDto dto = rowModel.getObject();
-					PageParameters parameters = new PageParameters();
-					parameters.add(OnePageParameterEncoder.PARAMETER, dto.getCampaignRef().getOid());
-					navigateToNext(PageCertCampaign.class, parameters);
-				}
-			};
-		} else {
-			column = new AbstractColumn<CertWorkItemDto, String>(createStringResource("PageCertDecisions.table.campaignName"), SearchingUtils.CAMPAIGN_NAME) {
-				@Override
-				public void populateItem(Item<ICellPopulator<CertWorkItemDto>> item, String componentId,
-						final IModel<CertWorkItemDto> rowModel) {
-					item.add(new Label(componentId, new AbstractReadOnlyModel<Object>() {
-						@Override
-						public Object getObject() {
-							return rowModel.getObject().getCampaignName();
-						}
-					}));
-				}
-			};
-		}
+                @Override
+                public void populateItem(Item<ICellPopulator<CertWorkItemDto>> item, String componentId, IModel<CertWorkItemDto> rowModel) {
+                    super.populateItem(item, componentId, rowModel);
+                    AccessCertificationCampaignType campaign = rowModel.getObject().getCampaign();
+                    if (campaign != null && campaign.getDescription() != null) {
+                        item.add(AttributeModifier.replace("title", campaign.getDescription()));
+                        item.add(new TooltipBehavior());
+                    }
+                }
+
+                @Override
+                public void onClick(AjaxRequestTarget target, IModel<CertWorkItemDto> rowModel) {
+                    CertWorkItemDto dto = rowModel.getObject();
+                    PageParameters parameters = new PageParameters();
+                    parameters.add(OnePageParameterEncoder.PARAMETER, dto.getCampaignRef().getOid());
+                    navigateToNext(PageCertCampaign.class, parameters);
+                }
+            };
+        } else {
+            column = new AbstractColumn<CertWorkItemDto, String>(createStringResource("PageCertDecisions.table.campaignName"), SearchingUtils.CAMPAIGN_NAME) {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public void populateItem(Item<ICellPopulator<CertWorkItemDto>> item, String componentId,
+                        final IModel<CertWorkItemDto> rowModel) {
+                    item.add(new Label(componentId, new IModel<Object>() {
+                        @Override
+                        public Object getObject() {
+                            return rowModel.getObject().getCampaignName();
+                        }
+                    }));
+                }
+            };
+        }
+        columns.add(column);
+
+        column = new PropertyColumn<CertWorkItemDto, String>(createStringResource("PageCertDecisions.table.iteration"),
+                CertCaseOrWorkItemDto.F_ITERATION) {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public String getCssClass() {
+                return "countLabel";
+            }
+
+        };
         columns.add(column);
 
         column = new AbstractColumn<CertWorkItemDto, String>(
                 createStringResource("PageCertDecisions.table.campaignStage")) {
+            private static final long serialVersionUID = 1L;
+
             @Override
             public void populateItem(Item<ICellPopulator<CertWorkItemDto>> item, String componentId, final IModel<CertWorkItemDto> rowModel) {
-                item.add(new Label(componentId, new AbstractReadOnlyModel<String>() {
+                item.add(new Label(componentId, new IModel<String>() {
                     @Override
                     public String getObject() {
                         CertWorkItemDto dto = rowModel.getObject();
@@ -254,14 +264,21 @@ public class PageCertDecisions extends PageAdminCertification {
                     item.add(new TooltipBehavior());
                 }
             }
+
+            @Override
+            public String getCssClass() {
+                return "countLabel";
+            }
         };
         columns.add(column);
 
         column = new AbstractColumn<CertWorkItemDto, String>(
                 createStringResource("PageCertDecisions.table.escalation")) {
+            private static final long serialVersionUID = 1L;
+
             @Override
             public void populateItem(Item<ICellPopulator<CertWorkItemDto>> item, String componentId, final IModel<CertWorkItemDto> rowModel) {
-                item.add(new Label(componentId, new AbstractReadOnlyModel<String>() {
+                item.add(new Label(componentId, new IModel<String>() {
                     @Override
                     public String getObject() {
                         CertWorkItemDto dto = rowModel.getObject();
@@ -275,90 +292,91 @@ public class PageCertDecisions extends PageAdminCertification {
                     item.add(new TooltipBehavior());
                 }
             }
+
+            @Override
+            public String getCssClass() {
+                return "countLabel";
+            }
         };
         columns.add(column);
 
         column = new PropertyColumn<CertWorkItemDto, String>(
                 createStringResource("PageCertDecisions.table.requested"),
                 SearchingUtils.CURRENT_REVIEW_REQUESTED_TIMESTAMP, CertWorkItemDto.F_REVIEW_REQUESTED) {
+            private static final long serialVersionUID = 1L;
+
             @Override
             public void populateItem(Item<ICellPopulator<CertWorkItemDto>> item, String componentId, IModel<CertWorkItemDto> rowModel) {
                 super.populateItem(item, componentId, rowModel);
                 CertWorkItemDto dto = rowModel.getObject();
                 Date started = dto.getStageStarted();
                 if (started != null) {
-                    item.add(AttributeModifier.replace("title", WebComponentUtil.getLocalizedDate(started, DateLabelComponent.LONG_MEDIUM_STYLE)));
+                    item.add(AttributeModifier.replace("title", WebComponentUtil.getShortDateTimeFormattedValue(started, PageCertDecisions.this)));
                     item.add(new TooltipBehavior());
                 }
             }
         };
         columns.add(column);
 
-        column = new PropertyColumn<CertWorkItemDto, String>(createStringResource("PageCertDecisions.table.deadline"),
+            column = new PropertyColumn<CertWorkItemDto, String>(createStringResource("PageCertDecisions.table.deadline"),
                 SearchingUtils.CURRENT_REVIEW_DEADLINE, CertWorkItemDto.F_DEADLINE_AS_STRING) {
-            @Override
-            public void populateItem(Item<ICellPopulator<CertWorkItemDto>> item, String componentId, final IModel<CertWorkItemDto> rowModel) {
-                super.populateItem(item, componentId, rowModel);
-                XMLGregorianCalendar deadline = rowModel.getObject().getCertCase().getCurrentStageDeadline();
-                if (deadline != null) {
-                    item.add(AttributeModifier.replace("title", WebComponentUtil.formatDate(deadline)));
-                    item.add(new TooltipBehavior());
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public void populateItem(Item<ICellPopulator<CertWorkItemDto>> item, String componentId, final IModel<CertWorkItemDto> rowModel) {
+                    super.populateItem(item, componentId, rowModel);
+                    XMLGregorianCalendar deadline = rowModel.getObject().getCertCase().getCurrentStageDeadline();
+                    if (deadline != null) {
+                        item.add(AttributeModifier.replace("title", WebComponentUtil.formatDate(deadline)));
+                        item.add(new TooltipBehavior());
+                    }
                 }
-            }
         };
         columns.add(column);
 
-        final AvailableResponses availableResponses = new AvailableResponses(getPage());
+        final AvailableResponses availableResponses = new AvailableResponses(this);
         final int responses = availableResponses.getResponseKeys().size();
 
-        column = new MultiButtonColumn<CertWorkItemDto>(new Model(), responses+1) {
+        column = new AbstractColumn<CertWorkItemDto, String>(new Model<>()) {
+
+            private static final long serialVersionUID = 1L;
 
             @Override
-            public String getCaption(int id) {
-                return availableResponses.getCaption(id);
-            }
+            public void populateItem(Item<ICellPopulator<CertWorkItemDto>> cellItem, String componentId,
+                                     IModel<CertWorkItemDto> rowModel) {
 
-            @Override
-            public boolean isButtonEnabled(int id, IModel<CertWorkItemDto> model) {
-                if (id < responses) {
-                    return !decisionEquals(model, availableResponses.getResponseValues().get(id));
-                } else {
-                    return false;
-                }
-            }
+                cellItem.add(new MultiButtonPanel<CertWorkItemDto>(componentId, rowModel, responses + 1) {
 
-            @Override
-            public boolean isButtonVisible(int id, IModel<CertWorkItemDto> model) {
-                if (id < responses) {
-                    return true;
-                } else {
-                    return !availableResponses.isAvailable(model.getObject().getResponse());
-                }
-            }
+                    private static final long serialVersionUID = 1L;
 
-            @Override
-            public String getButtonColorCssClass(int id) {
-                if (id < responses) {
-                    return getDecisionButtonColor(getRowModel(), availableResponses.getResponseValues().get(id));
-                } else {
-                    return BUTTON_COLOR_CLASS.DANGER.toString();
-                }
-            }
+                    @Override
+                    protected AjaxIconButton createButton(int index, String componentId, IModel<CertWorkItemDto> model) {
+                        AjaxIconButton btn;
+                        if (index < responses) {
+                            btn = buildDefaultButton(componentId, null, new Model(availableResponses.getTitle(index)),
+                                    new Model<>("btn btn-sm " + getDecisionButtonColor(model, availableResponses.getResponseValues().get(index))),
+                                    target ->
+                                            recordActionPerformed(target, model.getObject(), availableResponses.getResponseValues().get(index)));
+                            btn.add(new EnableBehaviour(() -> !decisionEquals(model, availableResponses.getResponseValues().get(index))));
+                        } else {
+                            btn = buildDefaultButton(componentId, null, new Model(availableResponses.getTitle(index)),
+                                    new Model<>("btn btn-sm " + ButtonColorClass.DANGER), null);
+                            btn.setEnabled(false);
+                            btn.add(new VisibleBehaviour(() -> !availableResponses.isAvailable(model.getObject().getResponse())));
+                        }
 
-            @Override
-            public void clickPerformed(int id, AjaxRequestTarget target,
-                                       IModel<CertWorkItemDto> model) {
-                if (id < responses) {      // should be always the case
-                    recordActionPerformed(target, model.getObject(), availableResponses.getResponseValues().get(id));
-                }
+                        return btn;
+                    }
+                });
             }
-
         };
         columns.add(column);
 
         column = new DirectlyEditablePropertyColumn<CertWorkItemDto>(
                 createStringResource("PageCertDecisions.table.comment"),
                 CertWorkItemDto.F_COMMENT) {
+            private static final long serialVersionUID = 1L;
+
             @Override
             public void onBlur(AjaxRequestTarget target, IModel model) {
                 // TODO determine somehow if the model.comment was really changed
@@ -393,20 +411,28 @@ public class PageCertDecisions extends PageAdminCertification {
     }
 
     private InlineMenuItem createMenu(String titleKey, final AccessCertificationResponseType response) {
-        return new InlineMenuItem(createStringResource(titleKey), false,
-                new HeaderMenuAction(this) {
+        return new InlineMenuItem(createStringResource(titleKey)) {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public InlineMenuItemAction initAction() {
+                return new HeaderMenuAction(PageCertDecisions.this) {
+                    private static final long serialVersionUID = 1L;
+
                     @Override
                     public void onClick(AjaxRequestTarget target) {
                         recordActionOnSelected(response, target);
                     }
-                });
+                };
+            }
+        };
     }
 
     private String getDecisionButtonColor(IModel<CertWorkItemDto> model, AccessCertificationResponseType response) {
         if (decisionEquals(model, response)) {
-            return BUTTON_COLOR_CLASS.PRIMARY.toString();
+            return ButtonColorClass.PRIMARY.toString();
         } else {
-            return BUTTON_COLOR_CLASS.DEFAULT.toString();
+            return ButtonColorClass.DEFAULT.toString();
         }
     }
 
@@ -437,7 +463,7 @@ public class PageCertDecisions extends PageAdminCertification {
                 getCertificationService().recordDecision(
                         workItemDto.getCampaignRef().getOid(),
                         workItemDto.getCaseId(), workItemDto.getWorkItemId(),
-						response, workItemDto.getComment(), task, resultOne);
+                        response, workItemDto.getComment(), task, resultOne);
             } catch (Exception ex) {
                 resultOne.recordFatalError(ex);
             } finally {
@@ -496,25 +522,25 @@ public class PageCertDecisions extends PageAdminCertification {
 
     //endregion
 
-//	protected void dispatchToObjectDetailsPage(ObjectReferenceType objectRef) {
-//		if (objectRef == null) {
-//			return;		// should not occur
-//		}
-//		QName type = objectRef.getType();
-//		PageParameters parameters = new PageParameters();
-//		parameters.add(OnePageParameterEncoder.PARAMETER, objectRef.getOid());
-//		if (RoleType.COMPLEX_TYPE.equals(type)) {
+//    protected void dispatchToObjectDetailsPage(ObjectReferenceType objectRef) {
+//        if (objectRef == null) {
+//            return;        // should not occur
+//        }
+//        QName type = objectRef.getType();
+//        PageParameters parameters = new PageParameters();
+//        parameters.add(OnePageParameterEncoder.PARAMETER, objectRef.getOid());
+//        if (RoleType.COMPLEX_TYPE.equals(type)) {
 //            setResponsePage(new PageRole(parameters, this));
 //        } else if (OrgType.COMPLEX_TYPE.equals(type)) {
 //            setResponsePage(new PageOrgUnit(parameters, this));
 //        } else if (UserType.COMPLEX_TYPE.equals(type)) {
 //            setResponsePage(new PageUser(parameters, this));
 //        } else if (ResourceType.COMPLEX_TYPE.equals(type)) {
-//			setResponsePage(new PageResource(parameters, this));
-//		} else {
+//            setResponsePage(new PageResource(parameters, this));
+//        } else {
 //            // nothing to do
 //        }
-//	}
+//    }
 
     private static class SearchFragment extends Fragment {
 
@@ -526,7 +552,7 @@ public class PageCertDecisions extends PageAdminCertification {
         }
 
         private void initLayout() {
-            final Form searchForm = new Form(ID_SEARCH_FORM);
+            final Form searchForm = new com.evolveum.midpoint.web.component.form.Form(ID_SEARCH_FORM);
             add(searchForm);
             searchForm.setOutputMarkupId(true);
 
@@ -539,6 +565,7 @@ public class PageCertDecisions extends PageAdminCertification {
 
         private AjaxFormComponentUpdatingBehavior createFilterAjaxBehaviour() {
             return new AjaxFormComponentUpdatingBehavior("change") {
+                private static final long serialVersionUID = 1L;
 
                 @Override
                 protected void onUpdate(AjaxRequestTarget target) {

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.reports;
@@ -26,6 +17,7 @@ import com.evolveum.midpoint.web.application.PageDescriptor;
 import com.evolveum.midpoint.web.component.AceEditor;
 import com.evolveum.midpoint.web.component.AjaxSubmitButton;
 import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
+import com.evolveum.midpoint.web.page.admin.PageAdmin;
 import com.evolveum.midpoint.web.page.admin.configuration.PageAdminConfiguration;
 import com.evolveum.midpoint.web.page.admin.reports.dto.ReportDto;
 import com.evolveum.midpoint.web.security.MidPointApplication;
@@ -57,13 +49,13 @@ import java.io.InputStreamReader;
  * @author lazyman
  */
 @PageDescriptor(url = "/admin/reports/create", action = {
-        @AuthorizationAction(actionUri = PageAdminReports.AUTH_REPORTS_ALL,
+        @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_REPORTS_ALL_URL,
                 label = PageAdminConfiguration.AUTH_CONFIGURATION_ALL_LABEL,
                 description = PageAdminConfiguration.AUTH_CONFIGURATION_ALL_DESCRIPTION),
         @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_REPORTS_REPORT_CREATE_URL,
                 label = "PageNewReport.auth.reports.label",
                 description = "PageNewReport.auth.reports.description")})
-public class PageNewReport extends PageAdminReports {
+public class PageNewReport extends PageAdmin {
 
     private static final Trace LOGGER = TraceManager.getTrace(PageNewReport.class);
 
@@ -90,13 +82,13 @@ public class PageNewReport extends PageAdminReports {
     private Model<String> xmlEditorModel;
 
     public PageNewReport() {
-    	xmlEditorModel = new Model<String>(null);
+        xmlEditorModel = new Model<>(null);
 
-    	initLayout();
-	}
+        initLayout();
+    }
 
     private void initLayout() {
-        Form mainForm = new Form(ID_MAIN_FORM);
+        Form mainForm = new com.evolveum.midpoint.web.component.form.Form(ID_MAIN_FORM);
         add(mainForm);
 
         final WebMarkupContainer input = new WebMarkupContainer(ID_INPUT);
@@ -107,7 +99,7 @@ public class PageNewReport extends PageAdminReports {
         buttonBar.setOutputMarkupId(true);
         mainForm.add(buttonBar);
 
-        final IModel<Integer> groupModel = new Model<Integer>(INPUT_FILE);
+        final IModel<Integer> groupModel = new Model<>(INPUT_FILE);
         RadioGroup importRadioGroup = new RadioGroup(ID_IMPORT_RADIO_GROUP, groupModel);
         importRadioGroup.add(new AjaxFormChoiceComponentUpdatingBehavior() {
 
@@ -164,12 +156,12 @@ public class PageNewReport extends PageAdminReports {
                 createStringResource("PageNewReport.button.import")) {
 
             @Override
-            protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            protected void onSubmit(AjaxRequestTarget target) {
                 importReportFromFilePerformed(target);
             }
 
             @Override
-            protected void onError(AjaxRequestTarget target, Form<?> form) {
+            protected void onError(AjaxRequestTarget target) {
                 target.add(getFeedbackPanel());
             }
         };
@@ -180,12 +172,12 @@ public class PageNewReport extends PageAdminReports {
                 createStringResource("PageNewReport.button.import")) {
 
             @Override
-            protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            protected void onSubmit(AjaxRequestTarget target) {
                 importReportFromStreamPerformed(target);
             }
 
             @Override
-            protected void onError(AjaxRequestTarget target, Form<?> form) {
+            protected void onError(AjaxRequestTarget target) {
                 target.add(getFeedbackPanel());
             }
         };
@@ -224,7 +216,7 @@ public class PageNewReport extends PageAdminReports {
             // Save file
 //            Task task = createSimpleTask(OPERATION_IMPORT_FILE);
             newFile.createNewFile();
-            uploadedFile.writeTo(newFile);
+            FileUtils.copyInputStreamToFile(uploadedFile.getInputStream(), newFile);
 
             InputStreamReader reader = new InputStreamReader(new FileInputStream(newFile), "utf-8");
 //            reader.
@@ -233,7 +225,7 @@ public class PageNewReport extends PageAdminReports {
 
             setResponsePage(new PageReport(new ReportDto(Base64.encodeBase64(reportIn))));
         } catch (Exception ex) {
-            result.recordFatalError("Couldn't import file.", ex);
+            result.recordFatalError(getString("PageImportObject.message.savePerformed.fatalError"), ex);
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't import file", ex);
         } finally {
             if (stream != null) {
@@ -263,7 +255,7 @@ public class PageNewReport extends PageAdminReports {
 
             setResponsePage(new PageReport(new ReportDto(Base64.encodeBase64(xml.getBytes()))));
         } catch (Exception ex) {
-            result.recordFatalError("Couldn't import object.", ex);
+            result.recordFatalError(getString("PageNewReport.message.importReportFromStreamPerformed.fatalError"), ex);
             LoggingUtils.logUnexpectedException(LOGGER, "Error occured during xml import", ex);
         } finally {
             if (stream != null) {

@@ -11,9 +11,17 @@ rebel.xml
 samples/model-client-sample-dotnet/ModelClientSample/ModelClientSample/bin
 samples/model-client-sample-dotnet/ModelClientSample/ModelClientSample/obj
 velocity.log
+.java-version
 
 dependency-reduced-pom.xml
 /nb-configuration.xml
 /nbactions.xml
 
 .DS_Store
+
+tools/schrodinger/build
+testing/schrodingertest/build
+
+test-output
+
+_mess

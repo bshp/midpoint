@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.server.dto;
@@ -38,10 +29,15 @@ import java.util.List;
  */
 public class NodeDto extends Selectable implements InlineMenuable {
 
+    public static final String F_CONTACT = "contact";
+    public static final String F_NAME = "name";
+    public static final String F_EXECUTION_STATUS = "executionStatus";
+    public static final String F_CLUSTERED = "clustered";
+    public static final String F_STATUS_MESSAGE = "statusMessage";
     private String oid;
     private String name;
     private String nodeIdentifier;
-    private String managementPort;
+    private String contact;
     private Long lastCheckInTime;
     private boolean clustered;
 
@@ -65,7 +61,7 @@ public class NodeDto extends Selectable implements InlineMenuable {
 
         nodeIdentifier = node.getNodeIdentifier();
         clustered = node.isClustered();
-        managementPort = node.getHostname() + ":" + node.getJmxPort();
+        contact = node.getUrl() != null ? node.getUrl() : node.getHostname();
 
         executionStatus = node.getExecutionStatus();
         errorStatus = node.getErrorStatus();
@@ -122,12 +118,12 @@ public class NodeDto extends Selectable implements InlineMenuable {
         return executionStatus;
     }
 
-    public String getManagementPort() {
-        return managementPort;
+    public String getContact() {
+        return contact;
     }
 
     public static List<String> getNodeIdentifiers(List<NodeDto> nodeDtoList) {
-        List<String> nodeList = new ArrayList<String>();
+        List<String> nodeList = new ArrayList<>();
         for (NodeDto nodeDto : nodeDtoList) {
             nodeList.add(nodeDto.getNodeIdentifier());
         }

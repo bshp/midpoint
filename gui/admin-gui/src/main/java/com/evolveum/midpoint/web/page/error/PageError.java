@@ -1,36 +1,26 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.error;
 
 import com.evolveum.midpoint.gui.api.page.PageBase;
-import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
-import com.evolveum.midpoint.security.api.AuthorizationConstants;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.application.PageDescriptor;
 import com.evolveum.midpoint.web.component.AjaxButton;
+import com.evolveum.midpoint.web.component.util.VisibleBehaviour;
 import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
-import com.evolveum.midpoint.web.page.admin.home.PageDashboard;
-import com.evolveum.midpoint.web.page.self.PageSelfDashboard;
-import com.evolveum.midpoint.web.session.SessionStorage;
+import com.evolveum.midpoint.web.security.SecurityUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.wicket.ajax.AjaxRequestTarget;
+import org.apache.wicket.markup.head.IHeaderResponse;
+import org.apache.wicket.markup.head.OnDomReadyHeaderItem;
+import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.request.http.WebResponse;
 import org.springframework.http.HttpStatus;
@@ -43,7 +33,7 @@ import java.util.Date;
  *
  * @author lazyman
  */
-@PageDescriptor(url = "/error")
+@PageDescriptor(url = "/error", permitAll = true)
 public class PageError extends PageBase {
 
     private static final String ID_CODE = "code";
@@ -52,6 +42,7 @@ public class PageError extends PageBase {
     private static final String ID_ERROR_MESSAGE = "errorMessage";
     private static final String ID_BACK = "back";
     private static final String ID_HOME = "home";
+    private static final String ID_CSRF_FIELD = "csrfField";
 
     private static final Trace LOGGER = TraceManager.getTrace(PageError.class);
 
@@ -103,7 +94,7 @@ public class PageError extends PageBase {
             exMessage = ex.getMessage();
         }
 
-        final IModel<String> message = new AbstractReadOnlyModel<String>() {
+        final IModel<String> message = new IModel<String>() {
 
             @Override
             public String getObject() {
@@ -143,6 +134,10 @@ public class PageError extends PageBase {
             }
         };
         add(home);
+
+        WebMarkupContainer csrfField = SecurityUtils.createHiddenInputForCsrf(ID_CSRF_FIELD);
+        csrfField.add(new VisibleBehaviour(() -> SecurityUtils.getPrincipalUser() != null));
+        add(csrfField);
     }
 
     private int getCode() {
@@ -154,6 +149,13 @@ public class PageError extends PageBase {
         super.configureResponse(response);
 
         response.setStatus(getCode());
+    }
+
+    @Override
+    public void renderHead(IHeaderResponse response) {
+        super.renderHead(response);
+
+        response.render(OnDomReadyHeaderItem.forScript("$('div.content-wrapper').css('margin-left', '0');"));
     }
 
     @Override

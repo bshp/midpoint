@@ -1,209 +1,160 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2018 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.common.commandline;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+
+import javax.xml.namespace.QName;
+
+import com.evolveum.midpoint.prism.*;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.SystemUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.evolveum.midpoint.prism.delta.PrismValueDeltaSetTriple;
+import com.evolveum.midpoint.repo.common.expression.Expression;
+import com.evolveum.midpoint.repo.common.expression.ExpressionEvaluationContext;
+import com.evolveum.midpoint.repo.common.expression.ExpressionFactory;
+import com.evolveum.midpoint.repo.common.expression.ExpressionVariables;
+import com.evolveum.midpoint.repo.common.expression.Source;
+import com.evolveum.midpoint.schema.constants.ExpressionConstants;
+import com.evolveum.midpoint.schema.constants.SchemaConstants;
+import com.evolveum.midpoint.schema.expression.TypedValue;
 import com.evolveum.midpoint.schema.result.OperationResult;
+import com.evolveum.midpoint.schema.util.MiscSchemaUtil;
+import com.evolveum.midpoint.task.api.Task;
+import com.evolveum.midpoint.util.DOMUtil;
+import com.evolveum.midpoint.util.exception.CommunicationException;
+import com.evolveum.midpoint.util.exception.ConfigurationException;
+import com.evolveum.midpoint.util.exception.ExpressionEvaluationException;
+import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
+import com.evolveum.midpoint.util.exception.SchemaException;
+import com.evolveum.midpoint.util.exception.SecurityViolationException;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
-import org.apache.commons.lang.SystemUtils;
-
-import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.CommandLineScriptType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.ProvisioningScriptArgumentType;
 
 /**
- * Created by matus on 7/17/2017.
+ * @author matus
+ * @author semancik
  */
-
+@Component
 public class CommandLineScriptExecutor {
-    public static final int EXIT_SUCCESS = 0;
-    public static final String QOTATION_MARK = "\"";
-    public static final String REGEX_CODE_SPLITTER = "([^\"]\\S*|\".+?\")\\s*";// bash -c "echo Im not a number, im a ; echo free man"
-    //-> [bash,-c,"echo Im not a number, im a ; echo free man"]
-    public static final String VARIABLE_REPORT_SOURCEDIR = "%source";
-    public static final String VARIABLE_REPORT_NAME = "%name";
 
-    private OperationResult result;
-    private String generatedOutputFilePath;
-    private String generatedOutputName;
-    private Boolean warningHasEmerged = false;
+    private static final String QUOTATION_MARK = "\"";
+
     private static final Trace LOGGER = TraceManager.getTrace(CommandLineScriptExecutor.class);
 
-    public CommandLineScriptExecutor(String code, String generatedOutputFilePath, Map<String, String> variables, OperationResult parentResult) throws IOException, InterruptedException {
-        this.result = parentResult.createSubresult(CommandLineScriptExecutor.class.getSimpleName() + ".run");
-        this.generatedOutputName = parseOutFileName(generatedOutputFilePath);
-        this.generatedOutputFilePath = modifyFilepathDependingOnOS(generatedOutputFilePath);
-        if (!LOGGER.isDebugEnabled()) {
-        } else {
-            LOGGER.debug("The shell code to be executed: {}", code);
+    @Autowired private PrismContext prismContext;
+    @Autowired private ExpressionFactory expressionFactory;
+
+    public void executeScript(CommandLineScriptType scriptType, ExpressionVariables variables, String shortDesc, Task task, OperationResult parentResult) throws IOException, InterruptedException, SchemaException, ExpressionEvaluationException, ObjectNotFoundException, CommunicationException, ConfigurationException, SecurityViolationException {
+
+        OperationResult result = parentResult.createSubresult(CommandLineScriptExecutor.class.getSimpleName() + ".run");
+
+        if (variables == null) {
+            variables = new ExpressionVariables();
         }
 
-        executeScript(code, variables);
-    }
+        String expandedCode = expandMacros(scriptType, variables, shortDesc, task, result);
 
-    public void executeScript(String code, Map<String, String> variables) throws IOException, InterruptedException {
-        code = code.replaceAll("\n", " "); // Remove new lines, replace with space
-        Matcher match = Pattern.compile(REGEX_CODE_SPLITTER).matcher(code);
+        // TODO: later: prepare agruments and environment
 
-        List<String> scriptParts = new ArrayList<String>();
+        String preparedCode = expandedCode.trim();
+        LOGGER.debug("Prepared shell code: {}", preparedCode);
 
-        while (match.find()) {
+        CommandLineRunner runner = new CommandLineRunner(preparedCode, result);
+        runner.setExectionMethod(scriptType.getExecutionMethod());
 
-            String processedCommand = match.group(1);
-            if (processedCommand.startsWith(QOTATION_MARK) && processedCommand.endsWith(QOTATION_MARK)) {
-                processedCommand = processedCommand.substring(1, processedCommand.length() - 1);
-            }
-            if (processedCommand.contains(VARIABLE_REPORT_SOURCEDIR)) {
-                processedCommand = processedCommand.replace(VARIABLE_REPORT_SOURCEDIR, generatedOutputFilePath);
-            }
-            if (processedCommand.contains(VARIABLE_REPORT_NAME)) {
-                processedCommand = processedCommand.replace(VARIABLE_REPORT_NAME, generatedOutputName);
-            }
-            scriptParts.add(processedCommand);
-        }
-        if (!LOGGER.isDebugEnabled()) {
-        } else {
-            LOGGER.debug("The constructed list of commands: {}", scriptParts);
-        }
-        ProcessBuilder processBuilder = new ProcessBuilder(scriptParts);
+        runner.execute();
 
-        if (variables != null && !variables.isEmpty()) {
-            Map<String, String> environmentVariables = processBuilder.environment();
-            for (String variableName : variables.keySet()) {
-                environmentVariables.put(variableName, variables.get(variableName));
-            }
-        }
-        if (!LOGGER.isDebugEnabled()) {
-        } else {
-            LOGGER.debug("Starting process ", processBuilder.command());
-        }
-        Process process = processBuilder.start();
-        Integer exitValue = process.waitFor();
-
-        if (exitValue == null) {
-            LOGGER.error("Unknown process error, process did not return an exit value.");
-        } else {
-
-            try (InputStream errorInputStream = process.getErrorStream();
-                 InputStream processInputStream = process.getInputStream()) {
-                if (errorInputStream == null) {
-                    evaluateExitValue(exitValue, readOutput(processInputStream));
-                } else {
-                    evaluateExitValue(exitValue, readOutput(processInputStream, errorInputStream));
-                }
-            }
-        }
         result.computeStatus();
     }
 
-    private String readOutput(InputStream processInputStream) throws IOException {
-        return readOutput(processInputStream, null);
-    }
 
-    private String readOutput(InputStream processInputStream, InputStream errorStream) throws IOException {
-        // LOGGER.debug("Evaluating output ");
-        StringBuilder outputBuilder = new StringBuilder();
-        try (BufferedReader bufferedProcessOutputReader = new BufferedReader(new InputStreamReader(processInputStream))) {
-            String line = null;
-            if (errorStream != null) {
-                try (BufferedReader bufferedProcessErrorOutputReader = new BufferedReader(new InputStreamReader(errorStream))) {
-                    outputBuilder.append(" Partial error while executing post report script: ").append(System.getProperty("line.separator"));
-                    if (bufferedProcessErrorOutputReader.ready()) {
-                        while ((line = bufferedProcessErrorOutputReader.readLine()) != null) {
-                            outputBuilder.append(" * " + line + System.getProperty("line.separator"));
-                        }
-                        String aWarning = outputBuilder.toString();
-                        if (!LOGGER.isWarnEnabled()) {
-                        } else {
-                            LOGGER.warn(aWarning);
-                        }
+    private String expandMacros(CommandLineScriptType scriptType, ExpressionVariables variables, String shortDesc, Task task, OperationResult result) throws SchemaException, ExpressionEvaluationException, ObjectNotFoundException, CommunicationException, ConfigurationException, SecurityViolationException {
+        String code = scriptType.getCode();
+        for (ProvisioningScriptArgumentType macroDef: scriptType.getMacro()) {
 
-                        result.recordWarning(aWarning);
-                        warningHasEmerged = true;
+            String macroName = macroDef.getName();
+            QName macroQName = new QName(SchemaConstants.NS_C, macroName);
+
+            String expressionOutput = "";
+
+            MutablePrismPropertyDefinition<String> outputDefinition = prismContext.definitionFactory().createPropertyDefinition(
+                    ExpressionConstants.OUTPUT_ELEMENT_NAME, DOMUtil.XSD_STRING);
+            outputDefinition.setMaxOccurs(1);
+            Expression<PrismPropertyValue<String>, PrismPropertyDefinition<String>> expression = expressionFactory
+                    .makeExpression(macroDef, outputDefinition, MiscSchemaUtil.getExpressionProfile(), shortDesc, task, result);
+
+            Collection<Source<?, ?>> sources = new ArrayList<>(1);
+            ExpressionEvaluationContext context = new ExpressionEvaluationContext(sources, variables, shortDesc, task);
+
+
+            TypedValue defaultObjectValAndDef = variables.get(macroName);
+            if (defaultObjectValAndDef != null) {
+                Object defaultObjectVal = defaultObjectValAndDef.getValue();
+                Item sourceItem;
+                if (defaultObjectVal instanceof Item) {
+                    sourceItem = (Item)defaultObjectVal;
+                } else if (defaultObjectVal instanceof String) {
+                    MutablePrismPropertyDefinition<String> sourceDefinition = prismContext.definitionFactory().createPropertyDefinition(
+                            ExpressionConstants.OUTPUT_ELEMENT_NAME, DOMUtil.XSD_STRING);
+                    sourceDefinition.setMaxOccurs(1);
+                    PrismProperty<String> sourceProperty = sourceDefinition.instantiate();
+                    sourceProperty.setRealValue(defaultObjectVal==null?null:defaultObjectVal.toString());
+                    sourceItem = sourceProperty;
+                } else {
+                    sourceItem = null;
+                }
+                Source<?, ?> defaultSource = new Source<>(sourceItem, null, sourceItem, macroQName, defaultObjectValAndDef.getDefinition());
+                context.setDefaultSource(defaultSource);
+                sources.add(defaultSource);
+            }
+
+            PrismValueDeltaSetTriple<PrismPropertyValue<String>> outputTriple = expression.evaluate(context, result);
+
+            LOGGER.trace("Result of the expression evaluation: {}", outputTriple);
+
+            if (outputTriple != null) {
+                Collection<PrismPropertyValue<String>> nonNegativeValues = outputTriple.getNonNegativeValues();
+                if (nonNegativeValues != null && !nonNegativeValues.isEmpty()) {
+                    Collection<String> expressionOutputs = PrismValueCollectionsUtil.getRealValuesOfCollection((Collection) nonNegativeValues);
+                    if (expressionOutputs != null && !expressionOutputs.isEmpty()) {
+                        expressionOutput = StringUtils.join(expressionOutputs, ",");
                     }
                 }
             }
-            outputBuilder = new StringBuilder();
-            while ((line = bufferedProcessOutputReader.readLine()) != null) {
-                outputBuilder.append(line + System.getProperty("line.separator"));
-            }
+
+            code = replaceMacro(code, macroDef.getName(), expressionOutput);
         }
-        if (outputBuilder != null) {
-            String outputString = outputBuilder.toString();
-            return outputString;
-        } else {
-            String outputString = "The process did not return any printable output";
-            return outputString;
-        }
+        return code;
     }
 
-    private void evaluateExitValue(Integer exitValue, String message) {
-        StringBuilder messageBuilder = new StringBuilder();
-        if (exitValue != EXIT_SUCCESS) {
-            messageBuilder.append("Process exited with an error, the exit value: ").append(exitValue)
-                    .append(". Only a part of the script might have been executed, the output: ").append(System.getProperty("line.separator")).append(message);
-            String warnMessage = messageBuilder.toString();
-            if (!LOGGER.isWarnEnabled()) {
-            } else {
-                LOGGER.warn(warnMessage);
-            }
-            if (!warningHasEmerged) {
-                result.recordWarning(warnMessage);
-            }
-        } else {
-            if (!LOGGER.isDebugEnabled()) {
-            } else {
-                LOGGER.debug("Script execution successful, the following output string was returned: {}", message);
-            }
-            if (!warningHasEmerged) {
-                result.recordSuccess();
-            }
-        }
+    private String replaceMacro(String code, String name, String value) {
+        return code.replace("%"+name+"%", value);
     }
 
-    private String modifyFilepathDependingOnOS(String filepath) {
+    public String getOsSpecificFilePath(String filepath) {
         StringBuilder pathEscapedSpaces = new StringBuilder();
-        if (SystemUtils.IS_OS_LINUX) {
+        if (SystemUtils.IS_OS_UNIX) {
             pathEscapedSpaces.append("'").append(filepath).append("'");
         } else if (SystemUtils.IS_OS_WINDOWS) {
             filepath = filepath.replace("/", "\\");
-            pathEscapedSpaces.append(QOTATION_MARK).append(filepath).append(QOTATION_MARK);
+            pathEscapedSpaces.append(QUOTATION_MARK).append(filepath).append(QUOTATION_MARK);
         } else {
             return filepath;
         }
         return pathEscapedSpaces.toString();
     }
 
-    private String parseOutFileName(String filepath) {
-        int divideAt = filepath.lastIndexOf("/") + 1;
-        StringBuilder nameBuilder = new StringBuilder();
-        String exportName = filepath.substring(divideAt);
-
-        if (SystemUtils.IS_OS_LINUX) {
-            nameBuilder.append("'").append(exportName).append("'");
-            exportName = nameBuilder.toString();
-        }
-        if (!LOGGER.isDebugEnabled()) {
-        } else {
-            LOGGER.debug("The report file name: {}", exportName);
-        }
-        return exportName;
-    }
 }

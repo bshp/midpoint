@@ -1,39 +1,26 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.page.admin.resources.component;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.evolveum.midpoint.gui.api.page.PageBase;
 import com.evolveum.midpoint.web.component.util.VisibleEnableBehaviour;
 import org.apache.wicket.Component;
 import org.apache.wicket.Page;
-import org.apache.wicket.ajax.AjaxEventBehavior;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.extensions.ajax.markup.html.AjaxLazyLoadPanel;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
-import org.apache.wicket.markup.repeater.RepeatingView;
-import org.apache.wicket.model.IModel;
-import org.apache.wicket.model.Model;
 import org.apache.wicket.model.StringResourceModel;
 
 import com.evolveum.midpoint.gui.api.component.BasePanel;
 import com.evolveum.midpoint.gui.api.component.result.OpResult;
-import com.evolveum.midpoint.gui.api.component.result.OperationResultPanel;
 import com.evolveum.midpoint.web.component.AjaxButton;
 import com.evolveum.midpoint.web.component.dialog.Popupable;
 
@@ -80,11 +67,13 @@ public class TestConnectionResultPanel extends BasePanel<List<OpResult>> impleme
             }
 
             @Override
-            protected void onComponentLoaded(Component component, AjaxRequestTarget target){
+            protected void onContentLoaded(Component content, Optional optionalTarget) {
                 isLoaded = true;
-                target.add(component);
+                AjaxRequestTarget target = (AjaxRequestTarget) optionalTarget.get();
+                target.add(content);
                 target.add(messageLabel);
             }
+
         };
         contentPanel.add(resultsPanel);
 
@@ -116,6 +105,16 @@ public class TestConnectionResultPanel extends BasePanel<List<OpResult>> impleme
     @Override
     public int getHeight() {
         return 400;
+    }
+
+    @Override
+    public String getWidthUnit(){
+        return "px";
+    }
+
+    @Override
+    public String getHeightUnit(){
+        return "px";
     }
 
     @Override

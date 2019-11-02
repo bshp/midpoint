@@ -1,22 +1,14 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.schema.statistics;
 
 import com.evolveum.midpoint.xml.ns._public.common.common_3.SynchronizationInformationType;
+import org.jetbrains.annotations.Nullable;
 
 import javax.xml.namespace.QName;
 
@@ -121,7 +113,10 @@ public class SynchronizationInformation {
         return rv;
     }
 
-    public static void addTo(SynchronizationInformationType sum, SynchronizationInformationType delta) {
+    public static void addTo(SynchronizationInformationType sum, @Nullable SynchronizationInformationType delta) {
+        if (delta == null) {
+            return;
+        }
         sum.setCountProtected(sum.getCountProtected() + delta.getCountProtected());
         sum.setCountNoSynchronizationPolicy(sum.getCountNoSynchronizationPolicy() + delta.getCountNoSynchronizationPolicy());
         sum.setCountSynchronizationDisabled(sum.getCountSynchronizationDisabled() + delta.getCountSynchronizationDisabled());
@@ -132,15 +127,15 @@ public class SynchronizationInformation {
         sum.setCountUnlinked(sum.getCountUnlinked() + delta.getCountUnlinked());
         sum.setCountUnmatched(sum.getCountUnmatched() + delta.getCountUnmatched());
 
-		sum.setCountProtectedAfter(sum.getCountProtectedAfter() + delta.getCountProtectedAfter());
-		sum.setCountNoSynchronizationPolicyAfter(sum.getCountNoSynchronizationPolicyAfter() + delta.getCountNoSynchronizationPolicyAfter());
-		sum.setCountSynchronizationDisabledAfter(sum.getCountSynchronizationDisabledAfter() + delta.getCountSynchronizationDisabledAfter());
-		sum.setCountNotApplicableForTaskAfter(sum.getCountNotApplicableForTaskAfter() + delta.getCountNotApplicableForTaskAfter());
-		sum.setCountDeletedAfter(sum.getCountDeletedAfter() + delta.getCountDeletedAfter());
-		sum.setCountDisputedAfter(sum.getCountDisputedAfter() + delta.getCountDisputedAfter());
-		sum.setCountLinkedAfter(sum.getCountLinkedAfter() + delta.getCountLinkedAfter());
-		sum.setCountUnlinkedAfter(sum.getCountUnlinkedAfter() + delta.getCountUnlinkedAfter());
-		sum.setCountUnmatchedAfter(sum.getCountUnmatchedAfter() + delta.getCountUnmatchedAfter());
+        sum.setCountProtectedAfter(sum.getCountProtectedAfter() + delta.getCountProtectedAfter());
+        sum.setCountNoSynchronizationPolicyAfter(sum.getCountNoSynchronizationPolicyAfter() + delta.getCountNoSynchronizationPolicyAfter());
+        sum.setCountSynchronizationDisabledAfter(sum.getCountSynchronizationDisabledAfter() + delta.getCountSynchronizationDisabledAfter());
+        sum.setCountNotApplicableForTaskAfter(sum.getCountNotApplicableForTaskAfter() + delta.getCountNotApplicableForTaskAfter());
+        sum.setCountDeletedAfter(sum.getCountDeletedAfter() + delta.getCountDeletedAfter());
+        sum.setCountDisputedAfter(sum.getCountDisputedAfter() + delta.getCountDisputedAfter());
+        sum.setCountLinkedAfter(sum.getCountLinkedAfter() + delta.getCountLinkedAfter());
+        sum.setCountUnlinkedAfter(sum.getCountUnlinkedAfter() + delta.getCountUnlinkedAfter());
+        sum.setCountUnmatchedAfter(sum.getCountUnmatchedAfter() + delta.getCountUnmatchedAfter());
     }
 
     private SynchronizationInformationType toSynchronizationInformationType() {
@@ -160,36 +155,36 @@ public class SynchronizationInformation {
         rv.setCountUnlinked(stateBefore.countUnlinked);
         rv.setCountUnmatched(stateBefore.countUnmatched);
 
-		rv.setCountProtectedAfter(stateAfter.countProtected);
-		rv.setCountNoSynchronizationPolicyAfter(stateAfter.countNoSynchronizationPolicy);
-		rv.setCountSynchronizationDisabledAfter(stateAfter.countSynchronizationDisabled);
-		rv.setCountNotApplicableForTaskAfter(stateAfter.countNotApplicableForTask);
-		rv.setCountDeletedAfter(stateAfter.countDeleted);
-		rv.setCountDisputedAfter(stateAfter.countDisputed);
-		rv.setCountLinkedAfter(stateAfter.countLinked);
-		rv.setCountUnlinkedAfter(stateAfter.countUnlinked);
-		rv.setCountUnmatchedAfter(stateAfter.countUnmatched);
+        rv.setCountProtectedAfter(stateAfter.countProtected);
+        rv.setCountNoSynchronizationPolicyAfter(stateAfter.countNoSynchronizationPolicy);
+        rv.setCountSynchronizationDisabledAfter(stateAfter.countSynchronizationDisabled);
+        rv.setCountNotApplicableForTaskAfter(stateAfter.countNotApplicableForTask);
+        rv.setCountDeletedAfter(stateAfter.countDeleted);
+        rv.setCountDisputedAfter(stateAfter.countDisputed);
+        rv.setCountLinkedAfter(stateAfter.countLinked);
+        rv.setCountUnlinkedAfter(stateAfter.countUnlinked);
+        rv.setCountUnmatchedAfter(stateAfter.countUnmatched);
     }
 
     public synchronized void recordSynchronizationOperationEnd(String objectName, String objectDisplayName, QName objectType, String objectOid,
-			long started, Throwable exception, Record originalStateIncrement, Record newStateIncrement) {
-		addToState(stateBefore, originalStateIncrement);
-		addToState(stateAfter, newStateIncrement);
+            long started, Throwable exception, Record originalStateIncrement, Record newStateIncrement) {
+        addToState(stateBefore, originalStateIncrement);
+        addToState(stateAfter, newStateIncrement);
     }
 
-	protected void addToState(Record state, Record increment) {
-		state.countProtected += increment.countProtected;
-		state.countNoSynchronizationPolicy += increment.countNoSynchronizationPolicy;
-		state.countSynchronizationDisabled += increment.countSynchronizationDisabled;
-		state.countNotApplicableForTask += increment.countNotApplicableForTask;
-		state.countDeleted += increment.countDeleted;
-		state.countDisputed += increment.countDisputed;
-		state.countLinked += increment.countLinked;
-		state.countUnlinked += increment.countUnlinked;
-		state.countUnmatched += increment.countUnmatched;
-	}
+    protected void addToState(Record state, Record increment) {
+        state.countProtected += increment.countProtected;
+        state.countNoSynchronizationPolicy += increment.countNoSynchronizationPolicy;
+        state.countSynchronizationDisabled += increment.countSynchronizationDisabled;
+        state.countNotApplicableForTask += increment.countNotApplicableForTask;
+        state.countDeleted += increment.countDeleted;
+        state.countDisputed += increment.countDisputed;
+        state.countLinked += increment.countLinked;
+        state.countUnlinked += increment.countUnlinked;
+        state.countUnmatched += increment.countUnmatched;
+    }
 
-	public void recordSynchronizationOperationStart(String objectName, String objectDisplayName, QName objectType, String objectOid) {
+    public void recordSynchronizationOperationStart(String objectName, String objectDisplayName, QName objectType, String objectOid) {
         // noop
     }
 

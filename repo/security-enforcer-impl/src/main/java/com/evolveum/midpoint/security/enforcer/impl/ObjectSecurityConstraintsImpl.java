@@ -1,24 +1,17 @@
 /**
- * Copyright (c) 2014 Evolveum
+ * Copyright (c) 2014-2018 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.security.enforcer.impl;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.evolveum.midpoint.prism.path.ItemPath;
+import com.evolveum.midpoint.security.api.Authorization;
 import com.evolveum.midpoint.security.api.AuthorizationConstants;
 import com.evolveum.midpoint.security.enforcer.api.ObjectSecurityConstraints;
 import com.evolveum.midpoint.util.DebugUtil;
@@ -27,115 +20,134 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.AuthorizationPhaseTy
 
 public class ObjectSecurityConstraintsImpl implements ObjectSecurityConstraints {
 
-	private Map<ItemPath, ItemSecurityConstraintsImpl> itemConstraintMap = new HashMap<>();
-	private Map<String, PhaseDecisionImpl> actionDecisionMap = new HashMap<>();
+    private Map<String, PhasedConstraints> actionMap = new HashMap<>();
 
-	public Map<ItemPath, ItemSecurityConstraintsImpl> getItemConstraintMap() {
-		return itemConstraintMap;
-	}
-
-	/**
-	 * Specifies decisions applicable to the entire object (regardless of any specific items)
-	 */
-	public Map<String, PhaseDecisionImpl> getActionDecisionMap() {
-		return actionDecisionMap;
-	}
-
-	@Override
-	public AuthorizationDecisionType getActionDecision(String actionUrl, AuthorizationPhaseType phase) {
-		AuthorizationDecisionType actionDecision = getSimpleActionDecision(actionDecisionMap, actionUrl, phase);
-		AuthorizationDecisionType allDecision = getSimpleActionDecision(actionDecisionMap, AuthorizationConstants.AUTZ_ALL_URL, phase);
-		if (actionDecision == null && allDecision == null) {
-			return null;
-		}
-		if (actionDecision == AuthorizationDecisionType.DENY || allDecision == AuthorizationDecisionType.DENY) {
-			return AuthorizationDecisionType.DENY;
-		}
-		if (actionDecision != null) {
-			return actionDecision;
-		}
-		return allDecision;
-	}
-
-	private AuthorizationDecisionType getSimpleActionDecision(Map<String, PhaseDecisionImpl> actionDecisionMap, String actionUrl, AuthorizationPhaseType phase) {
-		PhaseDecisionImpl phaseDecision = actionDecisionMap.get(actionUrl);
-		if (phaseDecision == null) {
-			return null;
-		}
-		if (phase == AuthorizationPhaseType.REQUEST) {
-			return phaseDecision.getRequestDecision();
-		} else if (phase == AuthorizationPhaseType.EXECUTION) {
-			return phaseDecision.getExecDecision();
-		} else if (phase == null) {
-			if (phaseDecision.getRequestDecision() == null && phaseDecision.getExecDecision() == null) {
-				return null;
-			}
-			if (phaseDecision.getRequestDecision() == AuthorizationDecisionType.DENY ||
-					phaseDecision.getExecDecision() == AuthorizationDecisionType.DENY) {
-				return AuthorizationDecisionType.DENY;
-			}
-			if (phaseDecision.getRequestDecision() == null || phaseDecision.getExecDecision() == null) {
-				return null;
-			}
-			return AuthorizationDecisionType.ALLOW;
-		} else {
-			throw new IllegalArgumentException("Unexpected phase "+phase);
-		}
-	}
-
-	public AuthorizationDecisionType findItemDecision(ItemPath itemPath, String actionUrl, AuthorizationPhaseType phase) {
-
-        // We return DENY immediately, and ALLOW only if no DENY is present. So here we remember if we should return ALLOW or null at the end.
-        boolean allow = false;
-
-		for (Map.Entry<ItemPath,ItemSecurityConstraintsImpl> entry : itemConstraintMap.entrySet()) {
-
-            ItemPath entryPath = entry.getKey();
-            if (entryPath.isSubPathOrEquivalent(itemPath)) {
-                ItemSecurityConstraintsImpl itemSecurityConstraints = entry.getValue();
-                if (itemSecurityConstraints == null) {
-                    continue;
-                }
-                AuthorizationDecisionType actionDecision = getSimpleActionDecision(itemSecurityConstraints.getActionDecisionMap(), actionUrl, phase);
-                AuthorizationDecisionType allDecision = getSimpleActionDecision(itemSecurityConstraints.getActionDecisionMap(),
-                        AuthorizationConstants.AUTZ_ALL_URL, phase);
-
-                if (actionDecision == AuthorizationDecisionType.DENY || allDecision == AuthorizationDecisionType.DENY) {
-                    return AuthorizationDecisionType.DENY;
-                }
-                if (actionDecision == AuthorizationDecisionType.ALLOW || allDecision == AuthorizationDecisionType.ALLOW) {
-                    allow = true;
-                }
+    public void applyAuthorization(Authorization autz) {
+        List<String> actions = autz.getAction();
+        AuthorizationPhaseType phase = autz.getPhase();
+        for (String action: actions) {
+            if (phase == null) {
+                getOrCreateItemConstraints(action, AuthorizationPhaseType.REQUEST).collectItems(autz);
+                getOrCreateItemConstraints(action, AuthorizationPhaseType.EXECUTION).collectItems(autz);
+            } else {
+                getOrCreateItemConstraints(action, phase).collectItems(autz);
             }
         }
+    }
 
-        if (allow) {
-            return AuthorizationDecisionType.ALLOW;
-        } else {
+    private ItemSecurityConstraintsImpl getOrCreateItemConstraints(String action, AuthorizationPhaseType phase) {
+        PhasedConstraints phasedConstraints = actionMap.computeIfAbsent(action, k -> new PhasedConstraints());
+        return phasedConstraints.get(phase);
+    }
+
+    private ItemSecurityConstraintsImpl getItemConstraints(String action, AuthorizationPhaseType phase) {
+        PhasedConstraints phasedConstraints = actionMap.get(action);
+        if (phasedConstraints == null) {
             return null;
         }
-	}
+        return phasedConstraints.get(phase);
+    }
 
-	@Override
-	public boolean hasNoItemDecisions() {
-		return itemConstraintMap.isEmpty();
-	}
+    @Override
+    public AuthorizationDecisionType findAllItemsDecision(String[] actionUrls, AuthorizationPhaseType phase) {
+        AuthorizationDecisionType decision = null;
+        for (String actionUrl : actionUrls) {
+            AuthorizationDecisionType actionDecision = findAllItemsDecision(actionUrl, phase);
+            if (actionDecision == AuthorizationDecisionType.DENY) {
+                return actionDecision;
+            }
+            if (actionDecision != null) {
+                decision = actionDecision;
+            }
+        }
+        return decision;
+    }
 
-	@Override
-	public String debugDump() {
-		return debugDump(0);
-	}
+    @Override
+    public AuthorizationDecisionType findAllItemsDecision(String actionUrl, AuthorizationPhaseType phase) {
+        if (phase == null) {
+            AuthorizationDecisionType requestDecision = getActionDecisionPhase(actionUrl, AuthorizationPhaseType.REQUEST);
+            if (requestDecision == null || AuthorizationDecisionType.DENY.equals(requestDecision)) {
+                return requestDecision;
+            }
+            return getActionDecisionPhase(actionUrl, AuthorizationPhaseType.EXECUTION);
+        } else {
+            return getActionDecisionPhase(actionUrl, phase);
+        }
+    }
 
-	@Override
-	public String debugDump(int indent) {
-		StringBuilder sb = new StringBuilder();
-		DebugUtil.indentDebugDump(sb, indent);
-		sb.append("ObjectSecurityConstraintsImpl");
-		sb.append("\n");
-		DebugUtil.debugDumpWithLabel(sb, "itemConstraintMap", itemConstraintMap, indent+1);
-		sb.append("\n");
-		DebugUtil.debugDumpWithLabel(sb, "actionDecisionMap", actionDecisionMap, indent+1);
-		return sb.toString();
-	}
+    public AuthorizationDecisionType getActionDecisionPhase(String actionUrl, AuthorizationPhaseType phase) {
+        ItemSecurityConstraintsImpl itemConstraints = getItemConstraints(actionUrl, phase);
+        if (itemConstraints == null) {
+            return null;
+        }
+        AutzItemPaths deniedItems = itemConstraints.getDeniedItems();
+        if (deniedItems.isAllItems()) {
+            return AuthorizationDecisionType.DENY;
+        }
+        AutzItemPaths allowedItems = itemConstraints.getAllowedItems();
+        if (allowedItems.isAllItems()) {
+            return AuthorizationDecisionType.ALLOW;
+        }
+        return null;
+    }
+
+    @Override
+    public AuthorizationDecisionType findItemDecision(ItemPath nameOnlyItemPath, String[] actionUrls, AuthorizationPhaseType phase) {
+        AuthorizationDecisionType decision = null;
+        for (String actionUrl : actionUrls) {
+            AuthorizationDecisionType actionDecision = findItemDecision(nameOnlyItemPath, actionUrl, phase);
+            if (actionDecision == AuthorizationDecisionType.DENY) {
+                return actionDecision;
+            }
+            if (actionDecision != null) {
+                decision = actionDecision;
+            }
+        }
+        return decision;
+    }
+
+    @Override
+    public AuthorizationDecisionType findItemDecision(ItemPath nameOnlyItemPath, String actionUrl, AuthorizationPhaseType phase) {
+        if (phase == null) {
+            AuthorizationDecisionType requestDecision = findItemDecisionPhase(nameOnlyItemPath, actionUrl, AuthorizationPhaseType.REQUEST);
+            if (requestDecision == null || AuthorizationDecisionType.DENY.equals(requestDecision)) {
+                return requestDecision;
+            }
+            return findItemDecisionPhase(nameOnlyItemPath, actionUrl, AuthorizationPhaseType.EXECUTION);
+        } else {
+            return findItemDecisionPhase(nameOnlyItemPath, actionUrl, phase);
+        }
+    }
+
+    public AuthorizationDecisionType findItemDecisionPhase(ItemPath nameOnlyItemPath, String actionUrl, AuthorizationPhaseType phase) {
+        ItemSecurityConstraintsImpl itemConstraints = getItemConstraints(actionUrl, phase);
+        AuthorizationDecisionType decision = null;
+        if (itemConstraints != null) {
+            decision = itemConstraints.findItemDecision(nameOnlyItemPath);
+            if (AuthorizationDecisionType.DENY.equals(decision)) {
+                return AuthorizationDecisionType.DENY;
+            }
+        }
+        ItemSecurityConstraintsImpl itemConstraintsActionAll = getItemConstraints(AuthorizationConstants.AUTZ_ALL_URL, phase);
+        if (itemConstraintsActionAll == null) {
+            return decision;
+        }
+        AuthorizationDecisionType decisionActionAll = itemConstraintsActionAll.findItemDecision(nameOnlyItemPath);
+        if (AuthorizationDecisionType.DENY.equals(decisionActionAll)) {
+            return AuthorizationDecisionType.DENY;
+        }
+        if (AuthorizationDecisionType.ALLOW.equals(decisionActionAll)) {
+            return AuthorizationDecisionType.ALLOW;
+        }
+        return decision;
+    }
+
+    @Override
+    public String debugDump(int indent) {
+        StringBuilder sb = DebugUtil.createTitleStringBuilderLn(ObjectSecurityConstraintsImpl.class, indent);
+        DebugUtil.debugDumpWithLabel(sb, "actionMap", actionMap, indent+1);
+        return sb.toString();
+    }
 
 }

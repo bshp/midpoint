@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.data;
@@ -25,6 +16,7 @@ import org.apache.wicket.extensions.markup.html.repeater.data.sort.SortOrder;
 import org.apache.wicket.extensions.markup.html.repeater.data.table.DataTable;
 import org.apache.wicket.markup.ComponentTag;
 import org.apache.wicket.markup.html.WebMarkupContainer;
+import org.apache.wicket.markup.repeater.data.IDataProvider;
 import org.apache.wicket.util.string.Strings;
 
 /**
@@ -38,6 +30,14 @@ public class TableHeadersToolbar<T> extends AjaxFallbackHeadersToolbar<String> {
 
     @Override
     protected WebMarkupContainer newSortableHeader(String headerId, final String property, final ISortStateLocator locator) {
+        IDataProvider provider = getTable().getDataProvider();
+        if (provider instanceof BaseSortableDataProvider) {
+            BaseSortableDataProvider sortableDataProvider = (BaseSortableDataProvider) provider;
+            if (sortableDataProvider.isOrderingDisabled()) {
+                return new WebMarkupContainer(headerId);
+            }
+        }
+
         return new AjaxFallbackOrderByBorder(headerId, property, locator) {
 
             @Override
@@ -47,7 +47,7 @@ public class TableHeadersToolbar<T> extends AjaxFallbackHeadersToolbar<String> {
 
             @Override
             protected void onAjaxClick(AjaxRequestTarget target) {
-            	target.add(getTable());
+                target.add(getTable());
             }
 
             @Override

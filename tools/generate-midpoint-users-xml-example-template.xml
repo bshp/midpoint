@@ -1,22 +1,18 @@
-	<user>
-		<name>u%%ID%%</name>
-		<assignment>
-			<targetRef oid="6405947a-be0f-11e5-8071-9fd947317f91" type="RoleType"/>
-		</assignment>
-		<givenName>%%GIVEN_NAME%%</givenName>
-		<familyName>%%FAMILY_NAME%%</familyName>
-		<fullName>%%GIVEN_NAME%% %%FAMILY_NAME%% (%%ID%%)</fullName>
-                <employeeNumber>E%%ID%%</employeeNumber>
-		<activation>
-			<administrativeStatus>enabled</administrativeStatus>
-		</activation>
-		<credentials>
-			<password>
-				<value>
-					<clearValue>qwe.%%ID%%</clearValue>
-				</value>
-			</password>
-		</credentials>
-	</user>
+<!--
+  ~ Copyright (c) 2010-2019 Evolveum and contributors
+  ~
+  ~ This work is dual-licensed under the Apache License 2.0
+  ~ and European Union Public License. See LICENSE file for details.
+  -->
+    <user>
+        <name>u%%ID%%</name>
+        <activation>
+            <administrativeStatus>enabled</administrativeStatus>
+        </activation>
+        <fullName>%%GIVEN_NAME%% %%FAMILY_NAME%% (%%ID%%)</fullName>
+        <givenName>%%GIVEN_NAME%%</givenName>
+        <familyName>%%FAMILY_NAME%%</familyName>
+        <employeeNumber>E%%ID%%</employeeNumber>
+    </user>
 
 

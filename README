@@ -1,5 +1,5 @@
-midPoint 3.6 "Comenius"
-------------------------------------
+MidPoint 4.1 Development Branch
+-------------------------------
 
 General information:
 
@@ -23,10 +23,12 @@ The most important features of midPoint are:
    - Password reset
    - Organizational structure management
    - Entitlements
-   - Support for ConnId and OpenICF connectors
+   - Archetypes
+   - Support for ConnId connectors
    - Provisioning consistency and error handling
    - Support for security auditing and reporting
-   - Workflow
+   - Data protection (experimental)
+   - Request approval
    - Reporting
    - Notifications
    - Local Java APIs, Remote web service interface (SOAP), REST API
@@ -51,6 +53,5 @@ following repository locations:
   
   git@github.com:Evolveum/midpoint.git
 
-This project is developed under Apache license (version 2.0) You may get copy
-of licence in LICENSE file. Please also see NOTICE file for addtional
-copyright statements.
+This project is dual-licensed under Apache License 2.0 
+and European Union Public License. See LICENSE file for details.

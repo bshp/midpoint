@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.page.admin.server.dto;
 
@@ -19,6 +10,7 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
+import javax.xml.datatype.XMLGregorianCalendar;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,11 +22,13 @@ public class TaskErrorDto implements Serializable {
     public static final String F_OBJECT_REF_NAME = "objectRefName";
     public static final String F_STATUS = "status";
     public static final String F_MESSAGE = "message";
+    public static final String F_ERROR_TIMESTAMP = "errorTimestamp";
 
     private String objectRefName;
     private OperationResultStatusType status;
     private String message;
     private String taskOid;
+    private XMLGregorianCalendar errorTimestamp;
 
     public TaskErrorDto() {
     }
@@ -48,6 +42,7 @@ public class TaskErrorDto implements Serializable {
             }
             status = execution.getStatus();
             message = extractMessages(execution);
+            errorTimestamp = execution.getTimestamp();
         }
     }
 
@@ -65,5 +60,9 @@ public class TaskErrorDto implements Serializable {
             messages.add(result.getMessage());
         }
         return StringUtils.join(messages, "; ");
+    }
+
+    public XMLGregorianCalendar getErrorTimestamp() {
+        return errorTimestamp;
     }
 }

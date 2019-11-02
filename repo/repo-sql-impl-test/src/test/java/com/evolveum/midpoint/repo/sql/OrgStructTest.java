@@ -1,30 +1,15 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql;
 
-import com.evolveum.midpoint.prism.Objectable;
-import com.evolveum.midpoint.prism.PrismConstants;
-import com.evolveum.midpoint.prism.PrismObject;
-import com.evolveum.midpoint.prism.PrismObjectDefinition;
-import com.evolveum.midpoint.prism.PrismReferenceValue;
+import com.evolveum.midpoint.prism.*;
 import com.evolveum.midpoint.prism.delta.ObjectDelta;
-import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.query.*;
-import com.evolveum.midpoint.prism.query.builder.QueryBuilder;
 import com.evolveum.midpoint.prism.util.PrismAsserts;
 import com.evolveum.midpoint.prism.util.PrismTestUtil;
 import com.evolveum.midpoint.repo.sql.data.common.ROrgClosure;
@@ -45,7 +30,7 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 
 import org.hibernate.Criteria;
 import org.hibernate.FetchMode;
-import org.hibernate.Query;
+import org.hibernate.query.Query;
 import org.hibernate.Session;
 import org.hibernate.criterion.Restrictions;
 import org.springframework.test.annotation.DirtiesContext;
@@ -122,7 +107,7 @@ public class OrgStructTest extends BaseSQLRepoTest {
         opResult.computeStatusIfUnknown();
         AssertJUnit.assertTrue(opResult.isSuccess());
 
-        List<PrismObject<OrgType>> orgTypes = repositoryService.searchObjects(OrgType.class, new ObjectQuery(), null, opResult);
+        List<PrismObject<OrgType>> orgTypes = repositoryService.searchObjects(OrgType.class, null, null, opResult);
         AssertJUnit.assertNotNull(orgTypes);
         AssertJUnit.assertEquals(9, orgTypes.size());
 
@@ -132,7 +117,7 @@ public class OrgStructTest extends BaseSQLRepoTest {
         PrismObjectDefinition<UserType> userObjectDef = prismContext.getSchemaRegistry()
                 .findObjectDefinitionByCompileTimeClass(UserType.class);
 
-        ObjectQuery query = QueryBuilder.queryFor(UserType.class, prismContext)
+        ObjectQuery query = prismContext.queryFor(UserType.class)
                 .item(UserType.F_NAME).eq(ELAINE_NAME)
                 .build();
         List<PrismObject<UserType>> users = repositoryService.searchObjects(UserType.class, query, null, opResult);
@@ -272,7 +257,7 @@ public class OrgStructTest extends BaseSQLRepoTest {
             orgClosure = criteria.list();
             AssertJUnit.assertEquals(3, orgClosure.size());
 
-            ObjectQuery query = QueryBuilder.queryFor(UserType.class, prismContext)
+            ObjectQuery query = prismContext.queryFor(UserType.class)
                     .item(UserType.F_NAME).eq(ELAINE_NAME1)
                     .build();
             List<PrismObject<UserType>> users = repositoryService.searchObjects(UserType.class, query, null, opResult);
@@ -327,7 +312,7 @@ public class OrgStructTest extends BaseSQLRepoTest {
             }
             AssertJUnit.assertEquals(4, orgClosure.size());
 
-            List<String> ancestors = new ArrayList<String>();
+            List<String> ancestors = new ArrayList<>();
             ancestors.add(MODIFY_ORG_ADD_REF_OID);
             ancestors.add(ORG_F003_OID);
             ancestors.add(ORG_F001_OID);
@@ -348,14 +333,14 @@ public class OrgStructTest extends BaseSQLRepoTest {
 
     private List<ROrgClosure> getOrgClosure(String ancestorOid, String descendantOid, Session session) {
         Query query = session.createQuery("from ROrgClosure where ancestorOid=:aOid and descendantOid=:dOid");
-        query.setString("aOid", ancestorOid);
-        query.setString("dOid", descendantOid);
+        query.setParameter("aOid", ancestorOid);
+        query.setParameter("dOid", descendantOid);
         return query.list();
     }
 
     private List<ROrgClosure> getOrgClosureByDescendant(String descendantOid, Session session) {
         Query query = session.createQuery("from ROrgClosure where descendantOid=:oid");
-        query.setString("oid", descendantOid);
+        query.setParameter("oid", descendantOid);
         return query.list();
     }
 
@@ -381,7 +366,7 @@ public class OrgStructTest extends BaseSQLRepoTest {
             }
             AssertJUnit.assertEquals(5, orgClosure.size());
 
-            List<String> ancestors = new ArrayList<String>();
+            List<String> ancestors = new ArrayList<>();
             ancestors.add(MODIFY_ORG_INCORRECT_ADD_REF_OID);
             ancestors.add(ORG_F001_OID);
             ancestors.add(ORG_F002_OID);
@@ -462,34 +447,6 @@ public class OrgStructTest extends BaseSQLRepoTest {
         }
     }
 
-    @Test(enabled = false)          // users are not in the closure any more
-    public void test004modifyOrgStructAddUser() throws Exception {
-        Session session = open();
-        try {
-            OperationResult opResult = new OperationResult("test004modifyOrgStructAddUser");
-
-            //test modification of org ref in another org type..
-            ObjectModificationType modification = PrismTestUtil.parseAtomicValue(new File(MODIFY_ORG_ADD_USER_FILENAME),
-                    ObjectModificationType.COMPLEX_TYPE);
-
-            ObjectDelta<UserType> delta = DeltaConvertor.createObjectDelta(modification, UserType.class, prismContext);
-
-            repositoryService.modifyObject(UserType.class, ELAINE_OID, delta.getModifications(), opResult);
-
-            LOGGER.info("==>after modify - add user to org<==");
-            List<ROrgClosure> orgClosure = getOrgClosureByDescendant(ELAINE_OID, session);
-            AssertJUnit.assertEquals(7, orgClosure.size());
-
-            LOGGER.info("==============CLOSURE TABLE==========");
-
-            for (ROrgClosure o : orgClosure) {
-                LOGGER.info("=> A: {}, D: {}", o.getAncestor(), o.getDescendant());
-            }
-        } finally {
-            close(session);
-        }
-    }
-
     @Test
     public void test005deleteOrg() throws Exception {
         OperationResult opResult = new OperationResult("test005deleteOrg");
@@ -512,7 +469,7 @@ public class OrgStructTest extends BaseSQLRepoTest {
     public void test006searchOrgStructUserUnbounded() throws Exception {
         OperationResult parentResult = new OperationResult("test006searchOrgStructUserUnbounded");
 
-        ObjectQuery objectQuery = QueryBuilder.queryFor(ObjectType.class, prismContext)
+        ObjectQuery objectQuery = prismContext.queryFor(ObjectType.class)
                 .isChildOf(SEARCH_ORG_OID_UNBOUNDED_DEPTH)
                 .asc(ObjectType.F_NAME)
                 .build();
@@ -542,7 +499,7 @@ public class OrgStructTest extends BaseSQLRepoTest {
             session.getTransaction().commit();
             session.close();
 
-            ObjectQuery objectQuery = QueryBuilder.queryFor(ObjectType.class, prismContext)
+            ObjectQuery objectQuery = prismContext.queryFor(ObjectType.class)
                     .isDirectChildOf(SEARCH_ORG_OID_DEPTH1)
                     .asc(ObjectType.F_NAME)
                     .build();
@@ -563,7 +520,7 @@ public class OrgStructTest extends BaseSQLRepoTest {
     public void test008searchRootOrg() throws Exception {
         OperationResult parentResult = new OperationResult("test008searchRootOrg");
 
-        ObjectQuery qSearch = QueryBuilder.queryFor(ObjectType.class, prismContext)
+        ObjectQuery qSearch = prismContext.queryFor(ObjectType.class)
                 .isRoot()
                 .asc(ObjectType.F_NAME)
                 .build();
@@ -579,9 +536,11 @@ public class OrgStructTest extends BaseSQLRepoTest {
     public void test009modifyOrgStructRemoveUser() throws Exception {
         OperationResult opResult = new OperationResult("test009modifyOrgStructRemoveUser");
 
-        PrismReferenceValue prv = new PrismReferenceValue(MODIFY_USER_DELETE_REF_OID);
+        PrismReferenceValue prv = itemFactory().createReferenceValue(MODIFY_USER_DELETE_REF_OID);
         prv.setTargetType(OrgType.COMPLEX_TYPE);
-        ObjectDelta<UserType> delta = ObjectDelta.createModificationDeleteReference(UserType.class, ELAINE_OID, UserType.F_PARENT_ORG_REF, prismContext, prv);
+        ObjectDelta<UserType> delta = prismContext.deltaFactory().object()
+                .createModificationDeleteReference(UserType.class, ELAINE_OID, UserType.F_PARENT_ORG_REF,
+                        prv);
 
         repositoryService.modifyObject(UserType.class, ELAINE_OID, delta.getModifications(), opResult);
 
@@ -597,11 +556,11 @@ public class OrgStructTest extends BaseSQLRepoTest {
 
     @Test
     public void test011OrgFilter() throws Exception {
-    	final String TEST_NAME = "test011OrgFilter";
-    	TestUtil.displayTestTitle(TEST_NAME);
+        final String TEST_NAME = "test011OrgFilter";
+        TestUtil.displayTestTitle(TEST_NAME);
         OperationResult opResult = new OperationResult(TEST_NAME);
 
-        ObjectQuery query = QueryBuilder.queryFor(ObjectType.class, prismContext)
+        ObjectQuery query = prismContext.queryFor(ObjectType.class)
                 .isDirectChildOf(ORG_F001_OID)
                 .asc(ObjectType.F_NAME)
                 .build();
@@ -615,12 +574,12 @@ public class OrgStructTest extends BaseSQLRepoTest {
 
     @Test
     public void test100ParentOrgRefFilterNullRelation() throws Exception {
-    	final String TEST_NAME = "test100ParentOrgRefFilterNullRelation";
-    	TestUtil.displayTestTitle(TEST_NAME);
+        final String TEST_NAME = "test100ParentOrgRefFilterNullRelation";
+        TestUtil.displayTestTitle(TEST_NAME);
         OperationResult opResult = new OperationResult(TEST_NAME);
 
-        ObjectQuery query = QueryBuilder.queryFor(ObjectType.class, prismContext)
-                .item(ObjectType.F_PARENT_ORG_REF).ref(new PrismReferenceValue(ORG_F001_OID))
+        ObjectQuery query = prismContext.queryFor(ObjectType.class)
+                .item(ObjectType.F_PARENT_ORG_REF).ref(itemFactory().createReferenceValue(ORG_F001_OID))
                 .build();
 
         // WHEN
@@ -632,13 +591,13 @@ public class OrgStructTest extends BaseSQLRepoTest {
 
     @Test
     public void test101ParentOrgRefFilterManagerRelation() throws Exception {
-    	final String TEST_NAME = "test101ParentOrgRefFilterManagerRelation";
-    	TestUtil.displayTestTitle(TEST_NAME);
+        final String TEST_NAME = "test101ParentOrgRefFilterManagerRelation";
+        TestUtil.displayTestTitle(TEST_NAME);
         OperationResult opResult = new OperationResult(TEST_NAME);
 
-        PrismReferenceValue refVal = new PrismReferenceValue(ORG_F001_OID);
+        PrismReferenceValue refVal = itemFactory().createReferenceValue(ORG_F001_OID);
         refVal.setRelation(SchemaConstants.ORG_MANAGER);
-        ObjectQuery query = QueryBuilder.queryFor(ObjectType.class, prismContext)
+        ObjectQuery query = prismContext.queryFor(ObjectType.class)
                 .item(ObjectType.F_PARENT_ORG_REF).ref(refVal)
                 .build();
 
@@ -651,13 +610,13 @@ public class OrgStructTest extends BaseSQLRepoTest {
 
     @Test
     public void test102ParentOrgRefFilterAnyRelation() throws Exception {
-    	final String TEST_NAME = "test102ParentOrgRefFilterAnyRelation";
-    	TestUtil.displayTestTitle(TEST_NAME);
+        final String TEST_NAME = "test102ParentOrgRefFilterAnyRelation";
+        TestUtil.displayTestTitle(TEST_NAME);
         OperationResult opResult = new OperationResult(TEST_NAME);
 
-        PrismReferenceValue refVal = new PrismReferenceValue(ORG_F001_OID);
+        PrismReferenceValue refVal = itemFactory().createReferenceValue(ORG_F001_OID);
         refVal.setRelation(PrismConstants.Q_ANY);
-        ObjectQuery query = QueryBuilder.queryFor(ObjectType.class, prismContext)
+        ObjectQuery query = prismContext.queryFor(ObjectType.class)
                 .item(ObjectType.F_PARENT_ORG_REF).ref(refVal)
                 .build();
 

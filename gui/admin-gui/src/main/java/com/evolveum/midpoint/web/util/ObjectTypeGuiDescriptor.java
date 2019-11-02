@@ -1,26 +1,14 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.util;
 
 import com.evolveum.midpoint.gui.api.GuiStyleConstants;
 import com.evolveum.midpoint.schema.constants.ObjectTypes;
-import com.evolveum.midpoint.schema.constants.SchemaConstants;
-
-import javax.xml.namespace.QName;
 
 /**
  * @author lazyman
@@ -67,8 +55,6 @@ public enum ObjectTypeGuiDescriptor {
 
     SECURITY_POLICY(ObjectTypes.SECURITY_POLICY, "ObjectTypeGuiDescriptor.securityPolicy", "", ""),
 
-    USER_ORG_MANAGER(SchemaConstants.ORG_MANAGER, "ObjectTypeGuiDescriptor.orgManager", "silk-user_red", "silk-user_red"),
-
     LOOKUP_TABLE(ObjectTypes.LOOKUP_TABLE, "ObjectTypeGuiDescriptor.lookupTable", "", ""),
 
     ACCESS_CERTIFICATION_DEFINITION(ObjectTypes.ACCESS_CERTIFICATION_DEFINITION, "ObjectTypeGuiDescriptor.accessCertificationDefinition", "", ""),
@@ -79,50 +65,48 @@ public enum ObjectTypeGuiDescriptor {
 
     SERVICE(ObjectTypes.SERVICE, "ObjectTypeGuiDescriptor.service", GuiStyleConstants.CLASS_OBJECT_SERVICE_ICON_COLORED, GuiStyleConstants.CLASS_OBJECT_SERVICE_ICON),
 
-    CASE(ObjectTypes.CASE, "ObjectTypeGuiDescriptor.case", "", "");             // TODO icons
+    CASE(ObjectTypes.CASE, "ObjectTypeGuiDescriptor.case", "", ""),             // TODO icons
+
+    FUNCTION_LIBRARY(ObjectTypes.FUNCTION_LIBRARY, "ObjectTypeGuiDescriptor.functionLibrary", "", ""),      // TODO icons
+
+    OBJECT_COLLECTION(ObjectTypes.OBJECT_COLLECTION, "ObjectTypeGuiDescriptor.objectCollection", "", ""),      // TODO icons
+
+    ARCHETYPE(ObjectTypes.ARCHETYPE, "ObjectTypeGuiDescriptor.archetype", "", ""),      // TODO icons
+
+    DASHBOARD(ObjectTypes.DASHBOARD, "ObjectTypeGuiDescriptor.dashboard", "fa fa-dashboard", "fa fa-dashboard"),
+
+    ASSIGNMENT_HOLDER_TYPE(ObjectTypes.ASSIGNMENT_HOLDER_TYPE, "ObjectTypeGuiDescriptor.assignmentHolderType", "", ""); //TODO icons
 
     public static final String ERROR_ICON = "silk-error";
     public static final String ERROR_LOCALIZATION_KEY = "ObjectTypeGuiDescriptor.unknown";
 
     private ObjectTypes type;
-    private QName relation;
     private String localizationKey;
     private String coloredIcon;
     private String blackIcon;
 
     ObjectTypeGuiDescriptor(ObjectTypes type, String localizationKey, String coloredIcon, String blackIcon) {
         this.coloredIcon = coloredIcon;
-		this.blackIcon = blackIcon;
+        this.blackIcon = blackIcon;
         this.localizationKey = localizationKey;
         this.type = type;
     }
 
-    ObjectTypeGuiDescriptor(QName relation, String localizationKey, String coloredIcon, String blackIcon) {
-        this.coloredIcon = coloredIcon;
-		this.blackIcon = blackIcon;
-        this.localizationKey = localizationKey;
-        this.relation = relation;
-    }
-
-	@SuppressWarnings("unused")
+    @SuppressWarnings("unused")
     public String getColoredIcon() {
         return coloredIcon;
     }
 
-	public String getBlackIcon() {
-		return blackIcon;
-	}
+    public String getBlackIcon() {
+        return blackIcon;
+    }
 
-	public String getLocalizationKey() {
+    public String getLocalizationKey() {
         return localizationKey;
     }
 
     public ObjectTypes getType() {
         return type;
-    }
-
-    public QName getRelation() {
-        return relation;
     }
 
     public static ObjectTypeGuiDescriptor getDescriptor(Class type) {
@@ -136,21 +120,11 @@ public enum ObjectTypeGuiDescriptor {
     }
 
     public static ObjectTypeGuiDescriptor getDescriptor(ObjectTypes type) {
-		if (type == null) {
-			return null;
-		}
+        if (type == null) {
+            return null;
+        }
         for (ObjectTypeGuiDescriptor descr : ObjectTypeGuiDescriptor.values()) {
             if (descr.getType() != null && descr.getType().equals(type)) {
-                return descr;
-            }
-        }
-
-        return null;
-    }
-
-    public static ObjectTypeGuiDescriptor getDescriptor(QName relation) {
-        for (ObjectTypeGuiDescriptor descr : ObjectTypeGuiDescriptor.values()) {
-            if (descr.getRelation() != null && descr.getRelation().equals(relation)) {
                 return descr;
             }
         }

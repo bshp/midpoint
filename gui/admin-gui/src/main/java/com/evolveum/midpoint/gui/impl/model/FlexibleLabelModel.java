@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.gui.impl.model;
@@ -28,6 +19,7 @@ import com.evolveum.midpoint.repo.common.expression.ExpressionVariables;
 import com.evolveum.midpoint.schema.constants.ExpressionConstants;
 import com.evolveum.midpoint.schema.internals.InternalsConfig;
 import com.evolveum.midpoint.schema.result.OperationResult;
+import com.evolveum.midpoint.schema.util.MiscSchemaUtil;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.util.DOMUtil;
 import com.evolveum.midpoint.util.exception.CommunicationException;
@@ -45,13 +37,10 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.ExpressionType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.GuiFlexibleLabelType;
 
 import org.apache.commons.lang.Validate;
-import org.apache.poi.ss.formula.functions.T;
 import org.apache.wicket.RestartResponseException;
 import org.apache.wicket.model.IModel;
 
 import java.util.Collection;
-
-import javax.xml.namespace.QName;
 
 /**
  * Model that returns string value for a flexible label. The label value defaults to
@@ -62,18 +51,14 @@ import javax.xml.namespace.QName;
  * @author semancik
  */
 public class FlexibleLabelModel<C extends Containerable> implements IModel<String> {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private static final Trace LOGGER = TraceManager.getTrace(FlexibleLabelModel.class);
+    private static final Trace LOGGER = TraceManager.getTrace(FlexibleLabelModel.class);
 
     private IModel<C> model;
     private ItemPath path;
     private GuiFlexibleLabelType configuration;
     private ModelServiceLocator serviceLocator;
-
-    public FlexibleLabelModel(IModel<C> model, QName item, ModelServiceLocator serviceLocator, GuiFlexibleLabelType configuration) {
-        this(model, new ItemPath(item), serviceLocator, configuration);
-    }
 
     public FlexibleLabelModel(IModel<C> model, ItemPath path, ModelServiceLocator serviceLocator, GuiFlexibleLabelType configuration) {
         Validate.notNull(model, "Containerable model must not be null.");
@@ -88,33 +73,36 @@ public class FlexibleLabelModel<C extends Containerable> implements IModel<Strin
     @Override
     public String getObject() {
         if (configuration == null) {
-        	return getDefaultValue();
+            return getDefaultValue();
         } else {
-        	ExpressionType expressionType = configuration.getExpression();
-        	if (expressionType == null) {
-        		return getDefaultValue();
-        	} else {
-        		Task task = serviceLocator.getPageTask();
-            	OperationResult result = task.getResult();
-            	String contextDesc = "flexible label "+path+" expression";
-        		try {
-					return getExpressionValue(expressionType, contextDesc, task, result);
-				} catch (SchemaException | ExpressionEvaluationException | ObjectNotFoundException | CommunicationException | ConfigurationException | SecurityViolationException e) {
-					result.recordFatalError(e);
-					LoggingUtils.logUnexpectedException(LOGGER, contextDesc, e, path);
-					if (InternalsConfig.nonCriticalExceptionsAreFatal()) {
-						throw new SystemException(e.getMessage(), e);
-					} else {
-						return "[Expression error]";
-					}
-				}
-        	}
+            ExpressionType expressionType = configuration.getExpression();
+            if (expressionType == null) {
+                return getDefaultValue();
+            } else {
+                Task task = serviceLocator.getPageTask();
+                OperationResult result = task.getResult();
+                String contextDesc = "flexible label "+path+" expression";
+                try {
+                    return getExpressionValue(expressionType, contextDesc, task, result);
+                } catch (SchemaException | ExpressionEvaluationException | ObjectNotFoundException | CommunicationException | ConfigurationException | SecurityViolationException e) {
+                    result.recordFatalError(e);
+                    LoggingUtils.logUnexpectedException(LOGGER, contextDesc, e, path);
+                    if (InternalsConfig.nonCriticalExceptionsAreFatal()) {
+                        throw new SystemException(e.getMessage(), e);
+                    } else {
+                        return "[Expression error]";
+                    }
+                }
+            }
         }
     }
 
-	private String getDefaultValue() {
-    	C object = model.getObject();
-		PrismProperty<?> property;
+    private String getDefaultValue() {
+        C object = model.getObject();
+        if (object == null){
+            return "";
+        }
+        PrismProperty<?> property;
         try {
             property = object.asPrismContainerValue().findOrCreateProperty(path);
         } catch (SchemaException ex) {
@@ -128,33 +116,34 @@ public class FlexibleLabelModel<C extends Containerable> implements IModel<Strin
 
     private String getExpressionValue(ExpressionType expressionType, String contextDesc, Task task, OperationResult result) throws SchemaException, ExpressionEvaluationException, ObjectNotFoundException, CommunicationException, ConfigurationException, SecurityViolationException {
 
-    	C object = model.getObject();
-    	ExpressionFactory expressionFactory = serviceLocator.getExpressionFactory();
-    	PrismPropertyDefinition<String> outputDefinition = new PrismPropertyDefinitionImpl<>(ExpressionConstants.OUTPUT_ELEMENT_NAME,
-    			DOMUtil.XSD_STRING, object.asPrismContainerValue().getPrismContext());
-		Expression<PrismPropertyValue<String>,PrismPropertyDefinition<String>> expression = expressionFactory.makeExpression(expressionType, outputDefinition, contextDesc, task, result);
-		ExpressionVariables variables = new ExpressionVariables();
-		variables.addVariableDefinition(ExpressionConstants.VAR_OBJECT, object);
-		addAdditionalExpressionVariables(variables);
-		ExpressionEvaluationContext context = new ExpressionEvaluationContext(null, variables, contextDesc, task, result);
-		PrismValueDeltaSetTriple<PrismPropertyValue<String>> outputTriple = expression.evaluate(context);
-		if (outputTriple == null) {
-			return "";
-		}
-		Collection<PrismPropertyValue<String>> outputValues = outputTriple.getNonNegativeValues();
-		if (outputValues.isEmpty()) {
-			return "";
-		}
-		if (outputValues.size() > 1) {
-			throw new SchemaException("Expression "+contextDesc+" produced more than one value");
-		}
-		return outputValues.iterator().next().getRealValue();
-	}
+        C object = model.getObject();
+        ExpressionFactory expressionFactory = serviceLocator.getExpressionFactory();
+        PrismContext prismContext = object.asPrismContainerValue().getPrismContext();
+        PrismPropertyDefinition<String> outputDefinition = prismContext.definitionFactory().createPropertyDefinition(ExpressionConstants.OUTPUT_ELEMENT_NAME,
+                DOMUtil.XSD_STRING);
+        Expression<PrismPropertyValue<String>,PrismPropertyDefinition<String>> expression = expressionFactory.makeExpression(expressionType, outputDefinition, MiscSchemaUtil.getExpressionProfile(), contextDesc, task, result);
+        ExpressionVariables variables = new ExpressionVariables();
+        variables.put(ExpressionConstants.VAR_OBJECT, object, object.asPrismContainerValue().getDefinition());
+        addAdditionalExpressionVariables(variables);
+        ExpressionEvaluationContext context = new ExpressionEvaluationContext(null, variables, contextDesc, task);
+        PrismValueDeltaSetTriple<PrismPropertyValue<String>> outputTriple = expression.evaluate(context, result);
+        if (outputTriple == null) {
+            return "";
+        }
+        Collection<PrismPropertyValue<String>> outputValues = outputTriple.getNonNegativeValues();
+        if (outputValues.isEmpty()) {
+            return "";
+        }
+        if (outputValues.size() > 1) {
+            throw new SchemaException("Expression "+contextDesc+" produced more than one value");
+        }
+        return outputValues.iterator().next().getRealValue();
+    }
 
     protected void addAdditionalExpressionVariables(ExpressionVariables variables) {
-	}
+    }
 
-	@Override
+    @Override
     public void setObject(String object) {
         throw new UnsupportedOperationException("Model is read-only");
     }
@@ -164,9 +153,9 @@ public class FlexibleLabelModel<C extends Containerable> implements IModel<Strin
     }
 
     private <T> String getStringRealValue(T value) {
-    	if (value == null) {
-    		return "";
-    	}
+        if (value == null) {
+            return "";
+        }
         if (value instanceof PolyString) {
             return ((PolyString) value).getOrig();
         }

@@ -1,26 +1,16 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.certification.helpers;
 
-import com.evolveum.midpoint.common.SystemConfigurationHolder;
 import com.evolveum.midpoint.gui.api.page.PageBase;
+import com.evolveum.midpoint.gui.api.util.WebModelServiceUtils;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AccessCertificationConfigurationType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AccessCertificationResponseType;
-import org.apache.wicket.Page;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -41,13 +31,12 @@ public class AvailableResponses implements Serializable {
 
     private List<String> responseKeys;
     private List<AccessCertificationResponseType> responseValues;
-    private Page page;
+    private PageBase pageBase;
 
-    public AvailableResponses(Page page) {
-        this.page = page;
+    public AvailableResponses(PageBase pageBase) {
+        this.pageBase = pageBase;
 
-        // TODO: use ModelInteractionService.getCertificationConfiguration() instead
-        AccessCertificationConfigurationType config = SystemConfigurationHolder.getCertificationConfiguration();
+        AccessCertificationConfigurationType config = WebModelServiceUtils.getCertificationConfiguration(pageBase);
 
         responseKeys = new ArrayList<>(6);
         responseValues = new ArrayList<>(6);
@@ -80,11 +69,11 @@ public class AvailableResponses implements Serializable {
         return response == null || responseValues.contains(response);
     }
 
-    public String getCaption(int id) {
+    public String getTitle(int id) {
         if (id < responseKeys.size()) {
-            return PageBase.createStringResourceStatic(page, responseKeys.get(id)).getString();
+            return PageBase.createStringResourceStatic(pageBase, responseKeys.get(id)).getString();
         } else {
-            return PageBase.createStringResourceStatic(page, "PageCertDecisions.menu.illegalResponse").getString();
+            return PageBase.createStringResourceStatic(pageBase, "PageCertDecisions.menu.illegalResponse").getString();
         }
     }
 

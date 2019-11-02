@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.configuration.component;
@@ -23,7 +14,6 @@ import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
-import com.evolveum.midpoint.web.component.input.TextPanel;
 import com.evolveum.midpoint.web.page.admin.dto.ObjectViewDto;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectReferenceType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
@@ -31,9 +21,9 @@ import org.apache.wicket.ajax.AjaxChannel;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.attributes.AjaxRequestAttributes;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
-import org.apache.wicket.markup.html.basic.Label;
+import org.apache.wicket.behavior.AttributeAppender;
+import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.form.TextField;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
@@ -50,11 +40,12 @@ import java.util.List;
  *  the one that resides in the popup window (ObjectSelectionPanel).
  */
 public class ChooseTypePanel<T extends ObjectType> extends BasePanel<ObjectViewDto<T>> {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private static final Trace LOGGER = TraceManager.getTrace(ChooseTypePanel.class);
+    private static final Trace LOGGER = TraceManager.getTrace(ChooseTypePanel.class);
 
     private static final String ID_OBJECT_NAME = "name";
+    private static final String ID_INPUT_CONTAINER = "inputContainer";
     private static final String ID_LINK_CHOOSE = "choose";
     private static final String ID_LINK_REMOVE = "remove";
 
@@ -64,17 +55,21 @@ public class ChooseTypePanel<T extends ObjectType> extends BasePanel<ObjectViewD
     }
 
     public ChooseTypePanel(String id, ObjectReferenceType ref){
-    	super(id, Model.of(new ObjectViewDto<T>(ref != null ? ref.getOid() : null, ref !=null ?  WebComponentUtil.getOrigStringFromPoly(ref.getTargetName()) : null)));
+        super(id, Model.of(new ObjectViewDto<>(ref != null ? ref.getOid() : null, ref != null ? WebComponentUtil.getOrigStringFromPoly(ref.getTargetName()) : null)));
         initLayout();
     }
 
     protected void initLayout() {
+        WebMarkupContainer inputContainer = new WebMarkupContainer(ID_INPUT_CONTAINER);
+        inputContainer.setOutputMarkupId(true);
+        inputContainer.add(getInputStyleClass());
+        add(inputContainer);
 
-        final TextField<String> name = new TextField<String>(ID_OBJECT_NAME, new PropertyModel<String>(getModel(), ObjectViewDto.F_NAME));
+        final TextField<String> name = new TextField<>(ID_OBJECT_NAME, new PropertyModel<>(getModel(), ObjectViewDto.F_NAME));
 
 
-//        		new Model<String>(){
-//        	private static final long serialVersionUID = 1L;
+//                new Model<String>(){
+//            private static final long serialVersionUID = 1L;
 //
 //            @Override
 //            public String getObject() {
@@ -95,7 +90,7 @@ public class ChooseTypePanel<T extends ObjectType> extends BasePanel<ObjectViewD
 
 
         AjaxLink<String> choose = new AjaxLink<String>(ID_LINK_CHOOSE) {
-        	private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
             @Override
             public void onClick(AjaxRequestTarget target) {
@@ -108,9 +103,10 @@ public class ChooseTypePanel<T extends ObjectType> extends BasePanel<ObjectViewD
                 attributes.setChannel(new AjaxChannel("blocking", AjaxChannel.Type.ACTIVE));
             }
         };
+        choose.setOutputMarkupId(true);
 
         AjaxLink<String> remove = new AjaxLink<String>(ID_LINK_REMOVE) {
-        	private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
             @Override
             public void onClick(AjaxRequestTarget target) {
@@ -118,10 +114,11 @@ public class ChooseTypePanel<T extends ObjectType> extends BasePanel<ObjectViewD
                 target.add(name);
             }
         };
+        remove.setOutputMarkupId(true);
 
-        add(choose);
+        inputContainer.add(name);
+        inputContainer.add(choose);
         add(remove);
-        add(name);
 
     }
 
@@ -138,7 +135,7 @@ public class ChooseTypePanel<T extends ObjectType> extends BasePanel<ObjectViewD
     }
 
     private void choosePerformed(AjaxRequestTarget target, T object){
-    	getPageBase().hideMainPopup(target);
+        getPageBase().hideMainPopup(target);
         ObjectViewDto<T> o = getModel().getObject();
 
         o.setName(WebComponentUtil.getName(object));
@@ -149,7 +146,7 @@ public class ChooseTypePanel<T extends ObjectType> extends BasePanel<ObjectViewD
             LOGGER.trace("Choose operation performed: {} ({})", o.getName(), o.getOid());
         }
 
-        target.add(get(ID_OBJECT_NAME));
+        target.add(get(ID_INPUT_CONTAINER).get(ID_OBJECT_NAME));
         executeCustomAction(target, object);
     }
 
@@ -158,25 +155,25 @@ public class ChooseTypePanel<T extends ObjectType> extends BasePanel<ObjectViewD
     }
 
     private void changeOptionPerformed(AjaxRequestTarget target){
-    	Class<T> type = getObjectTypeClass();
-    	List<QName> supportedTypes = new ArrayList<>();
-    	supportedTypes.add(WebComponentUtil.classToQName(getPageBase().getPrismContext(), type));
-    	ObjectBrowserPanel<T> objectBrowserPanel = new ObjectBrowserPanel<T>(getPageBase().getMainPopupBodyId(),
+        Class<T> type = getObjectTypeClass();
+        List<QName> supportedTypes = new ArrayList<>();
+        supportedTypes.add(WebComponentUtil.classToQName(getPageBase().getPrismContext(), type));
+        ObjectBrowserPanel<T> objectBrowserPanel = new ObjectBrowserPanel<T>(getPageBase().getMainPopupBodyId(),
                 type, supportedTypes, false, getPageBase(), getChooseQuery() != null ? getChooseQuery().getFilter() : null){
-    		private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
-			@Override
-    		protected void onSelectPerformed(AjaxRequestTarget target, T focus) {
-    			choosePerformed(target, focus);
-    		}
-    	};
-    	objectBrowserPanel.setOutputMarkupId(true);
+            @Override
+            protected void onSelectPerformed(AjaxRequestTarget target, T focus) {
+                choosePerformed(target, focus);
+            }
+        };
+        objectBrowserPanel.setOutputMarkupId(true);
 
-    	getPageBase().showMainPopup(objectBrowserPanel, target);
+        getPageBase().showMainPopup(objectBrowserPanel, target);
     }
 
     private void setToDefault(AjaxRequestTarget target){
-        ObjectViewDto<T> dto = new ObjectViewDto<T>();
+        ObjectViewDto<T> dto = new ObjectViewDto<>();
         dto.setType(getObjectTypeClass());
         getModel().setObject(dto);
         executeCustomRemoveAction(target);
@@ -186,12 +183,16 @@ protected void executeCustomRemoveAction(AjaxRequestTarget target) {
 
     }
 
+    protected AttributeAppender getInputStyleClass(){
+        return AttributeAppender.append("class", "col-md-4");
+    }
+
     public Class<T> getObjectTypeClass(){
         return ChooseTypePanel.this.getModelObject().getType();
     }
 
     public void setPanelEnabled(boolean isEnabled){
-        get(ID_LINK_CHOOSE).setEnabled(isEnabled);
+        get(ID_INPUT_CONTAINER).get(ID_LINK_CHOOSE).setEnabled(isEnabled);
         get(ID_LINK_REMOVE).setEnabled(isEnabled);
     }
 }

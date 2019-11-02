@@ -1,26 +1,19 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.page.admin.reports;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import com.evolveum.midpoint.prism.delta.DeltaFactory;
+import com.evolveum.midpoint.web.page.admin.PageAdmin;
+
 import org.apache.wicket.RestartResponseException;
 import org.apache.wicket.ajax.AjaxRequestTarget;
-import org.apache.wicket.ajax.markup.html.form.AjaxSubmitLink;
 import org.apache.wicket.extensions.markup.html.tabs.AbstractTab;
 import org.apache.wicket.extensions.markup.html.tabs.ITab;
 import org.apache.wicket.markup.html.WebMarkupContainer;
@@ -28,23 +21,16 @@ import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.util.string.StringValue;
-import org.apache.wicket.validation.IValidatable;
-import org.apache.wicket.validation.IValidator;
-import org.apache.wicket.validation.RawValidationError;
 
-import com.evolveum.midpoint.gui.api.component.result.OpResult;
 import com.evolveum.midpoint.gui.api.model.LoadableModel;
-import com.evolveum.midpoint.gui.api.page.PageBase;
 import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.gui.api.util.WebModelServiceUtils;
-import com.evolveum.midpoint.prism.PrismContext;
+import com.evolveum.midpoint.gui.impl.model.JasperTemplateModel;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.delta.ObjectDelta;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.security.api.AuthorizationConstants;
 import com.evolveum.midpoint.task.api.Task;
-import com.evolveum.midpoint.util.Holder;
-import com.evolveum.midpoint.util.exception.SchemaException;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.application.AuthorizationAction;
@@ -56,24 +42,23 @@ import com.evolveum.midpoint.web.page.admin.reports.component.AceEditorPanel;
 import com.evolveum.midpoint.web.page.admin.reports.component.JasperReportConfigurationPanel;
 import com.evolveum.midpoint.web.page.admin.reports.component.ReportConfigurationPanel;
 import com.evolveum.midpoint.web.page.admin.reports.dto.ReportDto;
-import com.evolveum.midpoint.web.page.error.PageError;
-import com.evolveum.midpoint.web.util.Base64Model;
 import com.evolveum.midpoint.web.util.OnePageParameterEncoder;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.ReportEngineSelectionType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ReportType;
 
 /**
  * @author shood
  */
 @PageDescriptor(url = "/admin/report", encoder = OnePageParameterEncoder.class, action = {
-        @AuthorizationAction(actionUri = PageAdminReports.AUTH_REPORTS_ALL,
+        @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_REPORTS_ALL_URL,
                 label = PageAdminConfiguration.AUTH_CONFIGURATION_ALL_LABEL,
                 description = PageAdminConfiguration.AUTH_CONFIGURATION_ALL_DESCRIPTION),
         @AuthorizationAction(actionUri = AuthorizationConstants.AUTZ_UI_REPORT_URL,
                 label = "PageReport.auth.report.label",
                 description = "PageReport.auth.report.description")})
-public class PageReport extends PageAdminReports {
+public class PageReport extends PageAdmin {
 
-    private static Trace LOGGER = TraceManager.getTrace(PageReport.class);
+    private static final Trace LOGGER = TraceManager.getTrace(PageReport.class);
 
     private static final String DOT_CLASS = PageReport.class.getName() + ".";
     private static final String OPERATION_LOAD_REPORT = DOT_CLASS + "loadReport";
@@ -95,21 +80,17 @@ public class PageReport extends PageAdminReports {
                 return loadReport();
             }
         };
-
-        initLayout();
     }
 
     public PageReport(final ReportDto reportDto) {
-    	model = new LoadableModel<ReportDto>(reportDto, false) {
+        model = new LoadableModel<ReportDto>(reportDto, false) {
 
-    		@Override
-    		protected ReportDto load() {
-    			// never called
-    			return reportDto;
-    		}
-
-		};
-		initLayout();
+            @Override
+            protected ReportDto load() {
+                // never called
+                return reportDto;
+            }
+        };
     }
 
     private ReportDto loadReport() {
@@ -118,7 +99,7 @@ public class PageReport extends PageAdminReports {
         Task task = createSimpleTask(OPERATION_LOAD_REPORT);
         OperationResult result = task.getResult();
         PrismObject<ReportType> prismReport = WebModelServiceUtils.loadObject(ReportType.class, reportOid.toString(),
-        		this, task, result);
+                this, task, result);
 
         if (prismReport == null) {
             LOGGER.error("Couldn't load report.");
@@ -130,41 +111,51 @@ public class PageReport extends PageAdminReports {
 //        return prismReport;
     }
 
+    @Override
+    protected void onInitialize() {
+        super.onInitialize();
+        initLayout();
+    }
+
     private void initLayout() {
-        Form mainForm = new Form(ID_MAIN_FORM);
+        Form mainForm = new com.evolveum.midpoint.web.component.form.Form(ID_MAIN_FORM);
         add(mainForm);
+        ReportEngineSelectionType reportEngineType = model.getObject().getReportEngineType();
 
         List<ITab> tabs = new ArrayList<>();
         tabs.add(new AbstractTab(createStringResource("PageReport.basic")) {
 
-        	private static final long serialVersionUID = 1L;
+            private static final long serialVersionUID = 1L;
 
-			@Override
+            @Override
             public WebMarkupContainer getPanel(String panelId) {
                 return new ReportConfigurationPanel(panelId, model);
             }
         });
-        tabs.add(new AbstractTab(createStringResource("PageReport.jasperTemplate")) {
+        if(!ReportEngineSelectionType.DASHBOARD.equals(reportEngineType)) {
+            tabs.add(new AbstractTab(createStringResource("PageReport.jasperTemplate")) {
 
-        	private static final long serialVersionUID = 1L;
-            @Override
-            public WebMarkupContainer getPanel(String panelId) {
-            	return new JasperReportConfigurationPanel(panelId, model);
-//                IModel<String> title = PageReport.this.createStringResource("PageReport.jasperTemplate");
-//                IModel<String> data = new Base64Model(new PrismPropertyModel<>(model, ReportType.F_TEMPLATE));
-//                return new AceEditorPanel(panelId, title, data);
-            }
-        });
-        tabs.add(new AbstractTab(createStringResource("PageReport.jasperTemplateStyle")) {
+                private static final long serialVersionUID = 1L;
+                @Override
+                public WebMarkupContainer getPanel(String panelId) {
+                    return new JasperReportConfigurationPanel(panelId, model);
+//                    IModel<String> title = PageReport.this.createStringResource("PageReport.jasperTemplate");
+//                    IModel<String> data = new Base64Model(new PrismPropertyModel<>(model, ReportType.F_TEMPLATE));
+//                    return new AceEditorPanel(panelId, title, data);
+                }
+            });
+            tabs.add(new AbstractTab(createStringResource("PageReport.jasperTemplateStyle")) {
 
-        	private static final long serialVersionUID = 1L;
-            @Override
-            public WebMarkupContainer getPanel(String panelId) {
-                IModel<String> title = PageReport.this.createStringResource("PageReport.jasperTemplateStyle");
-                IModel<String> data = new Base64Model(new PropertyModel(model, "templateStyle"));
-                return new AceEditorPanel(panelId, title, data);
-            }
-        });
+                private static final long serialVersionUID = 1L;
+                @Override
+                public WebMarkupContainer getPanel(String panelId) {
+                    IModel<String> title = PageReport.this.createStringResource("PageReport.jasperTemplateStyle");
+                    IModel<String> data = new JasperTemplateModel(new PropertyModel(model, "templateStyle"));
+                    return new AceEditorPanel(panelId, title, data);
+                }
+            });
+        }
+
 //        tabs.add(new AbstractTab(createStringResource("PageReport.fullXml")) {
 //
 //            @Override
@@ -257,12 +248,12 @@ public class PageReport extends PageAdminReports {
         AjaxSubmitButton save = new AjaxSubmitButton(ID_SAVE_BUTTON, createStringResource("PageBase.button.save")) {
 
             @Override
-            protected void onError(AjaxRequestTarget target, Form<?> form) {
+            protected void onError(AjaxRequestTarget target) {
                 target.add(getFeedbackPanel());
             }
 
             @Override
-            protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            protected void onSubmit(AjaxRequestTarget target) {
                 onSavePerformed(target);
             }
         };
@@ -271,12 +262,12 @@ public class PageReport extends PageAdminReports {
         AjaxSubmitButton cancel = new AjaxSubmitButton(ID_CANCEL_BUTTON, createStringResource("PageBase.button.cancel")) {
 
             @Override
-            protected void onError(AjaxRequestTarget target, Form<?> form) {
+            protected void onError(AjaxRequestTarget target) {
                 target.add(getFeedbackPanel());
             }
 
             @Override
-            protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            protected void onSubmit(AjaxRequestTarget target) {
                 onCancelPerformed(target);
             }
         };
@@ -284,32 +275,32 @@ public class PageReport extends PageAdminReports {
     }
 
     protected void onSavePerformed(AjaxRequestTarget target) {
-    	Task task = createSimpleTask(OPERATION_SAVE_REPORT);
+        Task task = createSimpleTask(OPERATION_SAVE_REPORT);
         OperationResult result = task.getResult();
         try {
 
             //TODO TODO TODO
             PrismObject<ReportType> newReport = model.getObject().getObject();
-			ObjectDelta<ReportType> delta = null;
-			if (newReport.getOid() == null) {
-				getPrismContext().adopt(newReport);
-				delta = ObjectDelta.createAddDelta(newReport);
-				delta.setPrismContext(getPrismContext());
-			} else {
-				PrismObject<ReportType> oldReport = WebModelServiceUtils.loadObject(ReportType.class,
-						newReport.getOid(), this, task, result);
+            ObjectDelta<ReportType> delta = null;
+            if (newReport.getOid() == null) {
+                getPrismContext().adopt(newReport);
+                delta = DeltaFactory.Object.createAddDelta(newReport);
+                delta.setPrismContext(getPrismContext());
+            } else {
+                PrismObject<ReportType> oldReport = WebModelServiceUtils.loadObject(ReportType.class,
+                        newReport.getOid(), this, task, result);
 
-				if (oldReport != null) {
-					delta = oldReport.diff(newReport);
-				}
-			}
-			if (delta != null) {
+                if (oldReport != null) {
+                    delta = oldReport.diff(newReport);
+                }
+            }
+            if (delta != null) {
                             getPrismContext().adopt(delta);
                             getModelService().executeChanges(WebComponentUtil.createDeltaCollection(delta), null, task, result);
-			}
+            }
 
         } catch (Exception e) {
-            result.recordFatalError("Couldn't save report.", e);
+            result.recordFatalError(getString("PageReport.message.couldNotSaveReport"), e);
 
         } finally {
             result.computeStatusIfUnknown();

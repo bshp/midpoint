@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.web.page.admin.reports.dto;
 
@@ -21,14 +12,20 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+import com.evolveum.midpoint.schema.result.OperationResult;
+import com.evolveum.midpoint.util.logging.LoggingUtils;
+import com.evolveum.midpoint.web.component.util.SerializableSupplier;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectCollectionType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.OperationResultStatusType;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.wicket.Component;
 import org.apache.wicket.model.IModel;
 
 import com.evolveum.midpoint.audit.api.AuditEventRecord;
-import com.evolveum.midpoint.schema.result.OperationResult;
+import com.evolveum.midpoint.model.api.util.DashboardUtils;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.util.exception.CommunicationException;
 import com.evolveum.midpoint.util.exception.ConfigurationException;
@@ -36,244 +33,278 @@ import com.evolveum.midpoint.util.exception.ExpressionEvaluationException;
 import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
 import com.evolveum.midpoint.util.exception.SchemaException;
 import com.evolveum.midpoint.util.exception.SecurityViolationException;
-import com.evolveum.midpoint.util.exception.SystemException;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.component.data.BaseSortableDataProvider;
-import com.evolveum.midpoint.web.session.UserProfileStorage;
 import com.evolveum.midpoint.xml.ns._public.common.audit_3.AuditEventRecordType;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Created by honchar.
  */
 public class AuditEventRecordProvider extends BaseSortableDataProvider<AuditEventRecordType> {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	public  static final String VALUE_REF_TARGET_NAMES_KEY = "valueRefTargetNames";
-	private static final Trace LOGGER = TraceManager.getTrace(BaseSortableDataProvider.class);
-	private IModel<List<AuditEventRecordType>> model;
+    @SuppressWarnings("unused")
+    private static final Trace LOGGER = TraceManager.getTrace(BaseSortableDataProvider.class);
 
-	private String auditEventQuery;
-	private Map<String, Object> parameters = new HashMap<>();
+    public static final String PARAMETER_VALUE_REF_TARGET_NAMES = "valueRefTargetNames";
+    public static final String PARAMETER_CHANGED_ITEM = "changedItem";
+    public static final String PARAMETER_FROM = "from";
+    public static final String PARAMETER_TO = "to";
+    public static final String PARAMETER_EVENT_TYPE = "eventType";
+    public static final String PARAMETER_EVENT_STAGE = "eventStage";
+    public static final String PARAMETER_OUTCOME = "outcome";
+    public static final String PARAMETER_INITIATOR_NAME = "initiatorName";
+    public static final String PARAMETER_CHANNEL = "channel";
+    public static final String PARAMETER_HOST_IDENTIFIER = "hostIdentifier";
+    public static final String PARAMETER_REQUEST_IDENTIFIER = "requestIdentifier";
+    public static final String PARAMETER_TARGET_OWNER_NAME = "targetOwnerName";
+    public static final String PARAMETER_TARGET_NAMES = "targetNames";
+    public static final String PARAMETER_TASK_IDENTIFIER = "taskIdentifier";
 
-	private static final String AUDIT_RECORDS_QUERY_CORE = "from RAuditEventRecord as aer left outer join aer.referenceValues as rv where 1=1 and ";
-	private static final String AUDIT_RECORDS_QUERY_COUNT = "select count(*) ";
-	private static final String AUDIT_RECORDS_ORDER_BY = " order by aer.timestamp desc";
-	private static final String SET_FIRST_RESULT_PARAMETER = "setFirstResult";
-	private static final String SET_MAX_RESULTS_PARAMETER = "setMaxResults";
+    @Nullable private final IModel<ObjectCollectionType> objectCollectionModel;
+    @NotNull private final SerializableSupplier<Map<String, Object>> parametersSupplier;
 
-	public AuditEventRecordProvider(Component component){
-		this(component, AUDIT_RECORDS_QUERY_CORE, new HashMap<String, Object>());
-	}
+    private static final String AUDIT_RECORDS_QUERY_SELECT = "select * ";
+    private static final String AUDIT_RECORDS_QUERY_CORE = " from m_audit_event as aer";
+    private static final String AUDIT_RECORDS_QUERY_ITEMS_CHANGED = " right join m_audit_item as item on item.record_id=aer.id ";
+    private static final String AUDIT_RECORDS_QUERY_REF_VALUES = " left outer join m_audit_ref_value as rv on rv.record_id=aer.id ";
+    private static final String AUDIT_RECORDS_QUERY_COUNT = "select count(*) ";
+    private static final String AUDIT_RECORDS_ORDER_BY = " order by aer.timestampValue desc";
+    private static final String SET_FIRST_RESULT_PARAMETER = "setFirstResult";
+    private static final String SET_MAX_RESULTS_PARAMETER = "setMaxResults";
 
-	public AuditEventRecordProvider(Component component, String auditEventQuery, Map<String, Object> parameters ){
-		super(component);
-		this.auditEventQuery = auditEventQuery;
-		this.parameters = parameters;
+    private static final String DOT_CLASS = AuditEventRecordProvider.class.getName() + ".";
+    private static final String OPERATION_COUNT_OBJECTS = DOT_CLASS + "countObjects";
+    private static final String OPERATION_SEARCH_OBJECTS = DOT_CLASS + "searchObjects";
 
-		initModel();
-	}
+//    private static final String TIMESTAMP_VALUE_NAME = "aer.timestamp";
 
-
-	private void initModel(){
-		model = new IModel<List<AuditEventRecordType>>() {
-			@Override
-			public List<AuditEventRecordType> getObject() {
-				return listRecords(auditEventQuery, true);
-			}
-
-			@Override
-			public void detach() {
-
-			}
-
-			@Override
-			public void setObject(List<AuditEventRecordType> object) {
-				// TODO Auto-generated method stub
-
-			}
-		};
-	}
-
-	@Override
-	public Iterator<AuditEventRecordType> internalIterator(long first, long count) {
-		saveCurrentPage(first, count);
-		List<AuditEventRecordType> recordsList = listRecords(auditEventQuery, true, first, count);
-		return recordsList.iterator();
-	}
-
-
-	protected int internalSize() {
- 		String query = generateFullQuery(AUDIT_RECORDS_QUERY_COUNT + auditEventQuery, false, true);
-		long count;
-		try {
-			Task task = getPage().createSimpleTask("internalSize");
-			count = getAuditService().countObjects(query, parameters, task, task.getResult());
-		} catch (SecurityViolationException | SchemaException | ObjectNotFoundException | ExpressionEvaluationException | CommunicationException | ConfigurationException e) {
-			// TODO: proper error handling (MID-3536)
-			throw new SystemException(e.getMessage(), e);
-		}
-
-		return ((Long)count).intValue();
- 	}
-
-
-
-	private List<AuditEventRecordType> listRecords(String query, boolean orderBy){
-        return listRecords(query, orderBy, 0, getPage().getItemsPerPage(UserProfileStorage.TableId.PAGE_AUDIT_LOG_VIEWER));
+    public AuditEventRecordProvider(Component component, @Nullable IModel<ObjectCollectionType> objectCollectionModel, @NotNull SerializableSupplier<Map<String, Object>> parametersSupplier) {
+        super(component);
+        this.objectCollectionModel = objectCollectionModel;
+        this.parametersSupplier = parametersSupplier;
     }
 
-	private List<AuditEventRecordType> listRecords(String query, boolean orderBy, long first, long count){
-		String parameterQuery = generateFullQuery(query, orderBy, false);
+    @Override
+    public Iterator<AuditEventRecordType> internalIterator(long first, long count) {
+        saveCurrentPage(first, count);
+        List<AuditEventRecordType> recordsList = listRecords(true, first, count);
+        return recordsList.iterator();
+    }
 
-        if (parameters.containsKey(SET_FIRST_RESULT_PARAMETER)){
-            parameters.remove(SET_FIRST_RESULT_PARAMETER);
+    protected int internalSize() {
+        String query;
+        String origQuery;
+        Map<String, Object> parameters = new HashMap<String, Object>();
+        origQuery = DashboardUtils.createQuery(getCollectionForQuery(), parameters, false, getPage().getClock());
+        if(StringUtils.isNotBlank(origQuery)) {
+            query = generateFullQuery(origQuery, false, true);
+        } else {
+            parameters = parametersSupplier.get();
+            query = generateFullQuery(parameters, false, true);
         }
-        parameters.put(SET_FIRST_RESULT_PARAMETER, ((Long) first).intValue());
-        if (parameters.containsKey(SET_MAX_RESULTS_PARAMETER)){
-            parameters.remove(SET_MAX_RESULTS_PARAMETER);
+        int count = 0;
+        Task task = getPage().createSimpleTask(OPERATION_COUNT_OBJECTS);
+        OperationResult result = task.getResult();
+        try {
+            count = (int) getAuditService().countObjects(query, parameters, task, result);
+        } catch (Exception e) {
+            result.recordFatalError(
+                    getPage().createStringResource("AuditEventRecordProvider.message.internalSize.fatalError", e.getMessage()).getString(), e);
+            LoggingUtils.logException(LOGGER, "Cannot count audit records: " + e.getMessage(), e);
         }
-        parameters.put(SET_MAX_RESULTS_PARAMETER, ((Long) count).intValue());
 
+        result.computeStatusIfUnknown();
+        getPage().showResult(result, false);
+        return count;
+     }
 
-        List<AuditEventRecord> auditRecords;
-		try {
-			Task task = getPage().createSimpleTask("listRecords");
-			auditRecords = getAuditService().listRecords(parameterQuery, parameters,
-					task, task.getResult());
-		} catch (SecurityViolationException | SchemaException | ObjectNotFoundException | ExpressionEvaluationException | CommunicationException | ConfigurationException e) {
-			// TODO: proper error handling (MID-3536)
-			throw new SystemException(e.getMessage(), e);
-		}
-		if (auditRecords == null){
-			auditRecords = new ArrayList<>();
-		}
-		List<AuditEventRecordType> auditRecordList = new ArrayList<>();
-		for (AuditEventRecord record : auditRecords){
-			auditRecordList.add(record.createAuditEventRecordType());
-		}
+    private List<AuditEventRecordType> listRecords(boolean ordered, long first, long count) {
+        String query;
+        String origQuery;
+        Map<String, Object> parameters = new HashMap<String, Object>();
+        origQuery = DashboardUtils.createQuery(getCollectionForQuery(), parameters, false, getPage().getClock());
+        if(StringUtils.isNotBlank(origQuery)) {
+            query = generateFullQuery(origQuery, ordered, false);
+        } else {
+            parameters = parametersSupplier.get();
+            query = generateFullQuery(parameters, ordered, false);
+        }
 
-		return auditRecordList;
-	}
+        parameters.put(SET_FIRST_RESULT_PARAMETER, (int) first);
+        parameters.put(SET_MAX_RESULTS_PARAMETER, (int) count);
 
-	public String getAuditEventQuery() {
-		return auditEventQuery;
-	}
+        List<AuditEventRecord> auditRecords = null;
+        Task task = getPage().createSimpleTask(OPERATION_SEARCH_OBJECTS);
+        OperationResult result = task.getResult();
+        try {
+            auditRecords = getAuditService().listRecords(query, parameters, task, result);
+        } catch (Exception e) {
+            result.recordFatalError(
+                    getPage().createStringResource("AuditEventRecordProvider.message.listRecords.fatalError", e.getMessage()).getString(), e);
+            LoggingUtils.logException(LOGGER, "Cannot search audit records: " + e.getMessage(), e);
+        }
+        if (auditRecords == null) {
+            auditRecords = new ArrayList<>();
+        }
+        List<AuditEventRecordType> auditRecordList = new ArrayList<>();
+        for (AuditEventRecord record : auditRecords){
+            auditRecordList.add(record.createAuditEventRecordType());
+        }
 
-	public void setAuditEventQuery(String auditEventQuery) {
-		this.auditEventQuery = auditEventQuery;
-	}
+        result.computeStatusIfUnknown();
+        getPage().showResult(result, false);
+        return auditRecordList;
+    }
 
-	private String generateFullQuery(String query, boolean orderBy, boolean isCount){
-		parameters = getParameters();
-		String valueRefFrom = constraintsValueRef(parameters) ? " left outer join aer.referenceValues as rv " : "";
-		if (parameters.get("changedItem") != null) {
-			if (isCount) {
-				query = "select count(*) from RAuditEventRecord as aer right join aer.changedItems as item " + valueRefFrom + " where 1=1 and ";
-			} else {
-				query = "from RAuditEventRecord as aer right join aer.changedItems as item " + valueRefFrom + " where 1=1 and ";
-			}
-//			query += "INNER JOIN aer.changedItems as item on item.record_id = aer.id WHERE 1=1 and  "
-//					+ "(item.changedItemPath = :changedItem) and ";
-			query += "(item.changedItemPath = :changedItem) and ";
+    @SuppressWarnings("unused")
+    @Nullable
+    public ObjectCollectionType getCollectionForQuery() {
+        if(objectCollectionModel == null) {
+            return null;
+        }
+        return objectCollectionModel.getObject();
+    }
 
-		} else {
-            parameters.remove("changedItem");
-//            query += "where 1=1 and ";
-		}
+    private String generateFullQuery(Map<String, Object> parameters, boolean ordered, boolean isCount) {
+        boolean filteredOnChangedItem = parameters.get(PARAMETER_CHANGED_ITEM) != null;
+        boolean filteredOnValueRefTargetNames = filteredOnValueRefTargetNames(parameters);
+        List<String> conditions = new ArrayList<>();
+        if (parameters.get(PARAMETER_FROM) != null) {
+            conditions.add("aer.timestampValue >= :from");
+        } else {
+            parameters.remove(PARAMETER_FROM);
+        }
+        if (parameters.get(PARAMETER_TO) != null) {
+            conditions.add("aer.timestampValue <= :to");
+        } else {
+            parameters.remove(PARAMETER_TO);
+        }
+        if (parameters.get(PARAMETER_EVENT_TYPE) != null) {
+            conditions.add("aer.eventType = :eventType");
+        } else {
+            parameters.remove(PARAMETER_EVENT_TYPE);
+        }
+        if (parameters.get(PARAMETER_EVENT_STAGE) != null) {
+            conditions.add("aer.eventStage = :eventStage");
+        } else {
+            parameters.remove(PARAMETER_EVENT_STAGE);
+        }
+        Object outcomeValue = parameters.get(PARAMETER_OUTCOME);
+        if (outcomeValue != null) {
+            if (outcomeValue != OperationResultStatusType.UNKNOWN) {
+                conditions.add("aer.outcome = :outcome");
+            } else {
+                // this is a bit questionable; but let us do it in this way to ensure compliance with GUI (null is shown as UNKNOWN)
+                // see MID-3903
+                conditions.add("(aer.outcome = :outcome or aer.outcome is null)");
+            }
+        } else {
+            parameters.remove(PARAMETER_OUTCOME);
+        }
+        if (parameters.get(PARAMETER_INITIATOR_NAME) != null) {
+            conditions.add("aer.initiatorOid = :initiatorName");
+        } else {
+            parameters.remove(PARAMETER_INITIATOR_NAME);
+        }
+        if (parameters.get(PARAMETER_CHANNEL) != null) {
+            conditions.add("aer.channel = :channel");
+        } else {
+            parameters.remove(PARAMETER_CHANNEL);
+        }
+        if (parameters.get(PARAMETER_HOST_IDENTIFIER) != null) {
+            conditions.add("aer.hostIdentifier = :hostIdentifier");
+        } else {
+            parameters.remove(PARAMETER_HOST_IDENTIFIER);
+        }
+        if (parameters.get(PARAMETER_REQUEST_IDENTIFIER) != null) {
+            conditions.add("aer.requestIdentifier = :requestIdentifier");
+        } else {
+            parameters.remove(PARAMETER_REQUEST_IDENTIFIER);
+        }
+        if (parameters.get(PARAMETER_TARGET_OWNER_NAME) != null) {
+            conditions.add("aer.targetOwnerOid = :targetOwnerName");
+        } else {
+            parameters.remove(PARAMETER_TARGET_OWNER_NAME);
+        }
+        if (parameters.get(PARAMETER_TARGET_NAMES) != null) {
+            conditions.add("aer.targetOid in ( :targetNames )");
+        } else {
+            parameters.remove(PARAMETER_TARGET_NAMES);
+        }
+        if (parameters.get(PARAMETER_TASK_IDENTIFIER) != null) {
+            conditions.add("aer.taskIdentifier = :taskIdentifier");
+        } else {
+            parameters.remove(PARAMETER_TASK_IDENTIFIER);
+        }
+        if (filteredOnChangedItem) {
+            conditions.add("item.changedItemPath = :changedItem");
+        } else {
+            parameters.remove(PARAMETER_CHANGED_ITEM);
+        }
+        if (filteredOnValueRefTargetNames) {
+            conditions.add("rv.targetName_orig in ( :valueRefTargetNames )");
+        } else {
+            parameters.remove(PARAMETER_VALUE_REF_TARGET_NAMES);
+        }
+        ObjectCollectionType collection = getCollectionForQuery();
+        String query = "";
+        if (collection == null || collection.getAuditSearch() == null
+                || collection.getAuditSearch().getRecordQuery() == null) {
+            query = AUDIT_RECORDS_QUERY_CORE;
+            if (filteredOnChangedItem) {
+                query += AUDIT_RECORDS_QUERY_ITEMS_CHANGED;
+            }
+            if (filteredOnValueRefTargetNames) {
+                query += AUDIT_RECORDS_QUERY_REF_VALUES;
+            }
+            if (!conditions.isEmpty()) {
+                query += " where ";
+            }
+        } else {
+            query = collection.getAuditSearch().getRecordQuery();
+        }
+        if (isCount) {
+            query = AUDIT_RECORDS_QUERY_COUNT + query;
+        } else {
+            query = AUDIT_RECORDS_QUERY_SELECT + query;
+        }
+        query += conditions.stream().collect(Collectors.joining(" and "));
+        if (ordered) {
+            query += AUDIT_RECORDS_ORDER_BY;
+        }
+        return query;
+    }
 
-		if (parameters.get("from") != null) {
-			query += "(aer.timestamp >= :from) and ";
-		} else {
-            parameters.remove("from");
-		}
-		if (parameters.get("to") != null) {
-			query += "(aer.timestamp <= :to) and ";
-		} else {
-            parameters.remove("to");
-		}
-		if (parameters.get("eventType") != null) {
-			query += "(aer.eventType = :eventType) and ";
-		} else {
-            parameters.remove("eventType");
-		}
-		if (parameters.get("eventStage") != null) {
-			query += "(aer.eventStage = :eventStage) and ";
-		} else {
-            parameters.remove("eventStage");
-		}
-		if (parameters.get("outcome") != null) {
-			query += "(aer.outcome = :outcome) and ";
-		} else {
-            parameters.remove("outcome");
-		}
-		if (parameters.get("initiatorName") != null) {
-			query += "(aer.initiatorOid = :initiatorName) and ";
-		} else {
-            parameters.remove("initiatorName");
-		}
-		if (parameters.get("channel") != null) {
-			query += "(aer.channel = :channel) and ";
-		} else {
-            parameters.remove("channel");
-		}
-		if (parameters.get("hostIdentifier") != null) {
-			query += "(aer.hostIdentifier = :hostIdentifier) and ";
-		} else {
-            parameters.remove("hostIdentifier");
-		}
-		if (parameters.get("targetOwnerName") != null) {
-			query += "(aer.targetOwnerOid = :targetOwnerName) and ";
-		} else {
-            parameters.remove("targetOwnerName");
-		}
-		if (parameters.get("targetNames") != null) {
-			query += "(aer.targetOid in ( :targetNames )) and ";
-		} else {
-            parameters.remove("targetNames");
-		}
-		if (parameters.get("taskIdentifier") != null) {
-			query += "(aer.taskIdentifier = :taskIdentifier) and ";
-		} else {
-            parameters.remove("taskIdentifier");
-		}
-		if (valueRefTargetIsNotEmpty(parameters.get(VALUE_REF_TARGET_NAMES_KEY))) {
-			query += "(rv.targetName.orig in ( :valueRefTargetNames )) and ";
-		} else {
-            parameters.remove(VALUE_REF_TARGET_NAMES_KEY);
-		}
+    private String generateFullQuery(String origQuery, boolean ordered, boolean isCount) {
+        String query = origQuery;
+        if (isCount) {
+            int index = query.toLowerCase().indexOf("from");
+            query = AUDIT_RECORDS_QUERY_COUNT + query.substring(index);
+        }
+        if (ordered) {
+            query += AUDIT_RECORDS_ORDER_BY;
+        }
+        return query;
+    }
 
-		query = query.substring(0, query.length()-5); // remove trailing " and "
-		if (orderBy){
-			query +=  AUDIT_RECORDS_ORDER_BY;
-		}
-		return query;
-	}
+    private boolean filteredOnValueRefTargetNames(Map<String, Object> parameters2) {
+        return valueRefTargetIsNotEmpty(parameters2.get(PARAMETER_VALUE_REF_TARGET_NAMES));
+    }
 
-	private boolean constraintsValueRef(Map<String, Object> parameters2) {
-		return valueRefTargetIsNotEmpty(parameters2.get(VALUE_REF_TARGET_NAMES_KEY));
-	}
+    private boolean valueRefTargetIsNotEmpty(Object valueRefTargetNamesParam) {
+        if (valueRefTargetNamesParam instanceof String) {
+            return StringUtils.isNotBlank((String)valueRefTargetNamesParam);
+        } else if (valueRefTargetNamesParam instanceof Collection) {
+            return CollectionUtils.isNotEmpty((Collection)valueRefTargetNamesParam);
+        } else {
+            return valueRefTargetNamesParam != null;
+        }
+    }
 
-	private boolean valueRefTargetIsNotEmpty(Object valueRefTargetNamesParam) {
-		if(valueRefTargetNamesParam instanceof String) {
-			return StringUtils.isNotBlank((String)valueRefTargetNamesParam);
-		} else if(valueRefTargetNamesParam instanceof Collection){
-			return CollectionUtils.isNotEmpty((Collection)valueRefTargetNamesParam);
-		} else {
-			return valueRefTargetNamesParam != null;
-		}
-	}
-
-	public Map<String, Object> getParameters() {
-		return parameters;
-	}
-
-	public void setParameters(Map<String, Object> parameters) {
-		this.parameters = parameters;
-	}
-
-	protected void saveCurrentPage(long from, long count){
-
-	}
-
+    protected void saveCurrentPage(long from, long count) {
+    }
 }

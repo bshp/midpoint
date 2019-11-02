@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql;
@@ -35,7 +26,6 @@ import com.evolveum.midpoint.prism.Objectable;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.PrismProperty;
 import com.evolveum.midpoint.prism.delta.ItemDelta;
-import com.evolveum.midpoint.prism.delta.ReferenceDelta;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.util.PrismTestUtil;
 import com.evolveum.midpoint.schema.MidPointPrismContextFactory;
@@ -111,16 +101,16 @@ public class ListAccountShadowOwnerTest extends BaseSQLRepoTest {
         assertNull("Account has owner and should not have (precondition)", accountOwnerOid);
 
         // WHEN (link account)
-        Collection<? extends ItemDelta> modifications = ReferenceDelta.createModificationAddCollection(UserType.class,
-                UserType.F_LINK_REF, prismContext, account);
+        Collection<? extends ItemDelta> modifications = prismContext.deltaFactory().reference().createModificationAddCollection(UserType.class,
+                UserType.F_LINK_REF, account);
         repositoryService.modifyObject(UserType.class, userOid, modifications, result);
         // THEN
         accountOwnerOid = repositoryService.listAccountShadowOwner(accountOid, result);
         assertEquals("listAccountShadowOwner returned wrong value", userOid, accountOwnerOid);
 
         // WHEN (unlink account)
-        modifications = ReferenceDelta.createModificationDeleteCollection(UserType.class, UserType.F_LINK_REF,
-                prismContext, account);
+        modifications = prismContext.deltaFactory().reference().createModificationDeleteCollection(UserType.class, UserType.F_LINK_REF,
+                account);
         repositoryService.modifyObject(UserType.class, userOid, modifications, result);
         // THEN
         accountOwnerOid = repositoryService.listAccountShadowOwner(accountOid, result);

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.server.handlers.dto;
@@ -36,31 +27,32 @@ import org.apache.wicket.Application;
  */
 public class ReportCreateHandlerDto extends HandlerDto {
 
-	public static final String F_REPORT_PARAMS = "reportParams";
-	public static final String F_REPORT_OUTPUT_OID = "reportOutputOid";
+    public static final String F_REPORT_PARAMS = "reportParams";
+    public static final String F_REPORT_OUTPUT_OID = "reportOutputOid";
 
-	public ReportCreateHandlerDto(TaskDto taskDto) {
-		super(taskDto);
-	}
+    public ReportCreateHandlerDto(TaskDto taskDto) {
+        super(taskDto);
+    }
 
-	public String getReportOutputOid() {
-		return taskDto.getExtensionPropertyRealValue(ReportConstants.REPORT_OUTPUT_OID_PROPERTY_NAME, String.class);
-	}
+    public String getReportOutputOid() {
+        return taskDto.getExtensionPropertyRealValue(ReportConstants.REPORT_OUTPUT_OID_PROPERTY_NAME, String.class);
+    }
 
-	public String getReportParams() {
-		PrismObject<TaskType> taskObject = taskDto.getTaskType().asPrismObject();
-		PrismContainer<ReportParameterType> container = taskObject.findContainer(new ItemPath(TaskType.F_EXTENSION, ReportConstants.REPORT_PARAMS_PROPERTY_NAME));
-		if (container == null || container.isEmpty()) {
-			return null;
-		}
-		PrismContainerValue<ReportParameterType> pcv = container.getValue();
-		PrismContext prismContext = ((MidPointApplication) Application.get()).getPrismContext();
-		try {
-			return WebXmlUtil.stripNamespaceDeclarations(
-					prismContext.xmlSerializer().serialize(pcv, ReportConstants.REPORT_PARAMS_PROPERTY_NAME));
-		} catch (SchemaException e) {
-			throw new SystemException("Couldn't serialize report parameters: " + e.getMessage(), e);
-		}
-	}
+    public String getReportParams() {
+        PrismObject<TaskType> taskObject = taskDto.getTaskType().asPrismObject();
+        PrismContainer<ReportParameterType> container = taskObject.findContainer(
+                ItemPath.create(TaskType.F_EXTENSION, ReportConstants.REPORT_PARAMS_PROPERTY_NAME));
+        if (container == null || container.isEmpty()) {
+            return null;
+        }
+        PrismContainerValue<ReportParameterType> pcv = container.getValue();
+        PrismContext prismContext = ((MidPointApplication) Application.get()).getPrismContext();
+        try {
+            return WebXmlUtil.stripNamespaceDeclarations(
+                    prismContext.xmlSerializer().serialize(pcv, ReportConstants.REPORT_PARAMS_PROPERTY_NAME));
+        } catch (SchemaException e) {
+            throw new SystemException("Couldn't serialize report parameters: " + e.getMessage(), e);
+        }
+    }
 
 }

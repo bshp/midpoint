@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2014 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql;
@@ -22,10 +13,7 @@ import static org.testng.AssertJUnit.assertNull;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.PrismObjectDefinition;
 import com.evolveum.midpoint.prism.PrismPropertyDefinition;
-import com.evolveum.midpoint.prism.delta.PropertyDelta;
-import com.evolveum.midpoint.prism.query.EqualFilter;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
-import com.evolveum.midpoint.prism.query.builder.QueryBuilder;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.prism.util.PrismAsserts;
 import com.evolveum.midpoint.prism.util.PrismTestUtil;
@@ -121,7 +109,7 @@ public class AddOverwriteTest extends BaseSQLRepoTest {
     private PrismObject getCarla(OperationResult opResult) throws Exception {
         final String CARLA_NAME = "carla";
         PrismObjectDefinition userObjectDef = prismContext.getSchemaRegistry().findObjectDefinitionByCompileTimeClass(UserType.class);
-        ObjectQuery query = QueryBuilder.queryFor(UserType.class, prismContext)
+        ObjectQuery query = prismContext.queryFor(UserType.class)
                 .item(UserType.F_NAME).eq(CARLA_NAME)
                 .build();
         List<PrismObject<UserType>> users = repositoryService.searchObjects(UserType.class, query, null, opResult);
@@ -151,7 +139,7 @@ public class AddOverwriteTest extends BaseSQLRepoTest {
 
         PrismObjectDefinition def = prismContext.getSchemaRegistry().findObjectDefinitionByCompileTimeClass(OrgType.class);
         Collection deltas = new ArrayList();
-        deltas.add(PropertyDelta.createAddDelta(def, OrgType.F_ORG_TYPE, "asdf"));
+        deltas.add(prismContext.deltaFactory().property().createAddDelta(def, OrgType.F_ORG_TYPE, "asdf"));
         repositoryService.modifyObject(OrgType.class, ORG_OID, deltas, result);
 
         version = repositoryService.getVersion(OrgType.class, ORG_OID, result);
@@ -163,7 +151,7 @@ public class AddOverwriteTest extends BaseSQLRepoTest {
 
     @Test
     public void addWithOverwriteResource() throws Exception {
-    	// GIVEN
+        // GIVEN
 
         SchemaRegistry reg= prismContext.getSchemaRegistry();
         PrismPropertyDefinition def = reg.findPropertyDefinitionByElementName(CapabilitiesType.F_NATIVE);

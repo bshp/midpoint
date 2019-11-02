@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2014 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.wizard.resource.component.schemahandling;
@@ -45,7 +36,6 @@ import org.apache.wicket.markup.html.form.DropDownChoice;
 import org.apache.wicket.markup.html.form.EnumChoiceRenderer;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.TextField;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
@@ -81,7 +71,7 @@ public class ResourceCredentialsEditor extends BasePanel<ResourceCredentialsDefi
 
     public ResourceCredentialsEditor(String id, IModel<ResourceCredentialsDefinitionType> model, PageResourceWizard parentPage) {
         super(id, model);
-		initLayout(parentPage);
+        initLayout(parentPage);
     }
 
     @Override
@@ -101,23 +91,23 @@ public class ResourceCredentialsEditor extends BasePanel<ResourceCredentialsDefi
 
     protected void initLayout(final PageResourceWizard parentPage) {
         DropDownChoice fetchStrategy = new DropDownChoice<>(ID_FETCH_STRATEGY,
-                new PropertyModel<AttributeFetchStrategyType>(getModel(), "password.fetchStrategy"),
+            new PropertyModel<>(getModel(), "password.fetchStrategy"),
                 WebComponentUtil.createReadonlyModelFromEnum(AttributeFetchStrategyType.class),
-                new EnumChoiceRenderer<AttributeFetchStrategyType>(this));
-		parentPage.addEditingEnabledBehavior(fetchStrategy);
+            new EnumChoiceRenderer<>(this));
+        parentPage.addEditingEnabledBehavior(fetchStrategy);
         add(fetchStrategy);
 
-		VisibleEnableBehaviour showIfEditingOrOutboundExists = new VisibleEnableBehaviour() {
-			@Override
-			public boolean isVisible() {
-				ResourceCredentialsDefinitionType credentials = getModel().getObject();
-				if (credentials == null || credentials.getPassword() == null) {
-					return !parentPage.isReadOnly();
-				}
-				return !parentPage.isReadOnly() || credentials.getPassword().getOutbound() != null;
-			}
-		};
-        TextField outboundLabel = new TextField<>(ID_OUTBOUND_LABEL, new AbstractReadOnlyModel<String>() {
+        VisibleEnableBehaviour showIfEditingOrOutboundExists = new VisibleEnableBehaviour() {
+            @Override
+            public boolean isVisible() {
+                ResourceCredentialsDefinitionType credentials = getModel().getObject();
+                if (credentials == null || credentials.getPassword() == null) {
+                    return !parentPage.isReadOnly();
+                }
+                return !parentPage.isReadOnly() || credentials.getPassword().getOutbound() != null;
+            }
+        };
+        TextField outboundLabel = new TextField<>(ID_OUTBOUND_LABEL, new IModel<String>() {
 
             @Override
             public String getObject() {
@@ -130,7 +120,7 @@ public class ResourceCredentialsEditor extends BasePanel<ResourceCredentialsDefi
                 MappingType outbound = null;
                 List<MappingType> outbounds = credentials.getPassword().getOutbound();
                 if (!outbounds.isEmpty()) {
-                	outbound = outbounds.get(0);
+                    outbound = outbounds.get(0);
                 }
                 return MappingTypeDto.createMappingLabel(outbound, LOGGER, getPageBase().getPrismContext(),
                         getString("MappingType.label.placeholder"), getString("MultiValueField.nameNotSpecified"));
@@ -138,22 +128,22 @@ public class ResourceCredentialsEditor extends BasePanel<ResourceCredentialsDefi
         });
         outboundLabel.setEnabled(false);
         outboundLabel.setOutputMarkupId(true);
-		outboundLabel.add(showIfEditingOrOutboundExists);
+        outboundLabel.add(showIfEditingOrOutboundExists);
         add(outboundLabel);
 
         AjaxSubmitLink outbound = new AjaxSubmitLink(ID_OUTBOUND_BUTTON) {
 
             @Override
-            protected void onSubmit(AjaxRequestTarget target, Form<?> form) {
+            protected void onSubmit(AjaxRequestTarget target) {
                 outboundEditPerformed(target);
             }
         };
         outbound.setOutputMarkupId(true);
-		outbound.add(showIfEditingOrOutboundExists);
+        outbound.add(showIfEditingOrOutboundExists);
         add(outbound);
 
         MultiValueTextEditPanel inbound = new MultiValueTextEditPanel<MappingType>(ID_INBOUND,
-                new PropertyModel<List<MappingType>>(getModel(), "password.inbound"), null, false, true, parentPage.getReadOnlyModel()) {
+            new PropertyModel<>(getModel(), "password.inbound"), null, false, true, parentPage.getReadOnlyModel()) {
 
             @Override
             protected IModel<String> createTextModel(final IModel<MappingType> model) {
@@ -181,16 +171,16 @@ public class ResourceCredentialsEditor extends BasePanel<ResourceCredentialsDefi
         add(inbound);
 
         DropDownChoice passwordPolicy = new DropDownChoice<>(ID_PASS_POLICY,
-                new PropertyModel<ObjectReferenceType>(getModel(), "password.passwordPolicyRef"),
-                new AbstractReadOnlyModel<List<ObjectReferenceType>>() {
+            new PropertyModel<>(getModel(), "password.passwordPolicyRef"),
+                new IModel<List<ObjectReferenceType>>() {
 
                     @Override
                     public List<ObjectReferenceType> getObject() {
-                    	return WebModelServiceUtils.createObjectReferenceList(ValuePolicyType.class, getPageBase(), passPolicyMap);
+                        return WebModelServiceUtils.createObjectReferenceList(ValuePolicyType.class, getPageBase(), passPolicyMap);
 
                     }
                 }, new ObjectReferenceChoiceRenderer(passPolicyMap));
-		parentPage.addEditingEnabledBehavior(passwordPolicy);
+        parentPage.addEditingEnabledBehavior(passwordPolicy);
         add(passwordPolicy);
 
         Label fetchTooltip = new Label(ID_T_FETCH);
@@ -240,10 +230,10 @@ public class ResourceCredentialsEditor extends BasePanel<ResourceCredentialsDefi
         List<ObjectReferenceType> references = new ArrayList<>();
 
         try{
-            policies = getPageBase().getModelService().searchObjects(ValuePolicyType.class, new ObjectQuery(), null, task, result);
+            policies = getPageBase().getModelService().searchObjects(ValuePolicyType.class, null, null, task, result);
             result.recomputeStatus();
         } catch (CommonException |RuntimeException e) {
-            result.recordFatalError("Couldn't load password policies.", e);
+            result.recordFatalError(getString("ResourceCredentialsEditor.message.createPasswordPolicyList.fatalError"), e);
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't load password policies", e);
         }
 

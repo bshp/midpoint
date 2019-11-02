@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.form.multivalue;
@@ -34,8 +25,8 @@ import org.apache.wicket.markup.html.form.TextField;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
+import org.apache.wicket.model.util.ListModel;
 
 import java.io.Serializable;
 import java.util.Iterator;
@@ -49,7 +40,8 @@ import java.util.List;
  *
  *  @author shood
  * */
-public class GenericMultiValueLabelEditPanel <T extends Serializable> extends BasePanel<List<T>> {
+public class GenericMultiValueLabelEditPanel<T extends Serializable> extends BasePanel<List<T>> { //BasePanel<List<T>> {
+    private static final long serialVersionUID = 1L;
 
     private static final Trace LOGGER = TraceManager.getTrace(GenericMultiValueLabelEditPanel.class);
 
@@ -70,6 +62,9 @@ public class GenericMultiValueLabelEditPanel <T extends Serializable> extends Ba
     private static final String CLASS_MULTI_VALUE = "multivalue-form";
 
     private boolean isMultiple;
+    private IModel<String> label;
+    private String labelSize;
+    private String textSize;
 
     public GenericMultiValueLabelEditPanel(String id, IModel<List<T>> value, IModel<String> label,
                                            String labelSize, String textSize, boolean isMultiple){
@@ -77,10 +72,14 @@ public class GenericMultiValueLabelEditPanel <T extends Serializable> extends Ba
         this.isMultiple = isMultiple;
         setOutputMarkupId(true);
 
-        initLayout(label, labelSize, textSize);
+        this.label = label;
+        this.labelSize = labelSize;
+        this.textSize = textSize;
     }
 
-    private void initLayout(final IModel<String> label, final String labelSize, final String textSize){
+    @Override
+    protected void onInitialize() {
+        super.onInitialize();
 
         Label l = new Label(ID_LABEL, label);
         l.setVisible(getLabelVisibility());
@@ -93,6 +92,7 @@ public class GenericMultiValueLabelEditPanel <T extends Serializable> extends Ba
         addFirstContainer.setOutputMarkupId(true);
         addFirstContainer.setOutputMarkupPlaceholderTag(true);
         addFirstContainer.add(new VisibleEnableBehaviour(){
+            private static final long serialVersionUID = 1L;
 
             @Override
             public boolean isVisible() {
@@ -101,7 +101,8 @@ public class GenericMultiValueLabelEditPanel <T extends Serializable> extends Ba
         });
         add(addFirstContainer);
 
-        AjaxLink addFirst = new AjaxLink(ID_ADD_FIRST) {
+        AjaxLink<Void> addFirst = new AjaxLink<Void>(ID_ADD_FIRST) {
+            private static final long serialVersionUID = 1L;
 
             @Override
             public void onClick(AjaxRequestTarget target) {
@@ -111,11 +112,12 @@ public class GenericMultiValueLabelEditPanel <T extends Serializable> extends Ba
         addFirstContainer.add(addFirst);
 
         ListView repeater = new ListView<T>(ID_REPEATER, getModel()) {
+            private static final long serialVersionUID = 1L;
 
             @Override
             protected void populateItem(final ListItem<T> listItem) {
                 WebMarkupContainer textWrapper = new WebMarkupContainer(ID_TEXT_WRAPPER);
-                textWrapper.add(AttributeAppender.prepend("class", new AbstractReadOnlyModel<String>() {
+                textWrapper.add(AttributeAppender.prepend("class", new IModel<String>() {
 
                     @Override
                     public String getObject() {
@@ -134,6 +136,7 @@ public class GenericMultiValueLabelEditPanel <T extends Serializable> extends Ba
 
                 TextField text = new TextField<>(ID_TEXT, createTextModel(listItem.getModel()));
                 text.add(new AjaxFormComponentUpdatingBehavior("blur") {
+                    private static final long serialVersionUID = 1L;
                     @Override
                     protected void onUpdate(AjaxRequestTarget ajaxRequestTarget) {}
                 });
@@ -146,7 +149,7 @@ public class GenericMultiValueLabelEditPanel <T extends Serializable> extends Ba
                 textWrapper.add(feedback);
 
                 WebMarkupContainer buttonGroup = new WebMarkupContainer(ID_BUTTON_GROUP);
-                buttonGroup.add(AttributeAppender.append("class", new AbstractReadOnlyModel<String>() {
+                buttonGroup.add(AttributeAppender.append("class", new IModel<String>() {
 
                     @Override
                     public String getObject() {
@@ -158,13 +161,22 @@ public class GenericMultiValueLabelEditPanel <T extends Serializable> extends Ba
                     }
                 }));
 
-                AjaxLink edit = new AjaxLink(ID_EDIT) {
+                AjaxLink<Void> edit = new AjaxLink<Void>(ID_EDIT) {
+                    private static final long serialVersionUID = 1L;
 
                     @Override
                     public void onClick(AjaxRequestTarget target) {
                         editValuePerformed(target, listItem.getModel());
                     }
                 };
+                edit.add(new VisibleEnableBehaviour(){
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public boolean isEnabled(){
+                        return GenericMultiValueLabelEditPanel.this.isEditButtonEnabled();
+                    }
+                });
                 textWrapper.add(edit);
 
                 listItem.add(buttonGroup);
@@ -190,30 +202,26 @@ public class GenericMultiValueLabelEditPanel <T extends Serializable> extends Ba
 
     protected IModel<String> createTextModel(final IModel<T> model) {
         return new IModel<String>() {
+            private static final long serialVersionUID = 1L;
             @Override
             public String getObject() {
                 T obj = model.getObject();
                 return obj != null ? obj.toString() : null;
             }
-
-            @Override
-            public void setObject(String object) {}
-
-            @Override
-            public void detach() {
-            }
         };
     }
 
     private void initButtons(WebMarkupContainer buttonGroup, final ListItem<T> item) {
-        AjaxLink add = new AjaxLink(ID_ADD) {
+         AjaxLink<Void> add = new AjaxLink<Void>(ID_ADD) {
+             private static final long serialVersionUID = 1L;
 
-            @Override
-            public void onClick(AjaxRequestTarget target) {
-                addValuePerformed(target);
-            }
-        };
+             @Override
+             public void onClick(AjaxRequestTarget target) {
+                 addValuePerformed(target);
+             }
+         };
         add.add(new VisibleEnableBehaviour() {
+            private static final long serialVersionUID = 1L;
 
             @Override
             public boolean isVisible() {
@@ -222,7 +230,8 @@ public class GenericMultiValueLabelEditPanel <T extends Serializable> extends Ba
         });
         buttonGroup.add(add);
 
-        AjaxLink remove = new AjaxLink(ID_REMOVE) {
+        AjaxLink<Void> remove = new AjaxLink<Void>(ID_REMOVE) {
+            private static final long serialVersionUID = 1L;
 
             @Override
             public void onClick(AjaxRequestTarget target) {
@@ -318,4 +327,7 @@ public class GenericMultiValueLabelEditPanel <T extends Serializable> extends Ba
         return true;
     }
 
+    protected boolean isEditButtonEnabled(){
+        return true;
+    }
 }

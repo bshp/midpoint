@@ -1,26 +1,15 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component;
 
 import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
-import com.evolveum.midpoint.web.page.admin.configuration.component.EmptyOnBlurAjaxFormUpdatingBehaviour;
 import com.evolveum.midpoint.web.page.admin.configuration.component.EmptyOnChangeAjaxFormUpdatingBehavior;
 import org.apache.wicket.ajax.AjaxRequestTarget;
-import org.apache.wicket.ajax.form.AjaxFormSubmitBehavior;
 import org.apache.wicket.datetime.markup.html.form.DateTextField;
 import org.apache.wicket.extensions.yui.calendar.DateTimeField;
 import org.apache.wicket.markup.html.form.DropDownChoice;
@@ -33,6 +22,7 @@ import org.joda.time.MutableDateTime;
 
 import java.util.Calendar;
 import java.util.Date;
+import java.util.GregorianCalendar;
 
 /**
  * @author lazyman
@@ -64,6 +54,29 @@ public class DateInput extends DateTimeField {
         });
         return dateField;
 
+    }
+
+    @Override
+    public void convertInput() {
+        super.convertInput();
+        Date convertedDate = getConvertedInput();
+        Date modelDate = getModelObject();
+        if (convertedDate == null || modelDate == null){
+            return;
+        }
+
+        GregorianCalendar gregorianCalendar = new GregorianCalendar();
+        gregorianCalendar.setTimeInMillis(modelDate.getTime());
+
+        //set seconds and milliseconds only in case when the date input value wasn't changed
+        if (gregorianCalendar.get(13) > 0 || gregorianCalendar.get(14) > 0){
+            GregorianCalendar convertedCalendar = new GregorianCalendar();
+            convertedCalendar.setTimeInMillis(convertedDate.getTime());
+
+            convertedCalendar.set(13, gregorianCalendar.get(13));
+            convertedCalendar.set(14, gregorianCalendar.get(14));
+            setConvertedInput(convertedCalendar.getTime());
+        }
     }
 
     @Override

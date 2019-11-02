@@ -1,25 +1,14 @@
 /*
- * Copyright (c) 2010-2014 Evolveum
+ * Copyright (c) 2010-2014 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.closure;
 
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.delta.ItemDelta;
-import com.evolveum.midpoint.prism.delta.ReferenceDelta;
-import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.util.exception.ObjectAlreadyExistsException;
 import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
@@ -98,12 +87,12 @@ public class OrgClosureConcurrencyTest extends AbstractOrgClosureTest {
         return configuration;
     }
 
-    @Test(enabled = true) public void test100LoadOrgStructure() throws Exception { _test100LoadOrgStructure(); }
-    @Test(enabled = true) public void test150CheckClosure() throws Exception { _test150CheckClosure(); }
-    @Test(enabled = true) public void test200AddRemoveLinksSeq() throws Exception { _test200AddRemoveLinksMT(false); }
-    @Test(enabled = true) public void test201AddRemoveLinksRandom() throws Exception { _test200AddRemoveLinksMT(true); }
-    @Test(enabled = true) public void test300AddRemoveNodesSeq() throws Exception { _test300AddRemoveNodesMT(false); }
-    @Test(enabled = true) public void test301AddRemoveNodesRandom() throws Exception { _test300AddRemoveNodesMT(true); }
+    @Test public void test100LoadOrgStructure() throws Exception { _test100LoadOrgStructure(); }
+    @Test public void test150CheckClosure() throws Exception { _test150CheckClosure(); }
+    @Test public void test200AddRemoveLinksSeq() throws Exception { _test200AddRemoveLinksMT(false); }
+    @Test public void test201AddRemoveLinksRandom() throws Exception { _test200AddRemoveLinksMT(true); }
+    @Test public void test300AddRemoveNodesSeq() throws Exception { _test300AddRemoveNodesMT(false); }
+    @Test public void test301AddRemoveNodesRandom() throws Exception { _test300AddRemoveNodesMT(true); }
 
     /**
      * We randomly select a set of links to be removed.
@@ -283,7 +272,8 @@ public class OrgClosureConcurrencyTest extends AbstractOrgClosureTest {
         ObjectReferenceType parentOrgRef = new ObjectReferenceType();
         parentOrgRef.setType(OrgType.COMPLEX_TYPE);
         parentOrgRef.setOid(edge.getAncestor());
-        ItemDelta removeParent = ReferenceDelta.createModificationDelete(OrgType.class, OrgType.F_PARENT_ORG_REF, prismContext, parentOrgRef.asReferenceValue());
+        ItemDelta removeParent = prismContext.deltaFactory().reference()
+                .createModificationDelete(OrgType.class, OrgType.F_PARENT_ORG_REF, parentOrgRef.asReferenceValue());
         modifications.add(removeParent);
         repositoryService.modifyObject(OrgType.class, edge.getDescendant(), modifications, new OperationResult("dummy"));
         synchronized(this) {
@@ -296,7 +286,8 @@ public class OrgClosureConcurrencyTest extends AbstractOrgClosureTest {
         ObjectReferenceType parentOrgRef = new ObjectReferenceType();
         parentOrgRef.setType(OrgType.COMPLEX_TYPE);
         parentOrgRef.setOid(edge.getAncestor());
-        ItemDelta itemDelta = ReferenceDelta.createModificationAdd(OrgType.class, OrgType.F_PARENT_ORG_REF, prismContext, parentOrgRef.asReferenceValue());
+        ItemDelta itemDelta = prismContext.deltaFactory().reference().createModificationAdd(OrgType.class, OrgType.F_PARENT_ORG_REF,
+                parentOrgRef.asReferenceValue());
         modifications.add(itemDelta);
         repositoryService.modifyObject(OrgType.class, edge.getDescendant(), modifications, new OperationResult("dummy"));
         synchronized(this) {
@@ -434,10 +425,10 @@ public class OrgClosureConcurrencyTest extends AbstractOrgClosureTest {
     private void rebuildGraph() {
         OperationResult result = new OperationResult("dummy");
         info("Graph before rebuilding: " + orgGraph.vertexSet().size() + " vertices, " + orgGraph.edgeSet().size() + " edges");
-        orgGraph.removeAllVertices(new HashSet<String>(orgGraph.vertexSet()));
+        orgGraph.removeAllVertices(new HashSet<>(orgGraph.vertexSet()));
         List<PrismObject> objects = null;
         try {
-            objects = (List) repositoryService.searchObjects(OrgType.class, new ObjectQuery(), null, result);
+            objects = (List) repositoryService.searchObjects(OrgType.class, null, null, result);
         } catch (SchemaException e) {
             throw new AssertionError(e);
         }

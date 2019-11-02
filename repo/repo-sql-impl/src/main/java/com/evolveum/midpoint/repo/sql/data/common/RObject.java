@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.data.common;
@@ -34,10 +25,12 @@ import com.evolveum.midpoint.repo.sql.data.common.container.ROperationExecution;
 import com.evolveum.midpoint.repo.sql.data.common.container.RTrigger;
 import com.evolveum.midpoint.repo.sql.data.common.embedded.REmbeddedReference;
 import com.evolveum.midpoint.repo.sql.data.common.embedded.RPolyString;
+import com.evolveum.midpoint.repo.sql.data.common.other.RAssignmentOwner;
 import com.evolveum.midpoint.repo.sql.data.common.other.RObjectType;
 import com.evolveum.midpoint.repo.sql.data.common.other.RReferenceOwner;
 import com.evolveum.midpoint.repo.sql.data.common.type.RObjectExtensionType;
 import com.evolveum.midpoint.repo.sql.data.factory.MetadataFactory;
+import com.evolveum.midpoint.repo.sql.helpers.modify.DeltaUpdaterUtils;
 import com.evolveum.midpoint.repo.sql.query.definition.JaxbName;
 import com.evolveum.midpoint.repo.sql.query.definition.JaxbPath;
 import com.evolveum.midpoint.repo.sql.query2.definition.IdQueryProperty;
@@ -52,54 +45,46 @@ import com.evolveum.midpoint.repo.sql.util.MidPointJoinedPersister;
 import com.evolveum.midpoint.repo.sql.util.RUtil;
 import com.evolveum.midpoint.schema.GetOperationOptions;
 import com.evolveum.midpoint.schema.SelectorOptions;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.OperationExecutionType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.TriggerType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.Validate;
 import org.hibernate.annotations.*;
+import org.hibernate.annotations.ForeignKey;
+import org.hibernate.annotations.NamedQueries;
+import org.hibernate.annotations.NamedQuery;
 
-import javax.persistence.Column;
-import javax.persistence.Embedded;
+import javax.persistence.*;
 import javax.persistence.Entity;
-import javax.persistence.Enumerated;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
 import javax.persistence.Index;
-import javax.persistence.Inheritance;
-import javax.persistence.InheritanceType;
-import javax.persistence.Lob;
-import javax.persistence.OneToMany;
 import javax.persistence.Table;
-import javax.persistence.Transient;
 import javax.xml.datatype.XMLGregorianCalendar;
 import java.io.Serializable;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+
+import static org.hibernate.annotations.CascadeType.*;
 
 /**
  * @author lazyman
  */
 @NamedQueries({
         @NamedQuery(name = "get.focusPhoto", query = "select p.photo from RFocusPhoto p where p.ownerOid = :oid"),
-        @NamedQuery(name = "get.object", query = "select o.oid, o.fullObject, o.stringsCount, o.longsCount, o.datesCount, o.referencesCount, o.polysCount, o.booleansCount from RObject as o where o.oid=:oid"),
+        @NamedQuery(name = "get.taskResult", query = "select t.fullResult from RTask t where t.oid = :oid"),
+        @NamedQuery(name = "get.taskStatus", query = "select t.status from RTask t where t.oid = :oid"),
+        @NamedQuery(name = "get.object", query = "select o.oid, o.fullObject, 0, 0, 0, 0, 0, 0 from RObject as o where o.oid=:oid"),
         @NamedQuery(name = "searchShadowOwner.getShadow", query = "select s.oid from RShadow as s where s.oid = :oid"),
-        @NamedQuery(name = "searchShadowOwner.getOwner", query = "select o.oid, o.fullObject, o.stringsCount, o.longsCount, o.datesCount, o.referencesCount, o.polysCount, o.booleansCount from RFocus as o left join o.linkRef as ref where ref.targetOid = :oid"),
-        @NamedQuery(name = "listAccountShadowOwner.getUser", query = "select u.oid, u.fullObject, u.stringsCount, u.longsCount, u.datesCount, u.referencesCount, u.polysCount, u.booleansCount from RUser as u left join u.linkRef as ref where ref.targetOid = :oid"),
-        @NamedQuery(name = "getExtCount", query = "select stringsCount, longsCount, datesCount, referencesCount, polysCount, booleansCount from RObject where oid = :oid"),
+        @NamedQuery(name = "searchShadowOwner.getOwner", query = "select o.oid, o.fullObject, 0, 0, 0, 0, 0, 0 from RFocus as o left join o.linkRef as ref where ref.targetOid = :oid"),
+        @NamedQuery(name = "listAccountShadowOwner.getUser", query = "select u.oid, u.fullObject, 0, 0, 0, 0, 0, 0 from RUser as u left join u.linkRef as ref where ref.targetOid = :oid"),
+//        @NamedQuery(name = "getExtCount", query = "select stringsCount, longsCount, datesCount, referencesCount, polysCount, booleansCount from RObject where oid = :oid"),
         @NamedQuery(name = "getVersion", query = "select o.version from RObject as o where o.oid = :oid"),
         @NamedQuery(name = "existOrgClosure", query = "select count(*) from ROrgClosure as o where o.ancestorOid = :ancestorOid and o.descendantOid = :descendantOid"),
         @NamedQuery(name = "sqlDeleteOrgClosure", query = "delete from ROrgClosure as o where o.descendantOid = :oid or o.ancestorOid = :oid"),
-        @NamedQuery(name = "listResourceObjectShadows", query = "select s.oid, s.fullObject, s.stringsCount, s.longsCount, s.datesCount, s.referencesCount, s.polysCount, s.booleansCount from RShadow as s left join s.resourceRef as ref where ref.targetOid = :oid"),
-        @NamedQuery(name = "getDefinition.ROExtDate", query = "select c.name, c.type, c.valueType from ROExtDate as c where c.ownerOid = :oid and c.ownerType = :ownerType"),
-        @NamedQuery(name = "getDefinition.ROExtString", query = "select c.name, c.type, c.valueType from ROExtString as c where c.ownerOid = :oid and c.ownerType = :ownerType"),
-        @NamedQuery(name = "getDefinition.ROExtPolyString", query = "select c.name, c.type, c.valueType from ROExtPolyString as c where c.ownerOid = :oid and c.ownerType = :ownerType"),
-        @NamedQuery(name = "getDefinition.ROExtLong", query = "select c.name, c.type, c.valueType from ROExtLong as c where c.ownerOid = :oid and c.ownerType = :ownerType"),
-        @NamedQuery(name = "getDefinition.ROExtReference", query = "select c.name, c.type, c.valueType from ROExtReference as c where c.ownerOid = :oid and c.ownerType = :ownerType"),
-        @NamedQuery(name = "getDefinition.ROExtBoolean", query = "select c.name, c.type, c.valueType from ROExtBoolean as c where c.ownerOid = :oid and c.ownerType = :ownerType"),
+        @NamedQuery(name = "listResourceObjectShadows", query = "select s.oid, s.fullObject, 0, 0, 0, 0, 0, 0 from RShadow as s left join s.resourceRef as ref where ref.targetOid = :oid"),
+        @NamedQuery(name = "getDefinition.ROExtDate", query = "select c.itemId from ROExtDate as c where c.owner.oid = :oid and c.ownerType = :ownerType"),
+        @NamedQuery(name = "getDefinition.ROExtString", query = "select c.itemId from ROExtString as c where c.owner.oid = :oid and c.ownerType = :ownerType"),
+        @NamedQuery(name = "getDefinition.ROExtPolyString", query = "select c.itemId from ROExtPolyString as c where c.owner.oid = :oid and c.ownerType = :ownerType"),
+        @NamedQuery(name = "getDefinition.ROExtLong", query = "select c.itemId from ROExtLong as c where c.owner.oid = :oid and c.ownerType = :ownerType"),
+        @NamedQuery(name = "getDefinition.ROExtReference", query = "select c.itemId from ROExtReference as c where c.owner.oid = :oid and c.ownerType = :ownerType"),
+        @NamedQuery(name = "getDefinition.ROExtBoolean", query = "select c.itemId from ROExtBoolean as c where c.owner.oid = :oid and c.ownerType = :ownerType"),
         @NamedQuery(name = "isAnySubordinateAttempt.oneLowerOid", query = "select count(*) from ROrgClosure o where o.ancestorOid=:aOid and o.descendantOid=:dOid"),
         @NamedQuery(name = "isAnySubordinateAttempt.moreLowerOids", query = "select count(*) from ROrgClosure o where o.ancestorOid=:aOid and o.descendantOid in (:dOids)"),
         @NamedQuery(name = "get.lookupTableLastId", query = "select max(r.id) from RLookupTableRow r where r.ownerOid = :oid"),
@@ -144,9 +129,9 @@ import java.util.Set;
 public abstract class RObject<T extends ObjectType> implements Metadata<RObjectReference<RFocus>>, EntityState, Serializable {
 
     public static final String F_OBJECT_TYPE_CLASS = "objectTypeClass";
-	public static final String F_TEXT_INFO_ITEMS = "textInfoItems";
+    public static final String F_TEXT_INFO_ITEMS = "textInfoItems";
 
-	private Boolean trans;
+    private Boolean trans;
 
     private String oid;
     private int version;
@@ -159,6 +144,7 @@ public abstract class RObject<T extends ObjectType> implements Metadata<RObjectR
     private RObjectType objectTypeClass;
     //ObjectType searchable fields
     private RPolyString name;
+    private Set<String> subtype;
     private Set<RObjectReference<ROrg>> parentOrgRef;
     private Set<RTrigger> trigger;
     private REmbeddedReference tenantRef;
@@ -173,22 +159,22 @@ public abstract class RObject<T extends ObjectType> implements Metadata<RObjectR
     private Set<RObjectReference<RFocus>> modifyApproverRef;
     private String modifyChannel;
     //extension, and other "any" like shadow/attributes
-    private Short booleansCount;
-    private Short stringsCount;
-    private Short longsCount;
-    private Short datesCount;
-    private Short referencesCount;
-    private Short polysCount;
-    private Set<ROExtString> strings;
-    private Set<ROExtLong> longs;
-    private Set<ROExtDate> dates;
-    private Set<ROExtReference> references;
-    private Set<ROExtPolyString> polys;
-    private Set<ROExtBoolean> booleans;
+    private Collection<ROExtString> strings = new ArrayList<>();
+    private Collection<ROExtLong> longs = new ArrayList<>();
+    private Collection<ROExtDate> dates = new ArrayList<>();
+    private Collection<ROExtReference> references = new ArrayList<>();
+    private Collection<ROExtPolyString> polys = new ArrayList<>();
+    private Collection<ROExtBoolean> booleans = new ArrayList<>();
 
     private Set<RObjectTextInfo> textInfoItems;
 
     private Set<ROperationExecution> operationExecutions;
+
+    // AssignmentHolderType information
+    private Set<RObjectReference<RAbstractRole>> roleMembershipRef;         // AssignmentHolderType
+    private Set<RObjectReference<RFocus>> delegatedRef;                     // AssignmentHolderType
+    private Set<RObjectReference<RArchetype>> archetypeRef;                 // AssignmentHolderType
+    private Set<RAssignment> assignments;                                   // AssignmentHolderType
 
     @Id
     @GeneratedValue(generator = "ObjectOidGenerator")
@@ -266,6 +252,77 @@ public abstract class RObject<T extends ObjectType> implements Metadata<RObjectR
         return createApproverRef;
     }
 
+    @Where(clause = RObjectReference.REFERENCE_TYPE + "= 8")
+    @OneToMany(mappedBy = "owner", orphanRemoval = true)
+    @ForeignKey(name = "none")
+    @Cascade({org.hibernate.annotations.CascadeType.ALL})
+    public Set<RObjectReference<RAbstractRole>> getRoleMembershipRef() {
+        if (roleMembershipRef == null) {
+            roleMembershipRef = new HashSet<>();
+        }
+        return roleMembershipRef;
+    }
+
+    @Where(clause = RObjectReference.REFERENCE_TYPE + "= 9")
+    @OneToMany(mappedBy = "owner", orphanRemoval = true)
+    @ForeignKey(name = "none")
+    @Cascade({org.hibernate.annotations.CascadeType.ALL})
+    public Set<RObjectReference<RFocus>> getDelegatedRef() {
+        if (delegatedRef == null) {
+            delegatedRef = new HashSet<>();
+        }
+        return delegatedRef;
+    }
+
+    @Where(clause = RObjectReference.REFERENCE_TYPE + "= 11")
+    @OneToMany(mappedBy = "owner", orphanRemoval = true)
+    @ForeignKey(name = "none")
+    @Cascade({org.hibernate.annotations.CascadeType.ALL})
+    public Set<RObjectReference<RArchetype>> getArchetypeRef() {
+        if (archetypeRef == null) {
+            archetypeRef = new HashSet<>();
+        }
+        return archetypeRef;
+    }
+
+    @Transient
+    protected Set<RAssignment> getAssignments(RAssignmentOwner owner) {
+        Set<RAssignment> assignments = getAssignments();
+        Set<RAssignment> wanted = new HashSet<>();
+        if (assignments == null) {
+            return wanted;
+        }
+
+        Iterator<RAssignment> iterator = assignments.iterator();
+        while (iterator.hasNext()) {
+            RAssignment ass = iterator.next();
+            if (owner.equals(ass.getAssignmentOwner())) {
+                wanted.add(ass);
+            }
+        }
+
+        return wanted;
+    }
+
+    @Transient
+    public Set<RAssignment> getAssignment() {
+        return getAssignments(RAssignmentOwner.FOCUS);
+    }
+
+    @JaxbPath(itemPath = @JaxbName(localPart = "assignment"))
+    @JaxbPath(itemPath = @JaxbName(localPart = "inducement"))
+    @OneToMany(mappedBy = RAssignment.F_OWNER, orphanRemoval = true)
+    @ForeignKey(name = "none")
+    @Cascade({org.hibernate.annotations.CascadeType.ALL})
+    @NotQueryable   // virtual definition is used instead
+    public Set<RAssignment> getAssignments() {
+        if (assignments == null) {
+            assignments = new HashSet<>();
+        }
+        return assignments;
+    }
+
+
     @JaxbPath(itemPath = { @JaxbName(localPart = "metadata"), @JaxbName(localPart = "createChannel") })
     public String getCreateChannel() {
         return createChannel;
@@ -311,117 +368,70 @@ public abstract class RObject<T extends ObjectType> implements Metadata<RObjectR
     }
 
     @NotQueryable
-    @OneToMany(mappedBy = "owner", orphanRemoval = true)
-    @Cascade({org.hibernate.annotations.CascadeType.ALL})
-    public Set<ROExtLong> getLongs() {
-        if (longs == null) {
-            longs = new HashSet<>();
-        }
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "owner", orphanRemoval = true)
+    //@Cascade({ PERSIST, MERGE, REMOVE, REFRESH, DELETE, REPLICATE, LOCK, DETACH })      // not SAVE_UPDATE
+    @Cascade({ ALL} )
+    public Collection<ROExtLong> getLongs() {
         return longs;
     }
 
     @NotQueryable
-    @OneToMany(mappedBy = "owner", orphanRemoval = true)
-    @Cascade({org.hibernate.annotations.CascadeType.ALL})
-    public Set<ROExtBoolean> getBooleans() {
-        if (booleans == null) {
-            booleans = new HashSet<>();
-        }
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "owner", orphanRemoval = true)
+    //@Cascade({ PERSIST, MERGE, REMOVE, REFRESH, DELETE, REPLICATE, LOCK, DETACH })      // not SAVE_UPDATE
+    @Cascade({ ALL} )
+    public Collection<ROExtBoolean> getBooleans() {
         return booleans;
     }
 
     @NotQueryable
-    @OneToMany(mappedBy = "owner", orphanRemoval = true)
-    @Cascade({org.hibernate.annotations.CascadeType.ALL})
-    public Set<ROExtString> getStrings() {
-        if (strings == null) {
-            strings = new HashSet<>();
-        }
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "owner", orphanRemoval = true)
+    //@Cascade({ PERSIST, MERGE, REMOVE, REFRESH, DELETE, REPLICATE, LOCK, DETACH })      // not SAVE_UPDATE
+    @Cascade({ ALL} )
+    public Collection<ROExtString> getStrings() {
         return strings;
     }
 
     @NotQueryable
-    @OneToMany(mappedBy = "owner", orphanRemoval = true)
-    @Cascade({org.hibernate.annotations.CascadeType.ALL})
-    public Set<ROExtDate> getDates() {
-        if (dates == null) {
-            dates = new HashSet<>();
-        }
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "owner", orphanRemoval = true)
+    //@Cascade({ PERSIST, MERGE, REMOVE, REFRESH, DELETE, REPLICATE, LOCK, DETACH })      // not SAVE_UPDATE
+    @Cascade({ ALL} )
+    public Collection<ROExtDate> getDates() {
         return dates;
     }
 
     @NotQueryable
-    @OneToMany(mappedBy = "owner", orphanRemoval = true)
-    @Cascade({org.hibernate.annotations.CascadeType.ALL})
-    public Set<ROExtReference> getReferences() {
-        if (references == null) {
-            references = new HashSet<>();
-        }
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "owner", orphanRemoval = true)
+    //@Cascade({ PERSIST, MERGE, REMOVE, REFRESH, DELETE, REPLICATE, LOCK, DETACH })      // not SAVE_UPDATE
+    @Cascade({ ALL} )
+    public Collection<ROExtReference> getReferences() {
         return references;
     }
 
     @NotQueryable
-    @OneToMany(mappedBy = "owner", orphanRemoval = true)
-    @Cascade({org.hibernate.annotations.CascadeType.ALL})
-    public Set<ROExtPolyString> getPolys() {
-        if (polys == null) {
-            polys = new HashSet<>();
-        }
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "owner", orphanRemoval = true)
+    //@Cascade({ PERSIST, MERGE, REMOVE, REFRESH, DELETE, REPLICATE, LOCK, DETACH })      // not SAVE_UPDATE
+    @Cascade({ ALL} )
+    public Collection<ROExtPolyString> getPolys() {
         return polys;
-    }
-
-    @NotQueryable
-    public Short getStringsCount() {
-        if (stringsCount == null) {
-            stringsCount = 0;
-        }
-        return stringsCount;
-    }
-
-    @NotQueryable
-    public Short getBooleansCount() {
-        if (booleansCount == null) {
-            booleansCount = 0;
-        }
-        return booleansCount;
-    }
-
-    @NotQueryable
-    public Short getLongsCount() {
-        if (longsCount == null) {
-            longsCount = 0;
-        }
-        return longsCount;
-    }
-
-    @NotQueryable
-    public Short getDatesCount() {
-        if (datesCount == null) {
-            datesCount = 0;
-        }
-        return datesCount;
-    }
-
-    @NotQueryable
-    public Short getReferencesCount() {
-        if (referencesCount == null) {
-            referencesCount = 0;
-        }
-        return referencesCount;
-    }
-
-    @NotQueryable
-    public Short getPolysCount() {
-        if (polysCount == null) {
-            polysCount = 0;
-        }
-        return polysCount;
     }
 
     @Enumerated
     @NotQueryable
     public RObjectType getObjectTypeClass() {
         return objectTypeClass;
+    }
+
+    @ElementCollection
+    @CollectionTable(name = "m_object_subtype", joinColumns = {
+            @JoinColumn(name = "object_oid", referencedColumnName = "oid", foreignKey = @javax.persistence.ForeignKey(name = "fk_object_subtype"))
+    })
+    @Cascade({org.hibernate.annotations.CascadeType.ALL})
+    public Set<String> getSubtype() {
+        return subtype;
+    }
+
+    public void setSubtype(Set<String> subtype) {
+        this.subtype = subtype;
     }
 
     @Transient
@@ -514,51 +524,27 @@ public abstract class RObject<T extends ObjectType> implements Metadata<RObjectR
         this.parentOrgRef = parentOrgRef;
     }
 
-    public void setStringsCount(Short stringsCount) {
-        this.stringsCount = stringsCount;
-    }
-
-    public void setLongsCount(Short longsCount) {
-        this.longsCount = longsCount;
-    }
-
-    public void setDatesCount(Short datesCount) {
-        this.datesCount = datesCount;
-    }
-
-    public void setReferencesCount(Short referencesCount) {
-        this.referencesCount = referencesCount;
-    }
-
-    public void setPolysCount(Short polysCount) {
-        this.polysCount = polysCount;
-    }
-
-    public void setPolys(Set<ROExtPolyString> polys) {
+    public void setPolys(Collection<ROExtPolyString> polys) {
         this.polys = polys;
     }
 
-    public void setReferences(Set<ROExtReference> references) {
+    public void setReferences(Collection<ROExtReference> references) {
         this.references = references;
     }
 
-    public void setDates(Set<ROExtDate> dates) {
+    public void setDates(Collection<ROExtDate> dates) {
         this.dates = dates;
     }
 
-    public void setLongs(Set<ROExtLong> longs) {
+    public void setLongs(Collection<ROExtLong> longs) {
         this.longs = longs;
     }
 
-    public void setStrings(Set<ROExtString> strings) {
+    public void setStrings(Collection<ROExtString> strings) {
         this.strings = strings;
     }
 
-    public void setBooleansCount(Short booleansCount) {
-        this.booleansCount = booleansCount;
-    }
-
-    public void setBooleans(Set<ROExtBoolean> booleans) {
+    public void setBooleans(Collection<ROExtBoolean> booleans) {
         this.booleans = booleans;
     }
 
@@ -592,6 +578,21 @@ public abstract class RObject<T extends ObjectType> implements Metadata<RObjectR
         this.operationExecutions = operationExecutions;
     }
 
+    public void setAssignments(Set<RAssignment> assignments) {
+        this.assignments = assignments;
+    }
+
+    public void setRoleMembershipRef(Set<RObjectReference<RAbstractRole>> roleMembershipRef) {
+        this.roleMembershipRef = roleMembershipRef;
+    }
+
+    public void setDelegatedRef(Set<RObjectReference<RFocus>> delegatedRef) {
+        this.delegatedRef = delegatedRef;
+    }
+
+    public void setArchetypeRef(Set<RObjectReference<RArchetype>> archetypeRef) {
+        this.archetypeRef = archetypeRef;
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -621,22 +622,14 @@ public abstract class RObject<T extends ObjectType> implements Metadata<RObjectR
         if (!MetadataFactory.equals(this, rObject)) return false;
 
         if (dates != null ? !dates.equals(rObject.dates) : rObject.dates != null) return false;
-        if (datesCount != null ? !datesCount.equals(rObject.datesCount) : rObject.datesCount != null) return false;
         if (longs != null ? !longs.equals(rObject.longs) : rObject.longs != null) return false;
-        if (longsCount != null ? !longsCount.equals(rObject.longsCount) : rObject.longsCount != null) return false;
         if (polys != null ? !polys.equals(rObject.polys) : rObject.polys != null) return false;
-        if (polysCount != null ? !polysCount.equals(rObject.polysCount) : rObject.polysCount != null) return false;
         if (references != null ? !references.equals(rObject.references) : rObject.references != null) return false;
-        if (referencesCount != null ? !referencesCount.equals(rObject.referencesCount) : rObject.referencesCount != null)
-            return false;
         if (strings != null ? !strings.equals(rObject.strings) : rObject.strings != null) return false;
-        if (stringsCount != null ? !stringsCount.equals(rObject.stringsCount) : rObject.stringsCount != null)
-            return false;
         if (booleans != null ? !booleans.equals(rObject.booleans) : rObject.booleans != null) return false;
-        if (booleansCount != null ? !booleansCount.equals(rObject.booleansCount) : rObject.booleansCount != null)
-            return false;
         if (textInfoItems != null ? !textInfoItems.equals(rObject.textInfoItems) : rObject.textInfoItems != null) return false;
         if (operationExecutions != null ? !operationExecutions.equals(rObject.operationExecutions) : rObject.operationExecutions != null) return false;
+        if (subtype != null ? !subtype.equals(rObject.subtype) : rObject.subtype != null) return false;
 
         return true;
     }
@@ -659,15 +652,17 @@ public abstract class RObject<T extends ObjectType> implements Metadata<RObjectR
 
     @Deprecated
     protected static <T extends ObjectType> void copyToJAXB(RObject<T> repo, ObjectType jaxb, PrismContext prismContext,
-                                                            Collection<SelectorOptions<GetOperationOptions>> options)
-            throws DtoTranslationException {
+                                                            Collection<SelectorOptions<GetOperationOptions>> options) {
         Validate.notNull(repo, "Repo object must not be null.");
         Validate.notNull(jaxb, "JAXB object must not be null.");
 
-        jaxb.setName(RPolyString.copyToJAXB(repo.getName()));
+        jaxb.setName(RPolyString.copyToJAXB(repo.getName(), prismContext));
         jaxb.setOid(repo.getOid());
         jaxb.setVersion(Integer.toString(repo.getVersion()));
         jaxb.setLifecycleState(repo.getLifecycleState());
+        if (repo.getSubtype() != null) {
+            jaxb.getSubtype().addAll(repo.getSubtype());
+        }
 
         if (SelectorOptions.hasToLoadPath(ObjectType.F_PARENT_ORG_REF, options)) {
             List orgRefs = RUtil.safeSetReferencesToList(repo.getParentOrgRef(), prismContext);
@@ -677,8 +672,31 @@ public abstract class RObject<T extends ObjectType> implements Metadata<RObjectR
         }
     }
 
-    public static <T extends ObjectType> void copyFromJAXB(ObjectType jaxb, RObject<T> repo, RepositoryContext repositoryContext,
-			IdGeneratorResult generatorResult)
+    static <T extends ObjectType> void copyAssignmentHolderInformationFromJAXB(AssignmentHolderType jaxb, RObject<T> repo,
+            RepositoryContext repositoryContext, IdGeneratorResult generatorResult) throws DtoTranslationException {
+
+        copyObjectInformationFromJAXB(jaxb, repo, repositoryContext, generatorResult);
+
+        repo.getRoleMembershipRef().addAll(
+                RUtil.safeListReferenceToSet(jaxb.getRoleMembershipRef(), repo, RReferenceOwner.ROLE_MEMBER, repositoryContext.relationRegistry));
+
+        repo.getDelegatedRef().addAll(
+                RUtil.safeListReferenceToSet(jaxb.getDelegatedRef(), repo, RReferenceOwner.DELEGATED, repositoryContext.relationRegistry));
+
+        repo.getArchetypeRef().addAll(
+                RUtil.safeListReferenceToSet(jaxb.getArchetypeRef(), repo, RReferenceOwner.ARCHETYPE, repositoryContext.relationRegistry));
+
+        for (AssignmentType assignment : jaxb.getAssignment()) {
+            RAssignment rAssignment = new RAssignment(repo, RAssignmentOwner.FOCUS);
+            RAssignment.fromJaxb(assignment, rAssignment, jaxb, repositoryContext, generatorResult);
+
+            repo.getAssignments().add(rAssignment);
+        }
+    }
+
+    static <T extends ObjectType> void copyObjectInformationFromJAXB(ObjectType jaxb, RObject<T> repo,
+            RepositoryContext repositoryContext,
+            IdGeneratorResult generatorResult)
             throws DtoTranslationException {
         Validate.notNull(jaxb, "JAXB object must not be null.");
         Validate.notNull(repo, "Repo object must not be null.");
@@ -690,87 +708,79 @@ public abstract class RObject<T extends ObjectType> implements Metadata<RObjectR
         repo.setName(RPolyString.copyFromJAXB(jaxb.getName()));
         repo.setLifecycleState(jaxb.getLifecycleState());
 
+        repo.setSubtype(RUtil.listToSet(jaxb.getSubtype()));
+
         String strVersion = jaxb.getVersion();
         int version = StringUtils.isNotEmpty(strVersion) && strVersion.matches("[0-9]*") ? Integer.parseInt(jaxb
                 .getVersion()) : 0;
         repo.setVersion(version);
 
-        repo.getParentOrgRef().addAll(RUtil.safeListReferenceToSet(jaxb.getParentOrgRef(), repositoryContext.prismContext,
-                repo, RReferenceOwner.OBJECT_PARENT_ORG));
+        repo.getParentOrgRef().addAll(RUtil.safeListReferenceToSet(jaxb.getParentOrgRef(),
+                repo, RReferenceOwner.OBJECT_PARENT_ORG, repositoryContext.relationRegistry));
 
         for (TriggerType trigger : jaxb.getTrigger()) {
             RTrigger rTrigger = new RTrigger(null);
-            RTrigger.copyFromJAXB(trigger, rTrigger, jaxb, repositoryContext, generatorResult);
+            RTrigger.fromJaxb(trigger, rTrigger, jaxb, repositoryContext, generatorResult);
 
             repo.getTrigger().add(rTrigger);
         }
 
-        MetadataFactory.fromJAXB(jaxb.getMetadata(), repo, repositoryContext.prismContext);
-        repo.setTenantRef(RUtil.jaxbRefToEmbeddedRepoRef(jaxb.getTenantRef(), repositoryContext.prismContext));
+        MetadataFactory.fromJAXB(jaxb.getMetadata(), repo, repositoryContext.prismContext, repositoryContext.relationRegistry);
+        repo.setTenantRef(RUtil.jaxbRefToEmbeddedRepoRef(jaxb.getTenantRef(), repositoryContext.relationRegistry));
 
         if (jaxb.getExtension() != null) {
-            copyFromJAXB(jaxb.getExtension().asPrismContainerValue(), repo, repositoryContext, RObjectExtensionType.EXTENSION);
+            copyExtensionOrAttributesFromJAXB(jaxb.getExtension().asPrismContainerValue(), repo, repositoryContext, RObjectExtensionType.EXTENSION, generatorResult);
         }
 
         repo.getTextInfoItems().addAll(RObjectTextInfo.createItemsSet(jaxb, repo, repositoryContext));
         for (OperationExecutionType opExec : jaxb.getOperationExecution()) {
             ROperationExecution rOpExec = new ROperationExecution(repo);
-            ROperationExecution.copyFromJAXB(opExec, rOpExec, jaxb, repositoryContext, generatorResult);
+            ROperationExecution.fromJaxb(opExec, rOpExec, jaxb, repositoryContext, generatorResult);
             repo.getOperationExecutions().add(rOpExec);
         }
     }
-
-    @Deprecated
-    public abstract T toJAXB(PrismContext prismContext, Collection<SelectorOptions<GetOperationOptions>> options)
-            throws DtoTranslationException;
 
     @Override
     public String toString() {
         return RUtil.getDebugString(this);
     }
 
-    public static void copyFromJAXB(PrismContainerValue containerValue, RObject repo, RepositoryContext repositoryContext,
-			RObjectExtensionType ownerType) throws DtoTranslationException {
-        RAnyConverter converter = new RAnyConverter(repositoryContext.prismContext);
+    static void copyExtensionOrAttributesFromJAXB(PrismContainerValue<?> containerValue, RObject<?> repo,
+            RepositoryContext repositoryContext, RObjectExtensionType ownerType, IdGeneratorResult generatorResult) throws DtoTranslationException {
+        RAnyConverter converter = new RAnyConverter(repositoryContext.prismContext, repositoryContext.extItemDictionary);
 
-        Set<RAnyValue> values = new HashSet<RAnyValue>();
+        Set<RAnyValue<?>> values = new HashSet<>();
         try {
-            List<Item<?,?>> items = containerValue.getItems();
             //TODO: is this enough? should we try items without definitions?
-            if (items != null) {
-                for (Item item : items) {
-                    values.addAll(converter.convertToRValue(item, false));
+            for (Item<?,?> item : containerValue.getItems()) {
+                Set<RAnyValue<?>> converted = converter.convertToRValue(item, false, ownerType);
+                if (generatorResult.isGeneratedOid()) {
+                    converted.forEach(v -> v.setTransient(true));
                 }
+                values.addAll(converted);
             }
         } catch (Exception ex) {
             throw new DtoTranslationException(ex.getMessage(), ex);
         }
 
-        for (RAnyValue value : values) {
-            ROExtValue ex = (ROExtValue) value;
+        for (RAnyValue<?> value : values) {
+            ROExtValue<?> ex = (ROExtValue<?>) value;
             ex.setOwner(repo);
             ex.setOwnerType(ownerType);
 
             if (value instanceof ROExtDate) {
-                repo.getDates().add(value);
+                repo.getDates().add((ROExtDate) value);
             } else if (value instanceof ROExtLong) {
-                repo.getLongs().add(value);
+                repo.getLongs().add((ROExtLong) value);
             } else if (value instanceof ROExtReference) {
-                repo.getReferences().add(value);
+                repo.getReferences().add((ROExtReference) value);
             } else if (value instanceof ROExtString) {
-                repo.getStrings().add(value);
+                repo.getStrings().add((ROExtString) value);
             } else if (value instanceof ROExtPolyString) {
-                repo.getPolys().add(value);
+                repo.getPolys().add((ROExtPolyString) value);
             } else if (value instanceof ROExtBoolean) {
-                repo.getBooleans().add(value);
+                repo.getBooleans().add((ROExtBoolean) value);
             }
         }
-
-        repo.setStringsCount((short) repo.getStrings().size());
-        repo.setDatesCount((short) repo.getDates().size());
-        repo.setPolysCount((short) repo.getPolys().size());
-        repo.setReferencesCount((short) repo.getReferences().size());
-        repo.setLongsCount((short) repo.getLongs().size());
-        repo.setBooleansCount((short) repo.getBooleans().size());
     }
 }

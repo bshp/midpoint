@@ -16,6 +16,7 @@ DETERMINISTIC
     DELETE FROM m_acc_cert_case;
     DELETE FROM m_acc_cert_campaign;
     DELETE FROM m_acc_cert_definition;
+    DELETE FROM m_audit_resource;
     DELETE FROM m_audit_prop_value;
     DELETE FROM m_audit_ref_value;
     DELETE FROM m_audit_delta;
@@ -38,7 +39,6 @@ DETERMINISTIC
     DELETE FROM m_assignment_reference;
     DELETE FROM m_assignment_policy_situation;
     DELETE FROM m_assignment;
-    DELETE FROM m_exclusion;
     DELETE FROM m_connector_target_system;
     DELETE FROM m_connector;
     DELETE FROM m_connector_host;
@@ -65,6 +65,7 @@ DETERMINISTIC
     DELETE FROM m_role;
     DELETE FROM m_service_type;
     DELETE FROM m_service;
+    DELETE FROM m_archetype;
     DELETE FROM m_abstract_role;
     DELETE FROM m_system_configuration;
     DELETE FROM m_generic_object;
@@ -72,10 +73,15 @@ DETERMINISTIC
     DELETE FROM m_focus;
     DELETE FROM m_security_policy;
     DELETE FROM m_form;
+    DELETE FROM m_case_wi_reference;
+    DELETE FROM m_case_wi;
     DELETE FROM m_case;
+    DELETE FROM m_function_library;
+    DELETE FROM m_ext_item;
+    DELETE FROM m_object_subtype;
+    DELETE FROM m_object_collection;
+    DELETE FROM m_dashboard;
     DELETE FROM m_object;
-
-    UPDATE hibernate_sequence SET next_val = 1;
 
     RETURN run;
   END$$

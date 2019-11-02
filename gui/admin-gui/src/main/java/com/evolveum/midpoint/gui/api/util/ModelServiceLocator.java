@@ -1,29 +1,40 @@
 /**
- * Copyright (c) 2016-2017 Evolveum
+ * Copyright (c) 2016-2019 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 package com.evolveum.midpoint.gui.api.util;
 
+import com.evolveum.midpoint.common.LocalizationService;
+import com.evolveum.midpoint.gui.api.prism.ItemStatus;
+import com.evolveum.midpoint.gui.api.prism.ItemWrapper;
+import com.evolveum.midpoint.gui.api.registry.GuiComponentRegistry;
+import com.evolveum.midpoint.gui.impl.factory.PrismObjectWrapperFactory;
+import com.evolveum.midpoint.gui.impl.factory.WrapperContext;
+import com.evolveum.midpoint.gui.impl.prism.PrismValueWrapper;
+import com.evolveum.midpoint.gui.impl.registry.GuiComponentRegistryImpl;
 import com.evolveum.midpoint.model.api.ModelInteractionService;
 import com.evolveum.midpoint.model.api.ModelService;
+import com.evolveum.midpoint.model.api.authentication.CompiledUserProfile;
+import com.evolveum.midpoint.model.api.interaction.DashboardService;
+import com.evolveum.midpoint.prism.Item;
 import com.evolveum.midpoint.prism.PrismContext;
+import com.evolveum.midpoint.prism.PrismObjectDefinition;
+import com.evolveum.midpoint.prism.PrismValue;
+import com.evolveum.midpoint.repo.common.ObjectResolver;
 import com.evolveum.midpoint.repo.common.expression.ExpressionFactory;
-import com.evolveum.midpoint.schema.util.ObjectResolver;
 import com.evolveum.midpoint.security.api.SecurityContextManager;
 import com.evolveum.midpoint.security.enforcer.api.SecurityEnforcer;
 import com.evolveum.midpoint.task.api.Task;
+import com.evolveum.midpoint.util.exception.SchemaException;
+import com.evolveum.midpoint.web.component.prism.ValueStatus;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AdminGuiConfigurationType;
+
+import java.util.Locale;
+
+import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Interface that allows location of model and model-like services,
@@ -36,37 +47,53 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.AdminGuiConfiguratio
  */
 public interface ModelServiceLocator {
 
-	ModelService getModelService();
+    ModelService getModelService();
 
-	ModelInteractionService getModelInteractionService();
+    ModelInteractionService getModelInteractionService();
 
-	Task createSimpleTask(String operationName);
+    DashboardService getDashboardService();
 
-	/**
-	 * Returns a task, that is used to retrieve and render the entire content
-	 * of the page. A single task is created to render the whole page, so
-	 * the summary result can be collected in the task result.
-	 */
-	Task getPageTask();
+    LocalizationService getLocalizationService();
 
-	PrismContext getPrismContext();
+    Task createSimpleTask(String operationName);
 
-	SecurityEnforcer getSecurityEnforcer();
-	
-	SecurityContextManager getSecurityContextManager();
+    /**
+     * Returns a task, that is used to retrieve and render the entire content
+     * of the page. A single task is created to render the whole page, so
+     * the summary result can be collected in the task result.
+     */
+    Task getPageTask();
 
-	ExpressionFactory getExpressionFactory();
+    PrismContext getPrismContext();
 
-	/**
-	 * Returns adminGuiConfiguraiton applicable to currently logged-in user.
-	 * Strictly speaking, this can be retrieved from modelInteractionService.
-	 * But having a separate function for that allows to get rid of
-	 * task and result parameters. And more importantly: this allows to
-	 * cache adminGuiConfig in the page (in case many components need it).
-	 */
-	AdminGuiConfigurationType getAdminGuiConfiguration();
+    SecurityEnforcer getSecurityEnforcer();
 
-	default ObjectResolver getModelObjectResolver() {
-		return null;
-	}
+    SecurityContextManager getSecurityContextManager();
+
+    ExpressionFactory getExpressionFactory();
+
+    /**
+     * Returns currently applicable user profile, compiled for efficient use in the user interface.
+     * applicable to currently logged-in user.
+     * Strictly speaking, this can be retrieved from modelInteractionService.
+     * But having a separate function for that allows to get rid of
+     * task and result parameters. And more importantly: this allows to
+     * cache adminGuiConfig in the page (in case many components need it).
+     */
+    @NotNull
+    CompiledUserProfile getCompiledUserProfile();
+
+    default ObjectResolver getModelObjectResolver() {
+        return null;
+    }
+
+    Locale getLocale();
+
+    GuiComponentRegistry getRegistry();
+
+    <O extends ObjectType> PrismObjectWrapperFactory<O> findObjectWrapperFactory(PrismObjectDefinition<O> objectDef);
+
+    <I extends Item, IW extends ItemWrapper> IW createItemWrapper(I item, ItemStatus status, WrapperContext ctx) throws SchemaException;
+
+    <IW extends ItemWrapper, VW extends PrismValueWrapper, PV extends PrismValue> VW createValueWrapper(IW parentWrapper, PV newValue, ValueStatus status, WrapperContext context) throws SchemaException;
 }

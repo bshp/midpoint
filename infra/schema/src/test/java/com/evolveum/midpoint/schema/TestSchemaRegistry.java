@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 /**
@@ -19,33 +10,17 @@
  */
 package com.evolveum.midpoint.schema;
 
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertFalse;
-import static org.testng.AssertJUnit.assertNotNull;
-import static org.testng.AssertJUnit.assertTrue;
-
-import java.io.File;
-import java.io.IOException;
-
-import javax.xml.transform.dom.DOMResult;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.validation.Schema;
-import javax.xml.validation.Validator;
-
 import com.evolveum.midpoint.prism.*;
-import com.evolveum.midpoint.prism.schema.SchemaRegistryImpl;
+import com.evolveum.midpoint.prism.impl.schema.SchemaRegistryImpl;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
-
-import org.testng.annotations.Test;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.xml.sax.SAXException;
 
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.schema.PrismSchema;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.util.DOMUtil;
+import com.evolveum.midpoint.util.DebugUtil;
 import com.evolveum.midpoint.util.exception.SchemaException;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.AbstractRoleType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.LookupTableType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.RoleType;
@@ -63,9 +38,11 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.Validator;
 
 import java.io.IOException;
+import java.util.List;
 
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertFalse;
+import static org.testng.AssertJUnit.assertNull;
 import static org.testng.AssertJUnit.assertNotNull;
 import static org.testng.AssertJUnit.assertTrue;
 
@@ -75,49 +52,49 @@ import static org.testng.AssertJUnit.assertTrue;
  */
 public class TestSchemaRegistry {
 
-	private static final String FOO_NAMESPACE = "http://example.com/xml/ns/foo";
-	private static final String USER_EXT_NAMESPACE = "http://example.com/xml/ns/user-extension";
-	private static final String EXTENSION_SCHEMA_NAMESPACE = "http://midpoint.evolveum.com/xml/ns/test/extension";
+    private static final String FOO_NAMESPACE = "http://example.com/xml/ns/foo";
+    private static final String USER_EXT_NAMESPACE = "http://example.com/xml/ns/user-extension";
+    private static final String EXTENSION_SCHEMA_NAMESPACE = "http://midpoint.evolveum.com/xml/ns/test/extension";
 
     /**
-	 * Test whether the midpoint prism context was constructed OK and if it can validate
-	 * ordinary user object.
-	 */
-	@Test
-	public void testBasic() throws SAXException, IOException, SchemaException {
+     * Test whether the midpoint prism context was constructed OK and if it can validate
+     * ordinary user object.
+     */
+    @Test
+    public void testBasic() throws SAXException, IOException, SchemaException {
 
-		MidPointPrismContextFactory factory = getContextFactory();
-		PrismContext context = factory.createInitializedPrismContext();
-		SchemaRegistry reg = context.getSchemaRegistry();
-		Schema javaxSchema = reg.getJavaxSchema();
-		assertNotNull(javaxSchema);
+        MidPointPrismContextFactory factory = getContextFactory();
+        PrismContext context = factory.createInitializedPrismContext();
+        SchemaRegistry reg = context.getSchemaRegistry();
+        Schema javaxSchema = reg.getJavaxSchema();
+        assertNotNull(javaxSchema);
 
-		// Try to use the schema to validate Jack
-//		PrismObject<UserType> user = context.parseObject(new File("src/test/resources/common/user-jack.xml"));
-//		Element document = context.serializeToDom(user);
-		Document document = DOMUtil.parseFile("src/test/resources/common/user-jack.xml");
-		Validator validator = javaxSchema.newValidator();
-		DOMResult validationResult = new DOMResult();
-		validator.validate(new DOMSource(document), validationResult);
-//		System.out.println("Validation result:");
-//		System.out.println(DOMUtil.serializeDOMToString(validationResult.getNode()));
-	}
+        // Try to use the schema to validate Jack
+//        PrismObject<UserType> user = context.parseObject(new File("src/test/resources/common/user-jack.xml"));
+//        Element document = context.serializeToDom(user);
+        Document document = DOMUtil.parseFile("src/test/resources/common/user-jack.xml");
+        Validator validator = javaxSchema.newValidator();
+        DOMResult validationResult = new DOMResult();
+        validator.validate(new DOMSource(document), validationResult);
+//        System.out.println("Validation result:");
+//        System.out.println(DOMUtil.serializeDOMToString(validationResult.getNode()));
+    }
 
 
     @Test
-	public void testCommonSchema() throws SchemaException, SAXException, IOException {
+    public void testCommonSchema() throws SchemaException, SAXException, IOException {
 
-		MidPointPrismContextFactory factory = getContextFactory();
-		PrismContext context = factory.createInitializedPrismContext();
-		SchemaRegistry schemaRegistry = context.getSchemaRegistry();
+        MidPointPrismContextFactory factory = getContextFactory();
+        PrismContext context = factory.createInitializedPrismContext();
+        SchemaRegistry schemaRegistry = context.getSchemaRegistry();
 
-		PrismSchema commonSchema = schemaRegistry.findSchemaByNamespace(SchemaConstants.NS_C);
-		assertNotNull("No parsed common schema", commonSchema);
-		System.out.println("Parsed common schema:");
-		System.out.println(commonSchema.debugDump());
+        PrismSchema commonSchema = schemaRegistry.findSchemaByNamespace(SchemaConstants.NS_C);
+        assertNotNull("No parsed common schema", commonSchema);
+        System.out.println("Parsed common schema:");
+        System.out.println(commonSchema.debugDump());
 
-		// TODO
-	}
+        // TODO
+    }
 
     @Test
     public void testReferenceInExtension() throws SchemaException, SAXException, IOException {
@@ -127,7 +104,7 @@ public class TestSchemaRegistry {
         SchemaRegistry schemaRegistry = context.getSchemaRegistry();
 
         // Common schema should be parsed during creation of the context
-		((SchemaRegistryImpl) schemaRegistry).loadPrismSchemaResource("schema/extension.xsd");
+        ((SchemaRegistryImpl) schemaRegistry).loadPrismSchemaResource("schema/extension.xsd");
 
         // Check that the extension schema was loaded
         PrismSchema extensionSchema = schemaRegistry.findSchemaByNamespace(EXTENSION_SCHEMA_NAMESPACE);
@@ -138,104 +115,180 @@ public class TestSchemaRegistry {
         System.out.println("UserRef definition:");
         System.out.println(itemDefinition.debugDump());
 
-        assertEquals("Wrong userRef definition class", PrismReferenceDefinitionImpl.class, itemDefinition.getClass());
+        assertTrue("Wrong userRef definition class: " + itemDefinition.getClass(), itemDefinition instanceof PrismReferenceDefinition);
     }
 
     @Test
-	public void testUserType() throws Exception {
+    public void testUserType() throws Exception {
+        System.out.println("===[ testUserType ]===");
 
-		MidPointPrismContextFactory factory = getContextFactory();
-		PrismContext context = factory.createInitializedPrismContext();
-		SchemaRegistry schemaRegistry = context.getSchemaRegistry();
+        MidPointPrismContextFactory factory = getContextFactory();
+        PrismContext context = factory.createInitializedPrismContext();
+        SchemaRegistry schemaRegistry = context.getSchemaRegistry();
 
-		PrismObjectDefinition<UserType> userDefinition = schemaRegistry.findObjectDefinitionByCompileTimeClass(UserType.class);
-		assertNotNull("No user definition", userDefinition);
+        PrismObjectDefinition<UserType> userDefinition = schemaRegistry.findObjectDefinitionByCompileTimeClass(UserType.class);
+        assertNotNull("No user definition", userDefinition);
 
-		System.out.println("testUserType:");
-		System.out.println(userDefinition.debugDump());
+        System.out.println("testUserType:");
+        System.out.println(userDefinition.debugDump());
 
-		assertFalse("User definition is marked as runtime", userDefinition.isRuntimeSchema());
+        assertFalse("User definition is marked as runtime", userDefinition.isRuntimeSchema());
 
-		PrismPropertyDefinition<PolyString> nameDef = userDefinition.findPropertyDefinition(ObjectType.F_NAME);
-		assertNotNull("No name definition", nameDef);
+        PrismPropertyDefinition<PolyString> nameDef = userDefinition.findPropertyDefinition(ObjectType.F_NAME);
+        assertNotNull("No name definition", nameDef);
 
-		PrismContainerDefinition extensionDef = userDefinition.findContainerDefinition(UserType.F_EXTENSION);
-		assertNotNull("No 'extension' definition", extensionDef);
-		assertTrue("Extension definition is NOT marked as runtime", extensionDef.isRuntimeSchema());
+        PrismContainerDefinition extensionDef = userDefinition.findContainerDefinition(UserType.F_EXTENSION);
+        assertNotNull("No 'extension' definition", extensionDef);
+        assertTrue("Extension definition is NOT marked as runtime", extensionDef.isRuntimeSchema());
 
-		PrismPropertyDefinition<PolyString> givenNameDef = userDefinition.findPropertyDefinition(UserType.F_GIVEN_NAME);
-		assertNotNull("No givenName definition", givenNameDef);
+        PrismPropertyDefinition<PolyString> givenNameDef = userDefinition.findPropertyDefinition(UserType.F_GIVEN_NAME);
+        assertNotNull("No givenName definition", givenNameDef);
 
-		PrismPropertyDefinition<String> preferredLanguageDef = userDefinition.findPropertyDefinition(UserType.F_PREFERRED_LANGUAGE);
-		assertNotNull("No preferredLanguage definition", preferredLanguageDef);
-		PrismReferenceValue preferredLanguageValueEnumerationRef = preferredLanguageDef.getValueEnumerationRef();
-		assertNotNull("No valueEnumerationRef in preferredLanguage definition", preferredLanguageValueEnumerationRef);
-		assertEquals("Wrong OID in valueEnumerationRef in preferredLanguage definition",
-				SystemObjectsType.LOOKUP_LANGUAGES.value(), preferredLanguageValueEnumerationRef.getOid());
-		assertEquals("Wrong type in valueEnumerationRef in preferredLanguage definition",
-				LookupTableType.COMPLEX_TYPE, preferredLanguageValueEnumerationRef.getTargetType());
+        PrismPropertyDefinition<String> preferredLanguageDef = userDefinition.findPropertyDefinition(UserType.F_PREFERRED_LANGUAGE);
+        assertNotNull("No preferredLanguage definition", preferredLanguageDef);
+        PrismReferenceValue preferredLanguageValueEnumerationRef = preferredLanguageDef.getValueEnumerationRef();
+        assertNotNull("No valueEnumerationRef in preferredLanguage definition", preferredLanguageValueEnumerationRef);
+        assertEquals("Wrong OID in valueEnumerationRef in preferredLanguage definition",
+                SystemObjectsType.LOOKUP_LANGUAGES.value(), preferredLanguageValueEnumerationRef.getOid());
+        assertEquals("Wrong type in valueEnumerationRef in preferredLanguage definition",
+                LookupTableType.COMPLEX_TYPE, preferredLanguageValueEnumerationRef.getTargetType());
 
-		// Just make sure this does not end with NPE or stack overflow
-		PrismObjectDefinition<UserType> shallowClone = userDefinition.clone();
-		PrismObjectDefinition<UserType> deepClone = userDefinition.deepClone(false);
-		PrismObjectDefinition<UserType> ultraDeepClone = userDefinition.deepClone(true);
-	}
-
-    @Test
-	public void testRoleType() throws Exception {
-
-		MidPointPrismContextFactory factory = getContextFactory();
-		PrismContext context = factory.createInitializedPrismContext();
-		SchemaRegistry schemaRegistry = context.getSchemaRegistry();
-
-		PrismObjectDefinition<RoleType> roleDefinition = schemaRegistry.findObjectDefinitionByCompileTimeClass(RoleType.class);
-		assertNotNull("No role definition", roleDefinition);
-
-		assertFalse("Role definition is marked as runtime", roleDefinition.isRuntimeSchema());
-
-		PrismPropertyDefinition nameDef = roleDefinition.findPropertyDefinition(ObjectType.F_NAME);
-		assertNotNull("No name definition", nameDef);
-
-		PrismContainerDefinition extensionDef = roleDefinition.findContainerDefinition(ObjectType.F_EXTENSION);
-		assertNotNull("No 'extension' definition", extensionDef);
-		assertTrue("Extension definition is NOT marked as runtime", extensionDef.isRuntimeSchema());
-
-		PrismPropertyDefinition identifierDef = roleDefinition.findPropertyDefinition(RoleType.F_IDENTIFIER);
-		assertNotNull("No identifier definition", identifierDef);
-
-		// Just make sure this does not end with NPE or stack overflow
-		PrismObjectDefinition<RoleType> shallowClone = roleDefinition.clone();
-		PrismObjectDefinition<RoleType> deepClone = roleDefinition.deepClone(false);
-		PrismObjectDefinition<RoleType> ultraDeepClone = roleDefinition.deepClone(true);
-	}
+        // Just make sure this does not end with NPE or stack overflow
+        PrismObjectDefinition<UserType> shallowClone = userDefinition.clone();
+        PrismObjectDefinition<UserType> deepClone = userDefinition.deepClone(false, null);
+        PrismObjectDefinition<UserType> ultraDeepClone = userDefinition.deepClone(true, null);
+    }
 
     @Test
-	public void testCommonSchemaAccountType() throws SchemaException, SAXException, IOException {
+    public void testRoleType() throws Exception {
+        System.out.println("\n\n===[ testRoleType ]===");
 
-		MidPointPrismContextFactory factory = getContextFactory();
-		PrismContext context = factory.createInitializedPrismContext();
-		SchemaRegistry schemaRegistry = context.getSchemaRegistry();
+        MidPointPrismContextFactory factory = getContextFactory();
+        PrismContext context = factory.createInitializedPrismContext();
+        SchemaRegistry schemaRegistry = context.getSchemaRegistry();
 
-		PrismObjectDefinition<ShadowType> accountDef = schemaRegistry.findObjectDefinitionByCompileTimeClass(ShadowType.class);
-		assertNotNull("No account definition", accountDef);
+        PrismObjectDefinition<RoleType> roleDefinition = schemaRegistry.findObjectDefinitionByCompileTimeClass(RoleType.class);
+        assertNotNull("No role definition", roleDefinition);
+        System.out.println("\nRole definition");
+        System.out.println(roleDefinition.debugDump(1));
+        System.out.println("\nRole definition CTD");
+        System.out.println(roleDefinition.getComplexTypeDefinition().debugDump(1));
 
-		System.out.println("testCommonSchemaAccountType:");
-		System.out.println(accountDef.debugDump());
+        assertFalse("Role definition is marked as runtime", roleDefinition.isRuntimeSchema());
 
-		PrismPropertyDefinition nameDef = accountDef.findPropertyDefinition(ShadowType.F_NAME);
-		assertNotNull("No name definition", nameDef);
+        PrismPropertyDefinition nameDef = roleDefinition.findPropertyDefinition(ObjectType.F_NAME);
+        assertNotNull("No name definition", nameDef);
 
-		PrismContainerDefinition extensionDef = accountDef.findContainerDefinition(ShadowType.F_EXTENSION);
-		assertNotNull("No 'extension' definition", extensionDef);
-		assertTrue("'extension' definition is not marked as runtime", extensionDef.isRuntimeSchema());
+        PrismContainerDefinition extensionDef = roleDefinition.findContainerDefinition(ObjectType.F_EXTENSION);
+        assertNotNull("No 'extension' definition", extensionDef);
+        assertTrue("Extension definition is NOT marked as runtime", extensionDef.isRuntimeSchema());
 
-		PrismContainerDefinition attributesDef = accountDef.findContainerDefinition(ShadowType.F_ATTRIBUTES);
-		assertNotNull("No 'attributes' definition", attributesDef);
-		assertTrue("'attributes' definition is not marked as runtime", attributesDef.isRuntimeSchema());
-	}
+        PrismPropertyDefinition identifierDef = roleDefinition.findPropertyDefinition(RoleType.F_IDENTIFIER);
+        assertNotNull("No identifier definition", identifierDef);
 
-	private MidPointPrismContextFactory getContextFactory() {
-		return new MidPointPrismContextFactory();
-	}
+        List<SchemaMigration> schemaMigrations = roleDefinition.getSchemaMigrations();
+        assertNull("Unexpected schema migrations in role definition", schemaMigrations);
+
+        // Just make sure this does not end with NPE or stack overflow
+        PrismObjectDefinition<RoleType> shallowClone = roleDefinition.clone();
+        PrismObjectDefinition<RoleType> deepClone = roleDefinition.deepClone(false, null);
+        PrismObjectDefinition<RoleType> ultraDeepClone = roleDefinition.deepClone(true, null);
+    }
+
+    @Test
+    public void testAbstractRoleType() throws Exception {
+        System.out.println("\n\n===[ testAbstractRoleType ]===");
+
+        MidPointPrismContextFactory factory = getContextFactory();
+        PrismContext context = factory.createInitializedPrismContext();
+        SchemaRegistry schemaRegistry = context.getSchemaRegistry();
+
+        PrismObjectDefinition<AbstractRoleType> abstractRoleDefinition = schemaRegistry.findObjectDefinitionByCompileTimeClass(AbstractRoleType.class);
+        assertNotNull("No role definition", abstractRoleDefinition);
+        System.out.println("\nAbstractRole definition");
+        System.out.println(abstractRoleDefinition.debugDump(1));
+        System.out.println("\nAbstractRole definition CTD");
+        System.out.println(abstractRoleDefinition.getComplexTypeDefinition().debugDump(1));
+
+        assertFalse("Role definition is marked as runtime", abstractRoleDefinition.isRuntimeSchema());
+
+        PrismPropertyDefinition nameDef = abstractRoleDefinition.findPropertyDefinition(ObjectType.F_NAME);
+        assertNotNull("No name definition", nameDef);
+
+        PrismContainerDefinition extensionDef = abstractRoleDefinition.findContainerDefinition(ObjectType.F_EXTENSION);
+        assertNotNull("Unexpected 'extension' definition", extensionDef);
+        assertTrue("Extension definition is NOT marked as runtime", extensionDef.isRuntimeSchema());
+        assertTrue("Extension definition is NOT empty", extensionDef.isEmpty());
+
+        PrismPropertyDefinition identifierDef = abstractRoleDefinition.findPropertyDefinition(AbstractRoleType.F_IDENTIFIER);
+        assertNotNull("No identifier definition", identifierDef);
+
+        assertNull("Unexpected schema migrations in abstract role definition (OTD)", abstractRoleDefinition.getSchemaMigrations());
+        List<SchemaMigration> schemaMigrations = abstractRoleDefinition.getComplexTypeDefinition().getSchemaMigrations();
+        assertEquals("Wrong number of schema migrations in AbstractRoleType definition (CTD)", 8, schemaMigrations.size());
+
+        // Just make sure this does not end with NPE or stack overflow
+        PrismObjectDefinition<AbstractRoleType> shallowClone = abstractRoleDefinition.clone();
+        PrismObjectDefinition<AbstractRoleType> deepClone = abstractRoleDefinition.deepClone(false, null);
+        PrismObjectDefinition<AbstractRoleType> ultraDeepClone = abstractRoleDefinition.deepClone(true, null);
+    }
+
+    @Test
+    public void testCommonSchemaShadowType() throws SchemaException, SAXException, IOException {
+        System.out.println("\n\n===[ testCommonSchemaShadowType ]===");
+
+        MidPointPrismContextFactory factory = getContextFactory();
+        PrismContext context = factory.createInitializedPrismContext();
+        SchemaRegistry schemaRegistry = context.getSchemaRegistry();
+
+        PrismObjectDefinition<ShadowType> shadowDef = schemaRegistry.findObjectDefinitionByCompileTimeClass(ShadowType.class);
+        assertNotNull("No shadow definition", shadowDef);
+
+        System.out.println("\nshadow definition:");
+        System.out.println(shadowDef.debugDump(1));
+
+        PrismPropertyDefinition nameDef = shadowDef.findPropertyDefinition(ShadowType.F_NAME);
+        assertNotNull("No name definition", nameDef);
+
+        PrismContainerDefinition extensionDef = shadowDef.findContainerDefinition(ShadowType.F_EXTENSION);
+        assertNotNull("No 'extension' definition", extensionDef);
+        assertTrue("'extension' definition is not marked as runtime", extensionDef.isRuntimeSchema());
+
+        PrismContainerDefinition attributesDef = shadowDef.findContainerDefinition(ShadowType.F_ATTRIBUTES);
+        assertNotNull("No 'attributes' definition", attributesDef);
+        assertTrue("'attributes' definition is not marked as runtime", attributesDef.isRuntimeSchema());
+
+        List<SchemaMigration> schemaMigrations = shadowDef.getSchemaMigrations();
+        System.out.println("\nshadow schema migrations ("+schemaMigrations.size()+"):");
+        System.out.println(DebugUtil.debugDump(schemaMigrations));
+        assertEquals("Wrong number of schema migrations in shadow definition", 1, schemaMigrations.size());
+
+        ComplexTypeDefinition shadowTypeDef = shadowDef.getComplexTypeDefinition();
+        List<SchemaMigration> shadowTypeSchemaMigrations = shadowTypeDef.getSchemaMigrations();
+        System.out.println("\nShadowType schema migrations ("+shadowTypeSchemaMigrations.size()+"):");
+        System.out.println(DebugUtil.debugDump(shadowTypeSchemaMigrations));
+        assertEquals("Wrong number of schema migrations in ShadowType definition", 4, shadowTypeSchemaMigrations.size());
+    }
+
+    @Test
+    public void testCommonSchemaLegacyAccount() throws SchemaException, SAXException, IOException {
+        System.out.println("\n\n===[ testCommonSchemaLegacyAccount ]===");
+
+        MidPointPrismContextFactory factory = getContextFactory();
+        PrismContext context = factory.createInitializedPrismContext();
+        SchemaRegistry schemaRegistry = context.getSchemaRegistry();
+
+        ItemDefinition accountDef = schemaRegistry.findItemDefinitionByElementName(SchemaConstants.C_ACCOUNT);
+        assertNotNull("No definition for legacy account", accountDef);
+        System.out.println("\naccount definition:");
+        System.out.println(accountDef.debugDump(1));
+        assertTrue("Expected object definition for legacy account, but got "+accountDef, accountDef instanceof  PrismObjectDefinition);
+
+        assertEquals("Unexpected element name in legacy account definition", SchemaConstants.C_SHADOW, accountDef.getItemName());
+    }
+
+    private MidPointPrismContextFactory getContextFactory() {
+        return new MidPointPrismContextFactory();
+    }
 
 }

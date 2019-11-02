@@ -1,22 +1,14 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.certification.dto;
 
 import com.evolveum.midpoint.gui.api.page.PageBase;
+import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.prism.xml.XmlTypeConverter;
 import com.evolveum.midpoint.schema.util.CertCampaignTypeUtil;
 import com.evolveum.midpoint.schema.util.ObjectTypeUtil;
@@ -25,12 +17,13 @@ import com.evolveum.midpoint.web.component.util.Selectable;
 import com.evolveum.midpoint.web.page.admin.certification.CertDecisionHelper;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.time.DurationFormatUtils;
 import org.jetbrains.annotations.NotNull;
 
 import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.namespace.QName;
 import java.util.*;
+
+import static com.evolveum.midpoint.schema.util.CertCampaignTypeUtil.norm;
 
 /**
  * A common superclass for CertCaseDto + CertWorkItemDto.
@@ -43,23 +36,26 @@ public class CertCaseOrWorkItemDto extends Selectable {
 
     public static final String F_OBJECT_NAME = "objectName";
     public static final String F_TARGET_NAME = "targetName";
-	@SuppressWarnings("unused")
+    @SuppressWarnings("unused")
     public static final String F_TARGET_TYPE = "targetType";
     public static final String F_CAMPAIGN_NAME = "campaignName";
     public static final String F_REVIEW_REQUESTED = "reviewRequested";
     public static final String F_DEADLINE_AS_STRING = "deadlineAsString";
     public static final String F_CONFLICTING_TARGETS = "conflictingTargets";
+    public static final String F_ITERATION = "iteration";
 
     private AccessCertificationCaseType certCase;
     private String objectName;
     private String targetName;
     private String deadlineAsString;
+    private QName defaultRelation;
 
     CertCaseOrWorkItemDto(@NotNull AccessCertificationCaseType _case, PageBase page) {
         this.certCase = _case;
         this.objectName = getName(_case.getObjectRef());
         this.targetName = getName(_case.getTargetRef());
         this.deadlineAsString = computeDeadlineAsString(page);
+        this.defaultRelation = page.getPrismContext().getDefaultRelation();
     }
 
     // ugly hack (for now) - we extract the name from serialization metadata
@@ -79,16 +75,20 @@ public class CertCaseOrWorkItemDto extends Selectable {
         return objectName;
     }
 
-	public QName getObjectType() {
-		return certCase.getObjectRef().getType();
-	}
+    public QName getObjectType() {
+        return certCase.getObjectRef().getType();
+    }
 
-	public QName getObjectType(CertDecisionHelper.WhichObject which) {
+    public QName getObjectType(CertDecisionHelper.WhichObject which) {
         switch (which) {
             case OBJECT: return getObjectType();
             case TARGET: return getTargetType();
             default: return null;
         }
+    }
+
+    public Integer getIteration() {
+        return norm(certCase.getIteration());
     }
 
     public String getTargetName() {
@@ -100,8 +100,8 @@ public class CertCaseOrWorkItemDto extends Selectable {
     }
 
     public ObjectReferenceType getCampaignRef() {
-        return ObjectTypeUtil.createObjectRef(getCampaign());
-	}
+        return ObjectTypeUtil.createObjectRef(getCampaign(), defaultRelation);
+    }
 
     public Long getCaseId() {
         return certCase.asPrismContainerValue().getId();
@@ -131,7 +131,7 @@ public class CertCaseOrWorkItemDto extends Selectable {
     }
 
     @SuppressWarnings("unused")
-	public Date getReviewRequested() {
+    public Date getReviewRequested() {
         XMLGregorianCalendar date = certCase.getCurrentStageCreateTimestamp();
         return XmlTypeConverter.toDate(date);
     }
@@ -180,49 +180,48 @@ public class CertCaseOrWorkItemDto extends Selectable {
                 delta = (delta / precision) * precision;
             }
 
-            //todo i18n
             if (delta > 0) {
-            	return PageBase.createStringResourceStatic(page, "PageCert.in", DurationFormatUtils.formatDurationWords(delta, true, true)).getString();
+                return PageBase.createStringResourceStatic(page, "PageCert.in", WebComponentUtil.formatDurationWordsForLocal(delta, true, true, page)).getString();
             } else if (delta < 0) {
-            	return PageBase.createStringResourceStatic(page, "PageCert.ago", DurationFormatUtils.formatDurationWords(-delta, true, true)).getString();
+                return PageBase.createStringResourceStatic(page, "PageCert.ago", WebComponentUtil.formatDurationWordsForLocal(-delta, true, true, page)).getString();
             } else {
                 return page.getString("PageCert.now");
             }
         }
     }
 
-	@SuppressWarnings("unused")
+    @SuppressWarnings("unused")
     public String getDeadlineAsString() {
         return deadlineAsString;
     }
 
-	/**
-	 * Preliminary implementation. Eventually we will create a list of hyperlinks pointing to the actual objects.
-	 */
-	@SuppressWarnings("unused")
-	public String getConflictingTargets() {
-    	if (!(certCase instanceof AccessCertificationAssignmentCaseType)) {
-    		return "";
-		}
-		AccessCertificationAssignmentCaseType assignmentCase = (AccessCertificationAssignmentCaseType) certCase;
-		if (assignmentCase.getAssignment() == null) {
-			return "";
-		}
-		Set<String> exclusions = new TreeSet<>();
-		List<EvaluatedExclusionTriggerType> allExclusionTriggers = PolicyRuleTypeUtil
-				.getAllExclusionTriggers(assignmentCase.getAssignment().getTriggeredPolicyRule());
+    /**
+     * Preliminary implementation. Eventually we will create a list of hyperlinks pointing to the actual objects.
+     */
+    @SuppressWarnings("unused")
+    public String getConflictingTargets() {
+        if (!(certCase instanceof AccessCertificationAssignmentCaseType)) {
+            return "";
+        }
+        AccessCertificationAssignmentCaseType assignmentCase = (AccessCertificationAssignmentCaseType) certCase;
+        if (assignmentCase.getAssignment() == null) {
+            return "";
+        }
+        Set<String> exclusions = new TreeSet<>();
+        List<EvaluatedExclusionTriggerType> allExclusionTriggers = PolicyRuleTypeUtil
+                .getAllExclusionTriggers(assignmentCase.getAssignment().getTriggeredPolicyRule());
 
-		for (EvaluatedExclusionTriggerType trigger : allExclusionTriggers) {
-			ObjectReferenceType conflicting = trigger.getConflictingObjectRef();
-			if (conflicting == null) {
-				continue;
-			}
-			if (conflicting.getTargetName() != null) {
-				exclusions.add(conflicting.getTargetName().getOrig());
-			} else {
-				exclusions.add(conflicting.getOid());			// TODO try to resolve?
-			}
-		}
-		return StringUtils.join(exclusions, ", ");
-	}
+        for (EvaluatedExclusionTriggerType trigger : allExclusionTriggers) {
+            ObjectReferenceType conflicting = trigger.getConflictingObjectRef();
+            if (conflicting == null) {
+                continue;
+            }
+            if (conflicting.getTargetName() != null) {
+                exclusions.add(conflicting.getTargetName().getOrig());
+            } else {
+                exclusions.add(conflicting.getOid());            // TODO try to resolve?
+            }
+        }
+        return StringUtils.join(exclusions, ", ");
+    }
 }

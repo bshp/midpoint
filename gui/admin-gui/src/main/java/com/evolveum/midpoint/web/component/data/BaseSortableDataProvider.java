@@ -1,23 +1,17 @@
 /*
- * Copyright (c) 2010-2017 Evolveum
+ * Copyright (c) 2010-2017 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.component.data;
 
 import com.evolveum.midpoint.gui.api.page.PageBase;
+import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.model.api.*;
+import com.evolveum.midpoint.model.api.authentication.CompiledObjectCollectionView;
+import com.evolveum.midpoint.model.api.authentication.CompiledUserProfile;
 import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.query.ObjectOrdering;
@@ -25,7 +19,7 @@ import com.evolveum.midpoint.prism.query.ObjectPaging;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.prism.query.OrderDirection;
 import com.evolveum.midpoint.repo.api.RepositoryService;
-import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
+import com.evolveum.midpoint.schema.*;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.task.api.TaskManager;
 import com.evolveum.midpoint.util.logging.Trace;
@@ -34,12 +28,13 @@ import com.evolveum.midpoint.web.page.PageDialog;
 import com.evolveum.midpoint.web.security.MidPointApplication;
 import com.evolveum.midpoint.wf.api.WorkflowManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AdminGuiConfigurationType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.DistinctSearchOptionType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.GuiObjectListViewType;
 import org.apache.commons.lang.Validate;
 import org.apache.wicket.Component;
 import org.apache.wicket.extensions.markup.html.repeater.data.sort.SortOrder;
 import org.apache.wicket.extensions.markup.html.repeater.util.SortParam;
 import org.apache.wicket.extensions.markup.html.repeater.util.SortableDataProvider;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.jetbrains.annotations.NotNull;
@@ -65,7 +60,7 @@ public abstract class BaseSortableDataProvider<T extends Serializable> extends S
 
     // after this amount of time cached size will be removed
     // from cache and replaced by new value, time in seconds
-    private Map<Serializable, CachedSize> cache = new HashMap<Serializable, CachedSize>();
+    private Map<Serializable, CachedSize> cache = new HashMap<>();
     private int cacheCleanupThreshold = 60;
     private boolean useCache;
     private boolean exportSize = false;
@@ -91,60 +86,78 @@ public abstract class BaseSortableDataProvider<T extends Serializable> extends S
     }
 
     protected ModelService getModel() {
-        MidPointApplication application = (MidPointApplication) MidPointApplication.get();
+        MidPointApplication application = MidPointApplication.get();
         return application.getModel();
     }
 
     protected RepositoryService getRepositoryService() {
-        MidPointApplication application = (MidPointApplication) MidPointApplication.get();
+        MidPointApplication application = MidPointApplication.get();
         return application.getRepositoryService();
     }
 
     protected TaskManager getTaskManager() {
-        MidPointApplication application = (MidPointApplication) MidPointApplication.get();
+        MidPointApplication application = MidPointApplication.get();
         return application.getTaskManager();
     }
 
     protected PrismContext getPrismContext() {
-        MidPointApplication application = (MidPointApplication) MidPointApplication.get();
+        MidPointApplication application = MidPointApplication.get();
         return application.getPrismContext();
     }
 
+    protected SchemaHelper getSchemaHelper() {
+        MidPointApplication application = MidPointApplication.get();
+        return application.getSchemaHelper();
+    }
+
+    protected GetOperationOptionsBuilder getOperationOptionsBuilder() {
+        return getSchemaHelper().getOperationOptionsBuilder();
+    }
+
+    protected GetOperationOptionsBuilder getOperationOptionsBuilder(Collection<SelectorOptions<GetOperationOptions>> createFrom) {
+        return getSchemaHelper().getOperationOptionsBuilder().setFrom(createFrom);
+    }
+
+    protected RelationRegistry getRelationRegistry() {
+        MidPointApplication application = MidPointApplication.get();
+        return application.getRelationRegistry();
+    }
+
     protected TaskService getTaskService() {
-        MidPointApplication application = (MidPointApplication) MidPointApplication.get();
+        MidPointApplication application = MidPointApplication.get();
         return application.getTaskService();
     }
 
     protected ModelInteractionService getModelInteractionService() {
-        MidPointApplication application = (MidPointApplication) MidPointApplication.get();
+        MidPointApplication application = MidPointApplication.get();
         return application.getModelInteractionService();
     }
 
     protected WorkflowService getWorkflowService() {
-        MidPointApplication application = (MidPointApplication) MidPointApplication.get();
+        MidPointApplication application = MidPointApplication.get();
         return application.getWorkflowService();
     }
 
     protected ModelAuditService getAuditService() {
-        MidPointApplication application = (MidPointApplication) MidPointApplication.get();
+        MidPointApplication application = MidPointApplication.get();
         return application.getAuditService();
     }
 
-	protected WorkflowManager getWorkflowManager() {
-		MidPointApplication application = (MidPointApplication) MidPointApplication.get();
-		return application.getWorkflowManager();
-	}
+    protected WorkflowManager getWorkflowManager() {
+        MidPointApplication application = MidPointApplication.get();
+        return application.getWorkflowManager();
+    }
 
     public List<T> getAvailableData() {
         if (availableData == null) {
-            availableData = new ArrayList<T>();
+            availableData = new ArrayList<>();
         }
         return availableData;
     }
 
     @Override
     public IModel<T> model(T object) {
-        return new Model<T>(object);
+        return new Model<>(object);
     }
 
     protected PageBase getPage() {
@@ -179,7 +192,7 @@ public abstract class BaseSortableDataProvider<T extends Serializable> extends S
      * @return By defaults it returns true.
      */
     public IModel<Boolean> isSizeAvailableModel() {
-        return new AbstractReadOnlyModel<Boolean>() {
+        return new IModel<Boolean>() {
             @Override
             public Boolean getObject() {
                 return true;
@@ -187,26 +200,70 @@ public abstract class BaseSortableDataProvider<T extends Serializable> extends S
         };
     }
 
-	protected ObjectPaging createPaging(long offset, long pageSize) {
-		return ObjectPaging.createPaging(safeLongToInteger(offset), safeLongToInteger(pageSize), createObjectOrderings(getSort()));
-	}
+    protected boolean checkOrderingSettings() {
+        return false;
+    }
 
-	/**
-	 * Could be overridden in subclasses.
-	 */
-	@NotNull
-	protected List<ObjectOrdering> createObjectOrderings(SortParam<String> sortParam) {
-		if (sortParam != null && sortParam.getProperty() != null) {
-			OrderDirection order = sortParam.isAscending() ? OrderDirection.ASCENDING : OrderDirection.DESCENDING;
-			return Collections.singletonList(
-					ObjectOrdering.createOrdering(
-							new ItemPath(new QName(SchemaConstantsGenerated.NS_COMMON, sortParam.getProperty())), order));
-		} else {
-			return Collections.emptyList();
-		}
-	}
+    public boolean isDistinct() {
+        // TODO: Default list view setting should never be needed. Always check setting for specific object type (and archetype).
+        CompiledObjectCollectionView def = WebComponentUtil.getDefaultGuiObjectListType((PageBase) component.getPage());
+        return def == null || def.getDistinct() != DistinctSearchOptionType.NEVER;      // change after other options are added
+    }
 
-	public void clearCache() {
+    protected GetOperationOptionsBuilder getDefaultOptionsBuilder() {
+        return getDistinctRelatedOptionsBuilder();  // probably others in the future
+    }
+
+    @NotNull
+    protected Collection<SelectorOptions<GetOperationOptions>> getDistinctRelatedOptions() {
+        return getDistinctRelatedOptionsBuilder().build();
+    }
+
+    @NotNull
+    protected GetOperationOptionsBuilder getDistinctRelatedOptionsBuilder() {
+        GetOperationOptionsBuilder builder = getOperationOptionsBuilder();
+        if (isDistinct()) {
+            return builder.distinct();
+        } else {
+            return builder;
+        }
+    }
+
+    public boolean isOrderingDisabled() {
+        if (!checkOrderingSettings()) {
+            return false;
+        }
+        // TODO: Default list view setting should never be needed. Always check setting for specific object type (and archetype).
+        CompiledObjectCollectionView def = WebComponentUtil.getDefaultGuiObjectListType((PageBase) component.getPage());
+        return def != null && def.isDisableSorting() != null && def.isDisableSorting();
+    }
+
+    protected ObjectPaging createPaging(long offset, long pageSize) {
+        Integer o = safeLongToInteger(offset);
+        Integer size = safeLongToInteger(pageSize);
+        List<ObjectOrdering> orderings = null;
+        if (!isOrderingDisabled()) {
+            orderings = createObjectOrderings(getSort());
+        }
+        return getPrismContext().queryFactory().createPaging(o, size, orderings);
+    }
+
+    /**
+     * Could be overridden in subclasses.
+     */
+    @NotNull
+    protected List<ObjectOrdering> createObjectOrderings(SortParam<String> sortParam) {
+        if (sortParam != null && sortParam.getProperty() != null) {
+            OrderDirection order = sortParam.isAscending() ? OrderDirection.ASCENDING : OrderDirection.DESCENDING;
+            return Collections.singletonList(
+                    getPrismContext().queryFactory().createOrdering(
+                            ItemPath.create(new QName(SchemaConstantsGenerated.NS_COMMON, sortParam.getProperty())), order));
+        } else {
+            return Collections.emptyList();
+        }
+    }
+
+    public void clearCache() {
         cache.clear();
         getAvailableData().clear();
     }
@@ -317,15 +374,14 @@ public abstract class BaseSortableDataProvider<T extends Serializable> extends S
         }
     }
 
-    private void setExportLimitValue(){
+    private void setExportLimitValue() {
         OperationResult result = new OperationResult(OPERATION_GET_EXPORT_SIZE_LIMIT);
         try {
-            AdminGuiConfigurationType adminGui = getModelInteractionService().getAdminGuiConfiguration(null, result);
-            if (adminGui != null && adminGui.getDefaultExportSettings() != null &&
-                    adminGui.getDefaultExportSettings().getSizeLimit() != null){
+            CompiledUserProfile adminGui = getModelInteractionService().getCompiledUserProfile(null, result);
+            if (adminGui.getDefaultExportSettings() != null && adminGui.getDefaultExportSettings().getSizeLimit() != null) {
                 exportLimit = adminGui.getDefaultExportSettings().getSizeLimit();
             }
-        } catch (Exception ex){
+        } catch (Exception ex) {
             LOGGER.error("Unable to get default export size limit, ", ex);
         }
     }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.schema.xjc.schema;
@@ -29,13 +20,15 @@ import org.xml.sax.ErrorHandler;
 import javax.xml.namespace.QName;
 import java.util.*;
 
+import static com.evolveum.midpoint.schema.xjc.util.ProcessorUtils.createQName;
+
 /**
  * @author lazyman
  */
 public class StepSchemaConstants implements Processor {
 
-    public static final String CLASS_NAME = "com.evolveum.midpoint.schema.SchemaConstantsGenerated";
-    private Map<String, JFieldVar> namespaceFields = new HashMap<String, JFieldVar>();
+    public static final String SCHEMA_CONSTANTS_GENERATED_CLASS_NAME = "com.evolveum.midpoint.schema.SchemaConstantsGenerated";
+    private Map<String, JFieldVar> namespaceFields = new HashMap<>();
 
     public Map<String, JFieldVar> getNamespaceFields() {
         return namespaceFields;
@@ -44,10 +37,10 @@ public class StepSchemaConstants implements Processor {
     @Override
     public boolean run(Outline outline, Options opt, ErrorHandler errorHandler) throws Exception {
         Model model = outline.getModel();
-        JDefinedClass schemaConstants = model.codeModel._class(CLASS_NAME);
+        JDefinedClass schemaConstants = model.codeModel._class(SCHEMA_CONSTANTS_GENERATED_CLASS_NAME);
 
         //creating namespaces
-        List<FieldBox<String>> namespaces = new ArrayList<FieldBox<String>>();
+        List<FieldBox<String>> namespaces = new ArrayList<>();
         for (PrefixMapper prefix : PrefixMapper.values()) {
             namespaces.add(new FieldBox("NS_" + prefix.getNamespaceName(), prefix.getNamespace()));
         }
@@ -59,7 +52,7 @@ public class StepSchemaConstants implements Processor {
         }
 
         //creating qnames
-        List<FieldBox<QName>> fields = new ArrayList<FieldBox<QName>>();
+        List<FieldBox<QName>> fields = new ArrayList<>();
         Map<QName, CElementInfo> map = model.getElementMappings(null);
         Set<Map.Entry<QName, CElementInfo>> set = map.entrySet();
         for (Map.Entry<QName, CElementInfo> entry : set) {
@@ -74,11 +67,7 @@ public class StepSchemaConstants implements Processor {
         Collections.sort(fields);
         for (FieldBox<QName> field : fields) {
             JFieldVar var = namespaceFields.get(field.getValue().getNamespaceURI());
-            if (var != null) {
-                createQNameDefinition(outline, schemaConstants, field.getFieldName(), var, field.getValue());
-            } else {
-                ProcessorUtils.createPSFField(outline, schemaConstants, field.getFieldName(), field.getValue());
-            }
+            createQName(outline, schemaConstants, field.getFieldName(), field.getValue(), var, true, true);
         }
 
         return true;
@@ -90,15 +79,4 @@ public class StepSchemaConstants implements Processor {
         return definedClass.field(psf, String.class, fieldName, JExpr.lit(value));
     }
 
-    private JFieldVar createQNameDefinition(Outline outline, JDefinedClass definedClass, String fieldName,
-            JFieldVar namespaceField, QName reference) {
-        JClass clazz = (JClass) outline.getModel().codeModel._ref(QName.class);
-
-        JInvocation invocation = (JInvocation) JExpr._new(clazz);
-        invocation.arg(namespaceField);
-        invocation.arg(reference.getLocalPart());
-
-        int psf = JMod.PUBLIC | JMod.STATIC | JMod.FINAL;
-        return definedClass.field(psf, QName.class, fieldName, invocation);
-    }
 }

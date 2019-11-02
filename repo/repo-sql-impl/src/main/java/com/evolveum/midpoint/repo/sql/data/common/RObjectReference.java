@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2010-2013 Evolveum
+ * Copyright (c) 2010-2013 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.repo.sql.data.common;
@@ -23,12 +14,13 @@ import com.evolveum.midpoint.repo.sql.data.common.other.RReferenceOwner;
 import com.evolveum.midpoint.repo.sql.query.definition.JaxbType;
 import com.evolveum.midpoint.repo.sql.query2.definition.NotQueryable;
 import com.evolveum.midpoint.repo.sql.util.ClassMapper;
+import com.evolveum.midpoint.repo.sql.util.EntityState;
 import com.evolveum.midpoint.repo.sql.util.MidPointSingleTablePersister;
 import com.evolveum.midpoint.repo.sql.util.RUtil;
+import com.evolveum.midpoint.schema.RelationRegistry;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectReferenceType;
 
 import org.apache.commons.lang.Validate;
-import org.hibernate.annotations.ForeignKey;
 import org.hibernate.annotations.NotFound;
 import org.hibernate.annotations.NotFoundAction;
 import org.hibernate.annotations.Persister;
@@ -36,7 +28,6 @@ import org.hibernate.annotations.Persister;
 import javax.persistence.*;
 
 import static com.evolveum.midpoint.repo.sql.util.RUtil.qnameToString;
-import static com.evolveum.midpoint.schema.util.ObjectTypeUtil.normalizeRelation;
 
 /**
  * @author lazyman
@@ -45,14 +36,16 @@ import static com.evolveum.midpoint.schema.util.ObjectTypeUtil.normalizeRelation
 @Entity
 @IdClass(RObjectReferenceId.class)
 @Table(name = "m_reference", indexes = {
-        @javax.persistence.Index(name = "iReferenceTargetOid", columnList = "targetOid")
+        @Index(name = "iReferenceTargetTypeRelation", columnList = "targetOid, reference_type, relation")
 })
 @Persister(impl = MidPointSingleTablePersister.class)
-public class RObjectReference<T extends RObject> implements ObjectReference {
+public class RObjectReference<T extends RObject> implements ObjectReference, EntityState {
 
     public static final String REFERENCE_TYPE = "reference_type";
 
     public static final String F_OWNER = "owner";
+
+    private Boolean trans;
 
     private RReferenceOwner referenceType;
 
@@ -70,7 +63,18 @@ public class RObjectReference<T extends RObject> implements ObjectReference {
     public RObjectReference() {
     }
 
-    @ForeignKey(name = "fk_reference_owner")
+    @Transient
+    @Override
+    public Boolean isTransient() {
+        return trans;
+    }
+
+    @Override
+    public void setTransient(Boolean trans) {
+        this.trans = trans;
+    }
+
+    @JoinColumn(foreignKey = @ForeignKey(name = "fk_reference_owner"))
     @MapsId("owner")
     @ManyToOne(fetch = FetchType.LAZY)
     @NotQueryable
@@ -88,10 +92,9 @@ public class RObjectReference<T extends RObject> implements ObjectReference {
         return ownerOid;
     }
 
-    //@MapsId("target")
-    @ForeignKey(name="none")
     @ManyToOne(fetch = FetchType.LAZY, optional = true, targetEntity = RObject.class)
-    @JoinColumn(referencedColumnName = "oid", updatable = false, insertable = false, nullable = true)
+    @JoinColumn(referencedColumnName = "oid", updatable = false, insertable = false, nullable = true,
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     @NotFound(action = NotFoundAction.IGNORE)
     @NotQueryable
     public T getTarget() {
@@ -171,6 +174,7 @@ public class RObjectReference<T extends RObject> implements ObjectReference {
 
         if (targetOid != null ? !targetOid.equals(ref.targetOid) : ref.targetOid != null) return false;
         if (type != ref.type) return false;
+        if (relation != null ? !relation.equals(ref.relation) : ref.relation != null) return false;
 
         return true;
     }
@@ -184,6 +188,16 @@ public class RObjectReference<T extends RObject> implements ObjectReference {
         return result;
     }
 
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("RObjectReference{");
+        sb.append("targetOid='").append(targetOid).append('\'');
+        sb.append(", relation='").append(relation).append('\'');
+        sb.append(", type=").append(type);
+        sb.append('}');
+        return sb.toString();
+    }
+
     public static void copyToJAXB(RObjectReference repo, ObjectReferenceType jaxb) {
         Validate.notNull(repo, "Repo object must not be null.");
         Validate.notNull(jaxb, "JAXB object must not be null.");
@@ -193,15 +207,17 @@ public class RObjectReference<T extends RObject> implements ObjectReference {
         jaxb.setRelation(RUtil.stringToQName(repo.getRelation()));
     }
 
-    public static void copyFromJAXB(ObjectReferenceType jaxb, ObjectReference repo) {
+    public static ObjectReference copyFromJAXB(ObjectReferenceType jaxb, ObjectReference repo, RelationRegistry relationRegistry) {
         Validate.notNull(repo, "Repo object must not be null.");
         Validate.notNull(jaxb, "JAXB object must not be null.");
         Validate.notEmpty(jaxb.getOid(), "Target oid must not be null.");
 
         repo.setType(ClassMapper.getHQLTypeForQName(jaxb.getType()));
-		repo.setRelation(qnameToString(normalizeRelation(jaxb.getRelation())));
+        repo.setRelation(qnameToString(relationRegistry.normalizeRelation(jaxb.getRelation())));
         repo.setTargetOid(jaxb.getOid());
-	}
+
+        return repo;
+    }
 
     public ObjectReferenceType toJAXB(PrismContext prismContext) {
         ObjectReferenceType ref = new ObjectReferenceType();

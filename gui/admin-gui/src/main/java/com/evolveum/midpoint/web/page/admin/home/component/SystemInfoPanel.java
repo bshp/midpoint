@@ -1,37 +1,25 @@
 /*
- * Copyright (c) 2010-2015 Evolveum
+ * Copyright (c) 2010-2015 Evolveum and contributors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This work is dual-licensed under the Apache License 2.0
+ * and European Union Public License. See LICENSE file for details.
  */
 
 package com.evolveum.midpoint.web.page.admin.home.component;
 
+import com.evolveum.midpoint.gui.api.component.BasePanel;
 import com.evolveum.midpoint.gui.api.model.LoadableModel;
 import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.component.DateLabelComponent;
-import com.evolveum.midpoint.web.component.util.SimplePanel;
 
 import org.apache.wicket.ajax.AjaxSelfUpdatingTimerBehavior;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
-import org.apache.wicket.model.AbstractReadOnlyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.util.time.Duration;
-import org.ocpsoft.prettytime.PrettyTime;
-
 import javax.management.Attribute;
 import javax.management.AttributeList;
 import javax.management.MBeanServer;
@@ -45,7 +33,7 @@ import java.util.Date;
 /**
  * @author Viliam Repan (lazyman)
  */
-public class SystemInfoPanel extends SimplePanel<SystemInfoPanel.SystemInfoDto> {
+public class SystemInfoPanel extends BasePanel<SystemInfoPanel.SystemInfoDto> {
 
     private static final Trace LOGGER = TraceManager.getTrace(SystemInfoPanel.class);
 
@@ -58,7 +46,13 @@ public class SystemInfoPanel extends SimplePanel<SystemInfoPanel.SystemInfoDto> 
     private static final String ID_UPTIME = "uptime";
 
     public SystemInfoPanel(String id) {
-        super(id);
+        super(id, (IModel<SystemInfoDto>) null);
+    }
+
+    @Override
+    protected void onInitialize(){
+        super.onInitialize();
+        initLayout();
     }
 
     @Override
@@ -136,8 +130,7 @@ public class SystemInfoPanel extends SimplePanel<SystemInfoPanel.SystemInfoDto> 
         dto.threads[2] = (Number) mbs.getAttribute(name, "TotalStartedThreadCount");
     }
 
-    @Override
-    protected void initLayout() {
+    private void initLayout() {
         final WebMarkupContainer table = new WebMarkupContainer(ID_TABLE);
         table.setOutputMarkupId(true);
         add(table);
@@ -155,7 +148,8 @@ public class SystemInfoPanel extends SimplePanel<SystemInfoPanel.SystemInfoDto> 
         Label threads = new Label(ID_THREADS, createThreadModel());
         table.add(threads);
 
-        DateLabelComponent startTime = new DateLabelComponent(ID_START_TIME, createStartTimeModel(), DateLabelComponent.MEDIUM_MEDIUM_STYLE);
+        DateLabelComponent startTime = new DateLabelComponent(ID_START_TIME, createStartTimeModel(),
+                WebComponentUtil.getLongDateTimeFormat(SystemInfoPanel.this.getPageBase()));
         table.add(startTime);
 
         Label uptime = new Label(ID_UPTIME, createUptimeModel());
@@ -163,20 +157,25 @@ public class SystemInfoPanel extends SimplePanel<SystemInfoPanel.SystemInfoDto> 
     }
 
     private IModel<String> createUptimeModel() {
-        return new AbstractReadOnlyModel<String>() {
+        return new IModel<String>() {
 
             @Override
             public String getObject() {
                 SystemInfoDto dto = getModelObject();
 
-                PrettyTime time = new PrettyTime();
-                return time.format(new Date(System.currentTimeMillis() - dto.uptime));
+                if (dto == null) {
+                    return null;
+                }
+
+                int minutes = (int)(dto.uptime / 1000L / 60L);
+                return WebComponentUtil.formatDurationWordsForLocal(minutes < 1 ? dto.uptime : (long)minutes * 1000L * 60L, true, true,
+                        SystemInfoPanel.this.getPageBase());
             }
         };
     }
 
     private IModel<Date> createStartTimeModel() {
-        return new AbstractReadOnlyModel<Date>() {
+        return new IModel<Date>() {
 
             @Override
             public Date getObject() {
@@ -187,11 +186,18 @@ public class SystemInfoPanel extends SimplePanel<SystemInfoPanel.SystemInfoDto> 
     }
 
     private IModel<String> createMemoryModel(final boolean heap) {
-        return new AbstractReadOnlyModel<String>() {
+        return new IModel<String>() {
 
             @Override
             public String getObject() {
                 SystemInfoDto dto = getModelObject();
+
+                //this is quite strange situation and probably it should not occur,
+                // but sometimes, in the development mode the model obejct is null
+                if (dto == null) {
+                    return null;
+                }
+
                 Long[] memory = heap ? dto.heapMemory : dto.nonHeapMemory;
 
                 StringBuilder sb = new StringBuilder();
@@ -205,11 +211,15 @@ public class SystemInfoPanel extends SimplePanel<SystemInfoPanel.SystemInfoDto> 
     }
 
     private IModel<String> createThreadModel() {
-        return new AbstractReadOnlyModel<String>() {
+        return new IModel<String>() {
 
             @Override
             public String getObject() {
                 SystemInfoDto dto = getModelObject();
+
+                if (dto == null) {
+                    return null;
+                }
 
                 StringBuilder sb = new StringBuilder();
                 sb.append(dto.threads[0]).append(" / ");
